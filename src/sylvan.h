@@ -60,6 +60,7 @@ namespace sylvan {
 #include <sylvan_bdd.h>
 #include <sylvan_ldd.h>
 #include <sylvan_reorder.h>
+#include <sylvan_zdd.h>
 
 #ifdef __cplusplus
 }
