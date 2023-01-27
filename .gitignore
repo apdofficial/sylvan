@@ -8,3 +8,6 @@
 
 # CMake files
 build/
+
+# Clion files
+.idea/
