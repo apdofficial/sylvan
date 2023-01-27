@@ -10,7 +10,10 @@
 #include <fcntl.h>
 #include <stdint.h>
 
-#include <sylvan_int.h>
+//#include <sylvan_int.h>
+
+#include <sylvan.h>
+#include <sylvan_obj.hpp>
 
 #include <string>
 
@@ -226,17 +229,17 @@ VOID_TASK_0(parse)
     read_wsnl();
     read_token("aag");
     read_ws();
-    uint64_t M = read_uint(); // maximum variable index
+    size_t M = read_uint(); // maximum variable index
     read_ws();
-    uint64_t I = read_uint(); // number of inputs
+    size_t I = read_uint(); // number of inputs
     read_ws();
-    uint64_t L = read_uint(); // number of latches
+    size_t L = read_uint(); // number of latches
     read_ws();
-    uint64_t O = read_uint(); // number of outputs
+    size_t O = read_uint(); // number of outputs
     read_ws();
-    uint64_t A = read_uint(); // number of AND gates
+    size_t A = read_uint(); // number of AND gates
     read_ws();
-    uint64_t B=0, C=0, J=0, F=0; // optional
+    size_t B=0, C=0, J=0, F=0; // optional
     read_ws();
     if (parser_peek() != '\n') {
         B = read_uint(); // number of bad state properties

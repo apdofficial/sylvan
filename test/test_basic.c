@@ -416,8 +416,7 @@ test_compose()
 int
 test_varswap()
 {
-    LACE_ME;
-
+    LACE_VARS;
     BDD one, two;
     BDDMAP map;
 
