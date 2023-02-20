@@ -24,6 +24,32 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
+ * Error codes for sylvan variable swap.
+ * These are the return values of sylvan_varswap.
+ */
+typedef enum sylvan_var_swap_err
+{
+    /// success
+    SYLVAN_VAR_SWAP_SUCCESS = 0,
+
+    //// cannot rehash in phase 1, no marked nodes remaining
+    SYLVAN_VAR_SWAP_REHASH1_FAIL = -1,
+
+    /// cannot rehash in phase 1, and marked nodes remaining
+    SYLVAN_VAR_SWAP_REHASH1_FAIL_MARKED = -2,
+
+    /// cannot rehash in phase 2, no marked nodes remaining
+    SYLVAN_VAR_SWAP_REHASH2_FAIL = -3,
+
+    /// cannot create node in phase 2 (ergo marked nodes remaining)
+    SYLVAN_VAR_SWAP_CREATE_FAIL = -4,
+
+    /// cannot rehash and cannot create node in phase 2
+    SYLVAN_VAR_SWAP_REHASH2_FAIL_CREATE_FAIL = -5,
+} sylvan_var_swap_err_t;
+
+
+/**
  * Sylvan dynamic variable reordering
  */
 void sylvan_init_reorder(void);
@@ -90,13 +116,7 @@ uint32_t mtbdd_getlevel(MTBDD node);
  * If the parameter <recovery> is set, then phase 1 only rehashes nodes that have variable "var+1".
  * Phase 2 will not abort on the first error, but try to finish as many nodes as possible.
  *
- * Return values:
- *  0: success
- * -1: cannot rehash in phase 1, no marked nodes remaining
- * -2: cannot rehash in phase 1, and marked nodes remaining
- * -3: cannot rehash in phase 2, no marked nodes remaining
- * -4: cannot create node in phase 2 (ergo marked nodes remaining)
- * -5: cannot rehash and cannot create node in phase 2
+ * Return sylvan_varswap_err_t
  *
  * See the implementation of sylvan_simple_varswap for notes on recovery/rollback.
  *
@@ -104,8 +124,9 @@ uint32_t mtbdd_getlevel(MTBDD node);
  * fails, even when nothing is changed. Worst case: recovery impossible.
  */
 
-TASK_DECL_2(int, sylvan_varswap, uint32_t, int);
+TASK_DECL_2(sylvan_var_swap_err_t, sylvan_varswap, uint32_t, int);
 #define sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
+
 
 /**
  * Very simply varswap, no iterative recovery, no nodes table resizing.

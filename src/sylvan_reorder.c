@@ -201,11 +201,12 @@ TASK_IMPL_2(int, sylvan_varswap, uint32_t, var, int, recovery)
         // do the not so trivial cases (creates new nodes)
         int flag_full = 0;
         CALL(sylvan_varswap_p2, var, 0, nodes->table_size, &flag_full);
-        if (flag_full) return -1;
+        if (flag_full) return SYLVAN_VAR_SWAP_REHASH1_FAIL;
     }
-    return 0;
+    return SYLVAN_VAR_SWAP_SUCCESS;
     (void)recovery;
 }
+
 
 /**
  * Simple variable swap, no iterative recovery or nodes table resizing.
@@ -259,7 +260,7 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
     sylvan_clear_and_mark();
     sylvan_rehash_all();
 
-    return 0;
+    return SYLVAN_VAR_SWAP_SUCCESS;
 }
 
 /**

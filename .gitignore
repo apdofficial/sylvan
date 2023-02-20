@@ -11,3 +11,5 @@ build/
 
 # Clion files
 .idea/
+CMakeFiles/3.25.2/CMakeSystem.cmake
+CMakeFiles/CMakeOutput.log
