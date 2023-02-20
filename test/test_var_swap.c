@@ -5,6 +5,8 @@
 #include "sylvan.h"
 #include "sylvan_int.h"
 #include "utest.h"
+#include "sylvan_var_swap.h"
+#include "sylvan_var_level.h"
 
 /**
  * Test variable swap
@@ -44,7 +46,7 @@ test_basic_variable_swap()
     ASSERT_EQ(mtbdd_getvar(var_six), level_seven);
     ASSERT_EQ(mtbdd_getvar(var_seven), level_six);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 TASK_0(int, runtests){

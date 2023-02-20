@@ -12,6 +12,8 @@
 #include "sylvan.h"
 #include "test_assert.h"
 #include "sylvan_int.h"
+#include "sylvan_var_swap.h"
+#include "sylvan_var_level.h"
 
 __thread uint64_t seed = 1;
 

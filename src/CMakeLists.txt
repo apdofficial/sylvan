@@ -13,11 +13,13 @@ target_sources(sylvan
     sylvan_mtbdd.c
     sylvan_obj.cpp
     sylvan_refs.c
-    sylvan_reorder.c
     sylvan_sl.c
     sylvan_stats.c
     sylvan_table.c
     sylvan_zdd.c
+    sylvan_var_swap.c
+    sylvan_var_level.c
+    sylvan_var_reorder.c
   PUBLIC
     sylvan.h
     sylvan_bdd.h
@@ -37,6 +39,9 @@ target_sources(sylvan
     sylvan_tls.h
     sylvan_zdd.h
     sylvan_zdd_int.h
+#    sylvan_var_swap.h
+#    sylvan_var_level.h
+#    sylvan_var_reorder.h
 )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
