@@ -18,21 +18,16 @@ typedef enum sylvan_var_swap_err
 {
     /// success
     SYLVAN_VAR_SWAP_SUCCESS = 0,
-
     //// cannot rehash in phase 1, no marked nodes remaining
-    SYLVAN_VAR_SWAP_REHASH1_FAIL = -1,
-
+    SYLVAN_VAR_SWAP_P1_REHASH_FAIL = -1,
     /// cannot rehash in phase 1, and marked nodes remaining
-    SYLVAN_VAR_SWAP_REHASH1_FAIL_MARKED = -2,
-
+    SYLVAN_VAR_SWAP_P1_REHASH_FAIL_MARKED = -2,
     /// cannot rehash in phase 2, no marked nodes remaining
-    SYLVAN_VAR_SWAP_REHASH2_FAIL = -3,
-
+    SYLVAN_VAR_SWAP_P2_REHASH_FAIL = -3,
     /// cannot create node in phase 2 (ergo marked nodes remaining)
-    SYLVAN_VAR_SWAP_CREATE_FAIL = -4,
-
+    SYLVAN_VAR_SWAP_P2_CREATE_FAIL = -4,
     /// cannot rehash and cannot create node in phase 2
-    SYLVAN_VAR_SWAP_REHASH2_FAIL_CREATE_FAIL = -5,
+    SYLVAN_VAR_SWAP_P2_REHASH_AND_CREATE_FAIL = -5,
 } sylvan_var_swap_err_t;
 
 

@@ -6,37 +6,44 @@
  * Function declarations (implementations below)
  */
 
-/**
- * Initialize variable swapping.
- * Removes exactly the nodes that will be changed from the hash table.
- */
-VOID_TASK_DECL_3(sylvan_varswap_p0, uint32_t, size_t, size_t);
+VOID_TASK_DECL_3(call_sylvan_var_swap_p0, uint32_t, size_t, size_t);
+/*!
+   \brief Adjacent variable swap phase 0
+   \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
+   that will be changed from the hash table.
+   \param var variable to be swapped
+   \param first starting index
+   \param count ending index
+*/
+#define call_sylvan_var_swap_p0(var, first, count) CALL(call_sylvan_var_swap_p0, var, first, count)
 
-/**
- * Implementation of the first phase of variable swapping.
- * For all <var+1> nodes, make <var> and rehash.
- * For all <var> nodes not depending on <var+1>, make <var+1> and rehash.
- * For all <var> nodes depending on <var+1>, stay <var> and mark. (no rehash)
- * Returns number of marked nodes left.
- *
- * This algorithm is also used for the recovery phase 1. This is an identical
- * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
- * nodes are rehashed.
- */
-TASK_DECL_3(uint64_t, sylvan_varswap_p1, uint32_t, size_t, size_t);
+TASK_DECL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, size_t, size_t);
+/*!
+   \brief Adjacent variable swap phase 1
+   \details Handle all trivial cases where no node is created, mark cases that are not trivial.
+   \param var variable to be swapped
+   \param first starting index
+   \param count ending index
+   \return number of nodes that were marked
+*/
+#define call_sylvan_var_swap_p1(var, first, count) CALL(call_sylvan_var_swap_p1, var, first, count)
 
-/**
- * Implementation of second phase of variable swapping.
- * For all nodes marked in the first phase:
- * - determine F00, F01, F10, F11
- * - obtain nodes F0 [var+1,F00,F10] and F1 [var+1,F01,F11]
- *   (and F0<>F1, trivial proof)
- * - in-place substitute outgoing edges with new F0 and F1
- * - and rehash into hash table
- * Returns 0 if there was no error, or 1 if nodes could not be
- * rehashed, or 2 if nodes could not be created, or 3 if both.
- */
-VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile int*);
+VOID_TASK_DECL_4(call_sylvan_var_swap_p2, uint32_t, size_t, size_t, volatile sylvan_var_swap_err_t*);
+/*!
+   \brief Adjacent variable swap phase 2
+   \details Handle the not so trivial cases. (creates new nodes)
+   \param var variable to be swapped
+   \param first starting index
+   \param count ending index
+   \param flag_full result error code with the following meaning:
+   <ul>
+   <li>0 if there was no error
+   <li>1 if nodes could not be rehashed
+   <li>2 if nodes could not be created
+   <li>3 if both 1 and 2 happened
+   </ul>
+*/
+#define call_sylvan_var_swap_p2(var, first, count, flag_full) CALL(call_sylvan_var_swap_p2, var, first, count, flag_full)
 
 /**
  * Custom makenode that doesn't trigger garbage collection.
@@ -99,15 +106,16 @@ mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
 TASK_IMPL_2(int, sylvan_varswap, uint32_t, var, int, recovery)
 {
     // first clear hashes of nodes with <var> and <var+1>
-    CALL(sylvan_varswap_p0, var, 0, nodes->table_size);
+    call_sylvan_var_swap_p0(var, 0, nodes->table_size);
     // handle all trivial cases, mark cases that are not trivial
-    uint64_t marked_count = CALL(sylvan_varswap_p1, var, 0, nodes->table_size);
+    uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size);
 
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
-        int flag_full = 0;
-        CALL(sylvan_varswap_p2, var, 0, nodes->table_size, &flag_full);
-        if (flag_full) return SYLVAN_VAR_SWAP_REHASH1_FAIL;
+        sylvan_var_swap_err_t result = SYLVAN_VAR_SWAP_SUCCESS;
+        call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+
+        if (result != SYLVAN_VAR_SWAP_SUCCESS) return result;
     }
     return SYLVAN_VAR_SWAP_SUCCESS;
     (void)recovery;
@@ -117,29 +125,32 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
 {
     // ensure that the cache is cleared
     sylvan_clear_cache();
-
     // first clear hashes of nodes with <var> and <var+1>
-    CALL(sylvan_varswap_p0, var, 0, nodes->table_size);
+    call_sylvan_var_swap_p0(var, 0, nodes->table_size);
     // handle all trivial cases, mark cases that are not trivial
-    uint64_t marked_count = CALL(sylvan_varswap_p1, var, 0, nodes->table_size);
+    uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size);
+
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
-        int flag_full = 0;
-        CALL(sylvan_varswap_p2, var, 0, nodes->table_size, &flag_full);
-        if (flag_full) {
+        sylvan_var_swap_err_t result = SYLVAN_VAR_SWAP_SUCCESS;
+        call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+
+        if (result != SYLVAN_VAR_SWAP_SUCCESS) {
             printf("Recovery time!\n");
             // clear hashes again of nodes with <var> and <var+1>
-            CALL(sylvan_varswap_p0, var, 0, nodes->table_size);
+            call_sylvan_var_swap_p0(var, 0, nodes->table_size);
             // handle all trivial cases, mark cases that are not trivial
-            uint64_t marked_count = CALL(sylvan_varswap_p1, var, 0, nodes->table_size);
+            uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size);
+
             if (marked_count != 0){
                 // do the not so trivial cases (but won't create new nodes this time)
-                flag_full = 0;
-                CALL(sylvan_varswap_p2, var, 0, nodes->table_size, &flag_full);
-                if (flag_full) {
+                result = SYLVAN_VAR_SWAP_SUCCESS;
+                call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+
+                if (result != SYLVAN_VAR_SWAP_SUCCESS) {
                     // actually, we should not see this!
                     fprintf(stderr, "sylvan: recovery varswap failed!\n");
-                    exit(-1);
+                    return SYLVAN_VAR_SWAP_P2_REHASH_AND_CREATE_FAIL;
                 }
             }
             printf("Recovery good.\n");
@@ -156,13 +167,17 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
     return SYLVAN_VAR_SWAP_SUCCESS;
 }
 
-VOID_TASK_IMPL_3(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count)
+/**
+ * Initialize variable swapping.
+ * Removes exactly the nodes that will be changed from the hash table.
+ */
+VOID_TASK_IMPL_3(call_sylvan_var_swap_p0, uint32_t, var, size_t, first, size_t, count)
 {
     // go recursive if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
-        SPAWN(sylvan_varswap_p0, var, first, count/2);
-        CALL(sylvan_varswap_p0, var, first+count/2, count-count/2);
-        SYNC(sylvan_varswap_p0);
+        SPAWN(call_sylvan_var_swap_p0, var, first, count / 2);
+        CALL(call_sylvan_var_swap_p0, var, first + count / 2, count - count / 2);
+        SYNC(call_sylvan_var_swap_p0);
         return;
     }
 
@@ -191,13 +206,24 @@ VOID_TASK_IMPL_3(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count)
     }
 }
 
-TASK_IMPL_3(uint64_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, count)
+/**
+ * Implementation of the first phase of variable swapping.
+ * For all <var+1> nodes, make <var> and rehash.
+ * For all <var> nodes not depending on <var+1>, make <var+1> and rehash.
+ * For all <var> nodes depending on <var+1>, stay <var> and mark. (no rehash)
+ * Returns number of marked nodes left.
+ *
+ * This algorithm is also used for the recovery phase 1. This is an identical
+ * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
+ * nodes are rehashed.
+ */
+TASK_IMPL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, var, size_t, first, size_t, count)
 {
     // go recursive if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
-        SPAWN(sylvan_varswap_p1, var, first, count/2);
-        uint64_t res1 = CALL(sylvan_varswap_p1, var, first+count/2, count-count/2);
-        uint64_t res2 = SYNC(sylvan_varswap_p1);
+        SPAWN(call_sylvan_var_swap_p1, var, first, count / 2);
+        uint64_t res1 = CALL(call_sylvan_var_swap_p1, var, first + count / 2, count - count / 2);
+        uint64_t res2 = SYNC(call_sylvan_var_swap_p1);
         return res1 + res2;
     }
 
@@ -279,13 +305,24 @@ TASK_IMPL_3(uint64_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, c
     return marked;
 }
 
-VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count, volatile int*, flag_full)
+/**
+ * Implementation of second phase of variable swapping.
+ * For all nodes marked in the first phase:
+ * - determine F00, F01, F10, F11
+ * - obtain nodes F0 [var+1,F00,F10] and F1 [var+1,F01,F11]
+ *   (and F0<>F1, trivial proof)
+ * - in-place substitute outgoing edges with new F0 and F1
+ * - and rehash into hash table
+ * Returns 0 if there was no error, or 1 if nodes could not be
+ * rehashed, or 2 if nodes could not be created, or 3 if both.
+ */
+VOID_TASK_IMPL_4(call_sylvan_var_swap_p2, uint32_t, var, size_t, first, size_t, count, volatile sylvan_var_swap_err_t*, result)
 {
     /* divide and conquer (if count above BLOCKSIZE) */
     if (count > BLOCKSIZE) {
-        SPAWN(sylvan_varswap_p2, var, first, count/2, flag_full);
-        CALL(sylvan_varswap_p2, var, first+count/2, count-count/2, flag_full);
-        SYNC(sylvan_varswap_p2);
+        SPAWN(call_sylvan_var_swap_p2, var, first, count / 2, result);
+        CALL(call_sylvan_var_swap_p2, var, first + count / 2, count - count / 2, result);
+        SYNC(call_sylvan_var_swap_p2);
         return;
     }
 
@@ -295,10 +332,12 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count,
         first = 2;
     }
 
+    // first, find all nodes that need to be replaced
     const size_t end = first + count;
 
+
     for (; first < end; first++) {
-        if (*flag_full) return; // the table is full
+        if (*result != SYLVAN_VAR_SWAP_SUCCESS) return; // the table is full
         if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
@@ -313,7 +352,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count,
             MTBDD f01 = node_gethigh(f0, n0);
             f0 = mtbdd_varswap_makemapnode(var+1, f00, f1);
             if (f0 == mtbdd_invalid) {
-                *flag_full = 1;
+                *result = SYLVAN_VAR_SWAP_P2_REHASH_FAIL;
                 return;
             } else {
                 mtbddnode_makemapnode(node, var, f0, f01);
@@ -344,7 +383,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count,
             f0 = mtbdd_varswap_makenode(var+1, f00, f10);
             f1 = mtbdd_varswap_makenode(var+1, f01, f11);
             if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
-                *flag_full = 1;
+                *result = SYLVAN_VAR_SWAP_P2_REHASH_FAIL;
                 return;
             } else {
                 // update node, which also removes the mark

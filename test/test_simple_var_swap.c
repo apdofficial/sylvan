@@ -145,6 +145,10 @@ UTEST_TASK_0(variable_swap_test, var_swap_random_swap)  {
         sylvan_getsha(one, hash3);
         sylvan_getsha(two, hash4);
 
+        // the ASSERT_STREQ tests fails due to the following functions being called in sylvan_simple_varswap:
+        // sylvan_clear_and_mark();
+        // sylvan_rehash_all();
+
         ASSERT_STREQ(hash1, hash4);
         ASSERT_STREQ(hash2, hash3);
     }
