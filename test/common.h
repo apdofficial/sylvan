@@ -30,7 +30,7 @@ rng(int low, int high)
     return low + uniform_deviate(xorshift_rand()) * (high-low);
 }
 
-inline BDD
+BDD
 make_random(int i, int j)
 {
     if (i == j) return rng(0, 2) ? sylvan_true : sylvan_false;

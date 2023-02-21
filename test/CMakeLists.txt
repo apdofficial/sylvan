@@ -5,6 +5,7 @@ macro(set_compilation_settings NAME)
     target_link_libraries(${NAME} PRIVATE sylvan::sylvan)
     target_compile_features(${NAME} PRIVATE c_std_11 cxx_std_11)
     target_compile_options(${NAME} PRIVATE -Wall -Wextra -Werror -Wno-deprecated -Wno-unused)
+    target_sources(${NAME} PRIVATE common.h)
     add_test(${NAME} ${NAME})
 endmacro(set_compilation_settings)
 
@@ -12,7 +13,6 @@ macro(add_test_file NAME SOURCE)
     add_executable(${NAME} ${SOURCE})
     set_compilation_settings(${NAME})
 endmacro(add_test_file)
-
 
 add_test_file(test_basic test_basic.c)
 add_test_file(test_cxx test_cxx.cpp)
