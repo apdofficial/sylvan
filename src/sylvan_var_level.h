@@ -1,8 +1,6 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
-#include <sylvan.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */

@@ -323,7 +323,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count,
 }
 
 
-
 /**
  * Simple variable swap, no iterative recovery or nodes table resizing.
  * Swaps <var> and <var+1>.

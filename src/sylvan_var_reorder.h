@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SYLVAN_REORDER_H
-#define SYLVAN_REORDER_H
-
-#include <sylvan.h>
+#ifndef SYLVAN_VAR_REORDER_H
+#define SYLVAN_VAR_REORDER_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,4 +33,5 @@ TASK_DECL_2(int, sylvan_sifting, uint32_t, uint32_t);
 }
 #endif /* __cplusplus */
 
-#endif
+#endif //SYLVAN_VAR_REORDER_H
+

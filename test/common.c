@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "sylvan_mtbdd.h"
+
+#include "sylvan.h"
+#include "sylvan_int.h"
 
 __thread uint64_t seed = 1;
 

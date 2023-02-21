@@ -1,18 +1,17 @@
 #include <argp.h>
-#include <assert.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cassert>
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdint.h>
-
-//#include <sylvan_int.h>
+#include <cstdint>
 
 #include <sylvan.h>
+//#include <sylvan_int.h>
 #include <sylvan_obj.hpp>
 
 #include <string>
@@ -21,6 +20,7 @@
 #include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include "sylvan_var_reorder.h"
 
 using namespace sylvan;
 
