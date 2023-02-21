@@ -47,7 +47,7 @@ UTEST_TASK_0(variable_swap_test, var_swap)  {
     two = mtbdd_ithlevel(level_seven);
 
     // swap the variables
-    ASSERT_EQ(sylvan_varswap(level_six), SYLVAN_VAR_SWAP_SUCCESS);
+    ASSERT_EQ(sylvan_simple_varswap(level_six), SYLVAN_VAR_SWAP_SUCCESS);
 
     // check if the levels are indeed swapped
     ASSERT_EQ(mtbdd_getvar(one), level_seven);
@@ -82,7 +82,7 @@ UTEST_TASK_0(variable_swap_test, var_swap_hash)  {
     sylvan_getsha(one, hash1);
     sylvan_getsha(two, hash2);
 
-    ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+    ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
 
     sylvan_getsha(one, hash3);
     sylvan_getsha(two, hash4);
@@ -118,7 +118,7 @@ UTEST_TASK_0(variable_swap_test, var_swap_random_swap)  {
         sylvan_getsha(one, hash1);
         sylvan_getsha(two, hash2);
 
-        ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
 
         sylvan_getsha(one, hash3);
         sylvan_getsha(two, hash4);
@@ -138,9 +138,9 @@ UTEST_TASK_0(variable_swap_test, var_swap_random_swap)  {
         sylvan_getsha(one, hash1);
         sylvan_getsha(two, hash2);
 
-        ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
-        ASSERT_EQ(sylvan_varswap(7), SYLVAN_VAR_SWAP_SUCCESS);
-        ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+        ASSERT_EQ(sylvan_simple_varswap(7), SYLVAN_VAR_SWAP_SUCCESS);
+        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
 
         sylvan_getsha(one, hash3);
         sylvan_getsha(two, hash4);
@@ -160,20 +160,20 @@ UTEST_TASK_0(variable_swap_test, bddmap)  {
 
     /* test bddmap [6 -> 6] becomes [7 -> 7] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(6));
-    ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+    ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
     ASSERT_EQ(sylvan_map_key(map), (uint32_t)7);
     ASSERT_EQ(sylvan_map_value(map), mtbdd_ithvar(7));
 
     /* test bddmap [6 -> 7] becomes [7 -> 6] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
-    ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+    ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
     ASSERT_EQ(sylvan_map_key(map), (uint32_t)7);
     ASSERT_EQ(sylvan_map_value(map), mtbdd_ithvar(6));
 
     /* test bddmap [6 -> 7, 7 -> 8] becomes [6 -> 8, 7 -> 6] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
     map = sylvan_map_add(map, 7, mtbdd_ithvar(8));
-    ASSERT_EQ(sylvan_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+    ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
     ASSERT_EQ(sylvan_map_key(map), (uint32_t)6);
     ASSERT_EQ(sylvan_map_value(map), mtbdd_ithvar(8));
 

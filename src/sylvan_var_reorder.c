@@ -137,7 +137,7 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high)
         if (pos < low || pos > high) continue; // nvm.
 
         for (; pos<high; pos++) {
-            if (CALL(sylvan_simple_varswap, pos) != 0) {
+            if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
                 // failed, table full. TODO garbage collect.
                 break;
             }
@@ -154,7 +154,8 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high)
             }
         }
         for (; pos>low; pos--) {
-            if (CALL(sylvan_simple_varswap, pos-1) != 0) {
+
+            if (sylvan_simple_varswap(pos - 1) != SYLVAN_VAR_SWAP_SUCCESS) {
                 break;
             }
             size_t after = llmsset_count_marked(nodes);
@@ -171,13 +172,13 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high)
         }
         printf("best: %zu (old %zu) at %zu (old %zu)\n", bestpos, oldpos, bestsize, oldsize);
         for (; pos<bestpos; pos++) {
-            if (CALL(sylvan_simple_varswap, pos) != 0) {
+            if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
                 printf("UH OH\n");
                 exit(-1);
             }
         }
         for (; pos>bestpos; pos--) {
-            if (CALL(sylvan_simple_varswap, pos-1) != 0) {
+            if (sylvan_simple_varswap(pos - 1) != SYLVAN_VAR_SWAP_SUCCESS) {
                 printf("UH OH\n");
                 exit(-1);
             }

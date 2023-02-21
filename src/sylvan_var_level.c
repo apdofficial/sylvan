@@ -129,15 +129,21 @@ sylvan_var_level_update(uint32_t var)
     var_to_level[var+1] = save;
 }
 
-size_t sylvan_get_levels_count(void) {
+size_t
+sylvan_get_levels_count(void)
+{
     return levels_count;
 }
 
-size_t sylvan_get_real_var(uint32_t level) {
+size_t
+sylvan_get_real_var(uint32_t level)
+{
     return level_to_var[level];
 }
 
-void sylvan_levels_destroy(void) {
+void
+sylvan_levels_destroy(void)
+{
      if (levels_size != 0) {
         free(levels);
         free(var_to_level);
