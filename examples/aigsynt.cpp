@@ -178,7 +178,7 @@ int *level_to_var;
 
 void make_gate(int a, MTBDD* gates, int* gatelhs, int* gatelft, int* gatergt, int* lookup)
 {
-    LACE_ME;
+    LACE_VARS;
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a]/2;
     int rgt = gatergt[a]/2;
@@ -250,7 +250,7 @@ VOID_TASK_0(parse)
 
     (void)M; // we don't actually need to know how many variables there are
 
-    INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
+    INFO("Preparing %llu inputs, %llu latches and %llu AND-gates\n", I, L, A);
 
     // INFO("Now reading %zu inputs\n", I);
 
@@ -690,7 +690,7 @@ main(int argc, char **argv)
     // Init Lace
     lace_init(workers, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
     lace_startup(0, NULL, NULL); // auto-detect program stack, do not use a callback for startup
-    LACE_ME;
+    LACE_VARS;
 
     // Init Sylvan
     // Give 2 GB memory
