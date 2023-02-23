@@ -688,9 +688,7 @@ main(int argc, char **argv)
     argp_parse(&argp, argc, argv, 0, 0, 0);
 
     // Init Lace
-    lace_init(workers, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
-    lace_startup(0, NULL, NULL); // auto-detect program stack, do not use a callback for startup
-    LACE_VARS;
+    lace_start(workers, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory
@@ -718,10 +716,12 @@ main(int argc, char **argv)
     buf = (uint8_t*)mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     if(buf == MAP_FAILED) Abort("mmap failed\n");
 
-    CALL(parse);
+    RUN(parse);
     
     // Report Sylvan statistics (if SYLVAN_STATS is set)
     if (verbose) sylvan_stats_report(stdout);
+
+    lace_stop();
 
     return 0;
 }
