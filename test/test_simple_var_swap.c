@@ -5,8 +5,8 @@
 #include "sylvan.h"
 #include "sylvan_int.h"
 #include "utest_lace.h"
-#include "sylvan_var_swap.h"
-#include "sylvan_var_level.h"
+#include "sylvan_varswap.h"
+#include "sylvan_levels.h"
 #include "common.h"
 
 UTEST_STATE();

@@ -1,14 +1,18 @@
 #include "sylvan_int.h"
-#include "sylvan_var_level.h"
+#include "sylvan_levels.h"
 #include "sylvan_mtbdd_int.h"
 
 
-//// Handling of variable levels
+/**
+ * Handling of variable levels
+ */
 static uint32_t *var_to_level = NULL;  // get the level of a "real variable"
 static uint32_t *level_to_var = NULL;  // get the "real variable" of a level
 static MTBDD *levels = NULL;           // array holding the 1-node BDD for each level
 static size_t levels_count = 0;        // number of created levels
 static size_t levels_size = 0;         // size of the 3 arrays
+
+
 
 
 /**

@@ -20,7 +20,7 @@
 #include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
-#include "sylvan_var_reorder.h"
+#include "sylvan_reorder.h"
 
 using namespace sylvan;
 

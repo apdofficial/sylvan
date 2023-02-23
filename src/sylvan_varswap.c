@@ -1,6 +1,6 @@
 #include <sylvan_int.h>
-#include "sylvan_var_swap.h"
-#include "sylvan_var_level.h"
+#include "sylvan_varswap.h"
+#include "sylvan_levels.h"
 
 /**
  * Function declarations (implementations below)
@@ -28,7 +28,7 @@ TASK_DECL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, size_t, size_t);
 */
 #define call_sylvan_var_swap_p1(var, first, count) CALL(call_sylvan_var_swap_p1, var, first, count)
 
-VOID_TASK_DECL_4(call_sylvan_var_swap_p2, uint32_t, size_t, size_t, volatile sylvan_var_swap_err_t*);
+VOID_TASK_DECL_4(call_sylvan_var_swap_p2, uint32_t, size_t, size_t, volatile sylvan_var_swap_res_t*);
 /*!
    \brief Adjacent variable swap phase 2
    \details Handle the not so trivial cases. (creates new nodes)
@@ -102,7 +102,6 @@ mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
     return index;
 }
 
-
 TASK_IMPL_2(int, sylvan_varswap, uint32_t, var, int, recovery)
 {
     // first clear hashes of nodes with <var> and <var+1>
@@ -112,7 +111,7 @@ TASK_IMPL_2(int, sylvan_varswap, uint32_t, var, int, recovery)
 
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_var_swap_err_t result = SYLVAN_VAR_SWAP_SUCCESS;
+        sylvan_var_swap_res_t result = SYLVAN_VAR_SWAP_SUCCESS;
         call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
 
         if (result != SYLVAN_VAR_SWAP_SUCCESS) return result;
@@ -132,7 +131,7 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
 
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_var_swap_err_t result = SYLVAN_VAR_SWAP_SUCCESS;
+        sylvan_var_swap_res_t result = SYLVAN_VAR_SWAP_SUCCESS;
         call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
 
         if (result != SYLVAN_VAR_SWAP_SUCCESS) {
@@ -154,7 +153,7 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
                 }
             }
             printf("Recovery good.\n");
-            return 1;
+            return SYLVAN_VAR_SWAP_ROLLBACK;
         }
     }
 
@@ -205,6 +204,7 @@ VOID_TASK_IMPL_3(call_sylvan_var_swap_p0, uint32_t, var, size_t, first, size_t, 
         }
     }
 }
+
 
 /**
  * Implementation of the first phase of variable swapping.
@@ -316,7 +316,7 @@ TASK_IMPL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, var, size_t, first, siz
  * Returns 0 if there was no error, or 1 if nodes could not be
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
-VOID_TASK_IMPL_4(call_sylvan_var_swap_p2, uint32_t, var, size_t, first, size_t, count, volatile sylvan_var_swap_err_t*, result)
+VOID_TASK_IMPL_4(call_sylvan_var_swap_p2, uint32_t, var, size_t, first, size_t, count, volatile sylvan_var_swap_res_t*, result)
 {
     /* divide and conquer (if count above BLOCKSIZE) */
     if (count > BLOCKSIZE) {
@@ -339,6 +339,7 @@ VOID_TASK_IMPL_4(call_sylvan_var_swap_p2, uint32_t, var, size_t, first, size_t, 
     for (; first < end; first++) {
         if (*result != SYLVAN_VAR_SWAP_SUCCESS) return; // the table is full
         if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
+
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getmark(node)) continue; // an unmarked node

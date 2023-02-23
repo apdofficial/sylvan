@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "sylvan.h"
 #include "sylvan_int.h"
 #include "utest_lace.h"
-#include "sylvan_var_swap.h"
-#include "sylvan_var_level.h"
+#include "sylvan_varswap.h"
+#include "sylvan_levels.h"
 #include "common.h"
 
 UTEST_STATE();
@@ -181,8 +182,6 @@ UTEST_TASK_0(variable_swap_test, bddmap)  {
     ASSERT_EQ(sylvan_map_key(map), (uint32_t)7);
     ASSERT_EQ(sylvan_map_value(map), mtbdd_ithvar(6));
 }
-
-
 
 int main(int argc, const char *const argv[]) {
     // Init Lace
