@@ -10,4 +10,5 @@
 build/
 
 # Clion files
-idea/
+.idea/
+CMakeFiles/
