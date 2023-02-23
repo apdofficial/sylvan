@@ -26,7 +26,7 @@ add_example(simple simple.cpp)
 
 add_executable(aigsynt)
 target_sources(aigsynt PRIVATE aigsynt.cpp)
-target_link_libraries(aigsynt PRIVATE Sylvan::Sylvan)
+target_link_libraries(aigsynt PRIVATE sylvan::sylvan)
 target_compile_features(aigsynt PRIVATE c_std_11 cxx_std_11)
 target_compile_options(aigsynt PRIVATE -Wall -Wextra -Werror -Wno-deprecated)
 
@@ -54,7 +54,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     endif()
     target_link_libraries(ldd2bdd PRIVATE ${ARGP_LIBRARIES})
     target_link_libraries(nqueens PRIVATE ${ARGP_LIBRARIES})
-    target_link_libraries(aagsynt PRIVATE ${ARGP_LIBRARIES})
+    target_link_libraries(aigsynt PRIVATE ${ARGP_LIBRARIES})
 endif()
 
 
