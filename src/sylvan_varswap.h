@@ -27,7 +27,6 @@ typedef enum {
     SYLVAN_VAR_SWAP_P2_REHASH_AND_CREATE_FAIL = -5,
 } sylvan_var_swap_res_t;
 
-
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *
@@ -65,6 +64,7 @@ typedef enum {
   */
 TASK_DECL_2(sylvan_var_swap_res_t, sylvan_varswap, uint32_t, int);
 #define sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
+
 
 /**
  * @brief Swaps two consecutive variables in the entire forest with recovery attempt.

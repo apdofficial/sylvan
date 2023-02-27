@@ -279,18 +279,7 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
             }
         }
     }
-
-    // AFTER CHANGE, check if >>my<< next has changed!!
-
-    for (;;) {
-        uint64_t frst = *fptr;
-        if (cas(fptr, frst, d_idx)) {
-            *dptr = (hash & MASK_HASH) | frst;
-            return 1;
-        }
-    }
 }
-#endif
 
 llmsset_t
 llmsset_create(size_t initial_size, size_t max_size)
