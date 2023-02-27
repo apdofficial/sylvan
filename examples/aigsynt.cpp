@@ -1,16 +1,18 @@
 #include <argp.h>
-#include <assert.h>
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cassert>
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdint.h>
+#include <cstdint>
 
-#include <sylvan_int.h>
+#include <sylvan.h>
+//#include <sylvan_int.h>
+#include <sylvan_obj.hpp>
 
 #include <string>
 
@@ -18,6 +20,7 @@
 #include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include "sylvan_reorder.h"
 
 using namespace sylvan;
 
@@ -92,6 +95,8 @@ static double t_start;
 /**
  * Global stuff
  */
+
+int did_gc = 0;
 
 uint8_t* buf;
 size_t pos, size;
@@ -176,9 +181,9 @@ void read_string(std::string &s)
 
 int *level_to_var;
 
-void make_gate(int a, MTBDD* gates, int* gatelhs, int* gatelft, int* gatergt, int* lookup)
+#define make_gate(a,b,c,d,e,f) CALL(make_gate,a,b,c,d,e,f)
+VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
-    LACE_VARS;
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a]/2;
     int rgt = gatergt[a]/2;
@@ -194,7 +199,7 @@ void make_gate(int a, MTBDD* gates, int* gatelhs, int* gatelft, int* gatergt, in
         make_gate(lookup[lft], gates, gatelhs, gatelft, gatergt, lookup);
         l = gates[lookup[lft]];
     } else {
-        l = sylvan_ithvar(level_to_var[lft]);
+        l = mtbdd_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
     }
     if (rgt == 0) {
         r = sylvan_false;
@@ -202,12 +207,21 @@ void make_gate(int a, MTBDD* gates, int* gatelhs, int* gatelft, int* gatergt, in
         make_gate(lookup[rgt], gates, gatelhs, gatelft, gatergt, lookup);
         r = gates[lookup[rgt]];
     } else {
-        r = sylvan_ithvar(level_to_var[rgt]);
+        r = mtbdd_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
     }
     if (gatelft[a]&1) l = sylvan_not(l);
     if (gatergt[a]&1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
+
+#if 0
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    if (did_gc or 2*used > total) {
+        sylvan_sifting(0, 0);
+        did_gc = 0;
+    }
+#endif
 }
 
 VOID_TASK_0(parse)
@@ -215,17 +229,17 @@ VOID_TASK_0(parse)
     read_wsnl();
     read_token("aag");
     read_ws();
-    uint64_t M = read_uint(); // maximum variable index
+    size_t M = read_uint(); // maximum variable index
     read_ws();
-    uint64_t I = read_uint(); // number of inputs
+    size_t I = read_uint(); // number of inputs
     read_ws();
-    uint64_t L = read_uint(); // number of latches
+    size_t L = read_uint(); // number of latches
     read_ws();
-    uint64_t O = read_uint(); // number of outputs
+    size_t O = read_uint(); // number of outputs
     read_ws();
-    uint64_t A = read_uint(); // number of AND gates
+    size_t A = read_uint(); // number of AND gates
     read_ws();
-    uint64_t B=0, C=0, J=0, F=0; // optional
+    size_t B=0, C=0, J=0, F=0; // optional
     read_ws();
     if (parser_peek() != '\n') {
         B = read_uint(); // number of bad state properties
@@ -248,9 +262,9 @@ VOID_TASK_0(parse)
     if (O != 1) Abort("expecting 1 output\n");
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
-    (void)M; // we don't actually need to know how many variables there are
+    mtbdd_newlevels(M+1);
 
-    INFO("Preparing %llu inputs, %llu latches and %llu AND-gates\n", I, L, A);
+    INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
 
     // INFO("Now reading %zu inputs\n", I);
 
@@ -446,7 +460,7 @@ VOID_TASK_0(parse)
 
     /*
     for (uint64_t a=0; a<A; a++) {
-        MTBDD lhs = sylvan_ithvar(read_uint()/2);
+        MTBDD lhs = sylvan_asdfithvar(read_uint()/2);
         mtbdd_refs_push(lhs);
         read_ws();
         int left = read_uint();
@@ -516,6 +530,7 @@ VOID_TASK_0(parse)
 #endif
 
     sylvan_stats_report(stdout);
+    sylvan_sifting(0, 0);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -566,7 +581,7 @@ VOID_TASK_0(parse)
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
         if (lookup[l_next[l]/2] == -1) {
-            nxt = sylvan_ithvar(level_to_var[l_next[l]/2]);
+            nxt = mtbdd_ithlevel(level_to_var[l_next[l]/2]);
         } else {
             nxt = gates[lookup[l_next[l]/2]];
         }
@@ -579,7 +594,7 @@ VOID_TASK_0(parse)
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
     if (lookup[outputs[0]/2] == -1) {
-        Unsafe = sylvan_ithvar(level_to_var[outputs[0]/2]);
+        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0]/2]);
     } else {
         Unsafe = gates[lookup[outputs[0]/2]];
     }
@@ -676,6 +691,8 @@ VOID_TASK_0(gc_end)
     size_t used, total;
     sylvan_table_usage(&used, &total);
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
+    INFO("Running the sifting algorithm.\n");
+    sylvan_sifting(0, 0);
 }
 
 int
@@ -695,6 +712,7 @@ main(int argc, char **argv)
     sylvan_set_limits(2LL*1LL<<30, 1, 15);
     sylvan_init_package();
     sylvan_init_mtbdd();
+    sylvan_init_reorder();
 
     // Set hooks for logging garbage collection
     if (verbose) {
