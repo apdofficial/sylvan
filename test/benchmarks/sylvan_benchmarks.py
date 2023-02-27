@@ -91,32 +91,31 @@ def y_step(low: float, up: float, leng: int):
     return [low + i * step for i in range(leng)]
 
 
-if USE_FILE_CSV:
-    data = pd.read_csv("data.csv")
-else:
-    dataset = []
-    for _ in range(10):
-        dataset.append(run_models(LINEAR_PROBING_EXECUTABLES_PATH,
-                                  MODELS_PATH,
-                                  ModelType.LDD,
-                                  HashTableType.LINEAR_PROBING))
-        dataset.append(run_models(LINEAR_PROBING_EXECUTABLES_PATH,
-                                  MODELS_PATH,
-                                  ModelType.BDD,
-                                  HashTableType.LINEAR_PROBING))
-        dataset.append(run_models(CHAINING_EXECUTABLES_PATH,
-                                  MODELS_PATH,
-                                  ModelType.LDD,
-                                  HashTableType.CHAINING))
-        dataset.append(run_models(CHAINING_EXECUTABLES_PATH,
-                                  MODELS_PATH,
-                                  ModelType.BDD,
-                                  HashTableType.CHAINING))
-    data = pd.concat(dataset)
-    data.to_csv("data.csv")
-
-
 if __name__ == "__main__":
+    if USE_FILE_CSV:
+        data = pd.read_csv("data.csv")
+    else:
+        dataset = []
+        for _ in range(10):
+            dataset.append(run_models(LINEAR_PROBING_EXECUTABLES_PATH,
+                                      MODELS_PATH,
+                                      ModelType.LDD,
+                                      HashTableType.LINEAR_PROBING))
+            dataset.append(run_models(LINEAR_PROBING_EXECUTABLES_PATH,
+                                      MODELS_PATH,
+                                      ModelType.BDD,
+                                      HashTableType.LINEAR_PROBING))
+            dataset.append(run_models(CHAINING_EXECUTABLES_PATH,
+                                      MODELS_PATH,
+                                      ModelType.LDD,
+                                      HashTableType.CHAINING))
+            dataset.append(run_models(CHAINING_EXECUTABLES_PATH,
+                                      MODELS_PATH,
+                                      ModelType.BDD,
+                                      HashTableType.CHAINING))
+        data = pd.concat(dataset)
+        data.to_csv("data.csv")
+
     pyplot.figure(figsize=(35, 25))
     g = sns.lineplot(x="model name", y="execution time", hue="hash_table_type", data=data)
     g.set_yticks(y_step(0.1, 11.5, 100))
