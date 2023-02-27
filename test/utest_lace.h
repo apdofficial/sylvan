@@ -248,5 +248,4 @@ cleanup:
     RUN(NAME, utest_result);                                            \
   };                                                                    \
   VOID_TASK_IMPL_1(NAME, int*, utest_result)
-
 #endif /* UTEST_LACE_H_INCLUDED */

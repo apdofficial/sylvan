@@ -141,7 +141,7 @@ TASK_IMPL_1(int, sylvan_simple_varswap, uint32_t, var)
             // clear hashes again of nodes with <var> and <var+1>
             call_sylvan_var_swap_p0(var, 0, nodes->table_size);
             // handle all trivial cases, mark cases that are not trivial
-            uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size);
+            marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size);
 
             if (marked_count != 0){
                 // do the not so trivial cases (but won't create new nodes this time)
