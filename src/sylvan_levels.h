@@ -73,9 +73,9 @@ void sylvan_var_level_update(uint32_t var);
 size_t sylvan_get_levels_count(void);
 
 /**
- * Get the number of created variables
+ * Get the variable of the given level
  */
-size_t sylvan_get_real_var(uint32_t level);
+size_t sylvan_get_var(uint32_t level);
 
 /**
  * Clean up the resourced allocated for managing levels

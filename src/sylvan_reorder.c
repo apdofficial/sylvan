@@ -31,14 +31,12 @@
 
 static int mtbdd_reorder_initialized = 0;
 
-static void
-reorder_quit() {
+static void reorder_quit() {
     sylvan_levels_destroy();
     mtbdd_reorder_initialized = 0;
 }
 
-void
-sylvan_init_reorder() {
+void sylvan_init_reorder(){
     sylvan_init_mtbdd();
 
     if (mtbdd_reorder_initialized) return;
@@ -48,26 +46,6 @@ sylvan_init_reorder() {
     sylvan_gc_add_mark_managed_refs();
 }
 
-void sort_levels(size_t size, const size_t level_counts[size], int level[size]) {
-    for (unsigned int i = 0; i < sylvan_get_levels_count(); i++) {
-        if (level_counts[sylvan_get_real_var(i)] < 128) /* threshold */ level[i] = -1;
-        else level[i] = i;
-    }
-
-    // just use gnome sort because meh
-    unsigned int i = 1, j = 2;
-    while (i < sylvan_get_levels_count()) {
-        long p = level[i - 1] == -1 ? -1 : (long) level_counts[sylvan_get_real_var(level[i - 1])];
-        long q = level[i] == -1 ? -1 : (long) level_counts[sylvan_get_real_var(level[i])];
-        if (p < q) {
-            int t = level[i];
-            level[i] = level[i - 1];
-            level[i - 1] = t;
-            if (--i) continue;
-        }
-        i = j++;
-    }
-}
 
 /**
  * Sifting in CUDD:
@@ -107,53 +85,60 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
 
     // we want to sort it
     int level[sylvan_get_levels_count()];
-    sort_levels(sylvan_get_levels_count(), level_counts, level);
+    for (unsigned int i = 0; i < sylvan_get_levels_count(); i++) {
+        if (level_counts[sylvan_get_var(i)] < 128) /* threshold */ level[i] = -1;
+        else level[i] = i;
+    }
 
+    // just use gnome sort because meh
+    unsigned int i = 1, j = 2;
+    while (i < sylvan_get_levels_count()) {
+        long p = level[i - 1] == -1 ? -1 : (long) level_counts[sylvan_get_var(level[i - 1])];
+        long q = level[i] == -1 ? -1 : (long) level_counts[sylvan_get_var(level[i])];
+        if (p < q) {
+            int t = level[i];
+            level[i] = level[i - 1];
+            level[i - 1] = t;
+            if (--i) continue;
+        }
+        i = j++;
+    }
 
     printf("chosen order: ");
     for (size_t i = 0; i < sylvan_get_levels_count(); i++) printf("%d ", level[i]);
     printf("\n");
-
-    // sift a thing
-//    int cur_var = level_to_var[lvl];
-//    int best = lvl;
 
     size_t cursize = llmsset_count_marked(nodes);
 
     for (unsigned int i = 0; i < sylvan_get_levels_count(); i++) {
         int lvl = level[i];
         if (lvl == -1) break; // done
-        size_t pos = sylvan_get_real_var(lvl);
+        size_t pos = sylvan_get_var(lvl);
 
-        printf("now moving level %u, currently at position %zu\n", lvl, pos);
+//         printf("now moving level %u, currently at position %zu\n", lvl, pos);
 
         size_t bestsize = cursize, bestpos = pos;
         size_t oldsize = cursize, oldpos = pos;
 
-        // TODO: if pos < low or pos > high, bye
-        if (pos < low || pos > high) continue; // nvm.
-
         for (; pos < high; pos++) {
             if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
-                // failed, table full.
-                // TODO garbage collect.
-                break;
+                printf("UH OH\n");
+                exit(-1);
             }
             size_t after = llmsset_count_marked(nodes);
-            printf("swap(DN): from %zu to %zu\n", cursize, after);
+             printf("swap(DN): from %zu to %zu\n", cursize, after);
             cursize = after;
             if (cursize < bestsize) {
                 bestsize = cursize;
                 bestpos = pos;
             }
-            if (cursize >= 2 * bestsize) {
-                pos++;
-                break;
-            }
+            if (cursize >= 2 * bestsize) break;
         }
         for (; pos > low; pos--) {
-            if (sylvan_simple_varswap(pos - 1) != SYLVAN_VAR_SWAP_SUCCESS) break;
-
+            if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
+                printf("UH OH\n");
+                exit(-1);
+            }
             size_t after = llmsset_count_marked(nodes);
             printf("swap(UP): from %zu to %zu\n", cursize, after);
             cursize = after;
@@ -161,10 +146,7 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
                 bestsize = cursize;
                 bestpos = pos;
             }
-            if (cursize >= 2 * bestsize) {
-                pos--;
-                break;
-            }
+            if (cursize >= 2 * bestsize) break;
         }
         printf("best: %zu (old %zu) at %zu (old %zu)\n", bestpos, oldpos, bestsize, oldsize);
         for (; pos < bestpos; pos++) {
@@ -174,16 +156,12 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
             }
         }
         for (; pos > bestpos; pos--) {
-            if (sylvan_simple_varswap(pos - 1) != SYLVAN_VAR_SWAP_SUCCESS) {
+            if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
                 printf("UH OH\n");
                 exit(-1);
             }
         }
     }
-
-    for (size_t i = 0; i < sylvan_get_levels_count(); i++) level_counts[i] = 0;
-    CALL(sylvan_count_nodes, level_counts, 0, nodes->table_size);
-    for (size_t i = 0; i < sylvan_get_levels_count(); i++) printf("Level %zu has %zu nodes\n", i, level_counts[i]);
 
     size_t after_size = llmsset_count_marked(nodes);
     printf("Result of sifting: from %zu to %zu nodes.\n", before_size, after_size);

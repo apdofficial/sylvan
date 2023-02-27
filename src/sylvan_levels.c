@@ -140,7 +140,7 @@ sylvan_get_levels_count(void)
 }
 
 size_t
-sylvan_get_real_var(uint32_t level)
+sylvan_get_var(uint32_t level)
 {
     return level_to_var[level];
 }
