@@ -12,7 +12,7 @@
 
 UTEST_STATE();
 
-UTEST_TASK_0(variable_swap_test, var_level)  {
+UTEST_TASK_0(test_varswap, var_level)  {
     BDD var_six, var_seven;
 
     uint32_t level_six = 6;
@@ -33,7 +33,7 @@ UTEST_TASK_0(variable_swap_test, var_level)  {
     ASSERT_EQ(mtbdd_getvar(var_seven), level_seven);
 }
 
-UTEST_TASK_0(variable_swap_test, var_swap)  {
+UTEST_TASK_0(test_varswap, var_swap)  {
     BDD one, two;
 
     uint32_t level_six = 6;
@@ -55,7 +55,7 @@ UTEST_TASK_0(variable_swap_test, var_swap)  {
     ASSERT_EQ(mtbdd_getvar(two), level_six);
 }
 
-UTEST_TASK_0(variable_swap_test, var_swap_hash)  {
+UTEST_TASK_0(test_varswap, var_swap_hash)  {
     BDD one, two;
     BDDMAP map;
 
@@ -92,7 +92,7 @@ UTEST_TASK_0(variable_swap_test, var_swap_hash)  {
     ASSERT_STREQ(hash2, hash3);
 }
 
-UTEST_TASK_0(variable_swap_test, var_swap_random_swap)  {
+UTEST_TASK_0(test_varswap, var_swap_random_swap)  {
     BDD one, two;
     BDDMAP map;
 
@@ -151,7 +151,7 @@ UTEST_TASK_0(variable_swap_test, var_swap_random_swap)  {
     }
 }
 
-UTEST_TASK_0(variable_swap_test, bddmap)  {
+UTEST_TASK_0(test_varswap, bddmap)  {
     BDDMAP map;
 
     // manually trigger sylvan garbage collection
