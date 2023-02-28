@@ -199,7 +199,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
         make_gate(lookup[lft], gates, gatelhs, gatelft, gatergt, lookup);
         l = gates[lookup[lft]];
     } else {
-        l = mtbdd_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
+        l = mtbdd_levels_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
     }
     if (rgt == 0) {
         r = sylvan_false;
@@ -207,7 +207,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
         make_gate(lookup[rgt], gates, gatelhs, gatelft, gatergt, lookup);
         r = gates[lookup[rgt]];
     } else {
-        r = mtbdd_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
+        r = mtbdd_levels_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
     }
     if (gatelft[a]&1) l = sylvan_not(l);
     if (gatergt[a]&1) r = sylvan_not(r);
@@ -262,7 +262,7 @@ VOID_TASK_0(parse)
     if (O != 1) Abort("expecting 1 output\n");
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
-    mtbdd_newlevels(M+1);
+    mtbdd_levels_new(M + 1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
 
@@ -581,7 +581,7 @@ VOID_TASK_0(parse)
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
         if (lookup[l_next[l]/2] == -1) {
-            nxt = mtbdd_ithlevel(level_to_var[l_next[l]/2]);
+            nxt = mtbdd_levels_ithlevel(level_to_var[l_next[l] / 2]);
         } else {
             nxt = gates[lookup[l_next[l]/2]];
         }
@@ -594,7 +594,7 @@ VOID_TASK_0(parse)
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
     if (lookup[outputs[0]/2] == -1) {
-        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0]/2]);
+        Unsafe = mtbdd_levels_ithlevel(level_to_var[outputs[0] / 2]);
     } else {
         Unsafe = gates[lookup[outputs[0]/2]];
     }

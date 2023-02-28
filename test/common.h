@@ -30,6 +30,9 @@ rng(int low, int high)
     return low + uniform_deviate(xorshift_rand()) * (high-low);
 }
 
+/**
+ * Make a random BDD
+ */
 BDD
 make_random(int i, int j)
 {

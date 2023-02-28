@@ -29,6 +29,14 @@
  */
 #define BLOCKSIZE 128
 
+VOID_TASK_DECL_2(get_level_counts, int*, size_t);
+/**
+ * @brief Count all variable levels (parallel...)
+ * \param level_counts - array of size mtbdd_levels_size()
+ * \param threshold - only count nodes from levels threshold
+ */
+#define get_level_counts(level_counts, threshold) RUN(get_level_counts, level_counts, threshold)
+
 static int mtbdd_reorder_initialized = 0;
 
 static void reorder_quit() {
@@ -43,8 +51,42 @@ void sylvan_init_reorder(){
     mtbdd_reorder_initialized = 1;
 
     sylvan_register_quit(reorder_quit);
-    sylvan_gc_add_mark_managed_refs();
+    mtbdd_levels_gc_add_mark_managed_refs();
 }
+
+
+/**
+ * Count all variable levels (parallel...)
+ */
+VOID_TASK_IMPL_2(get_level_counts, int*, level, size_t, threshold) {
+    // we want to sort it
+    size_t level_counts[mtbdd_levels_size()];
+    for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
+    mtbdd_levels_count_nodes(level_counts);
+
+
+    // we want to sort it
+//    int level[sylvan_get_levels_count()];
+    for (size_t i = 0; i < mtbdd_levels_size(); i++) {
+        if (level_counts[mtbdd_levels_level_to_var(i)] < threshold) level[i] = -1;
+        else level[i] = i;
+    }
+
+    // just use gnome sort because meh
+    unsigned int i = 1, j = 2;
+    while (i < mtbdd_levels_size()) {
+        long p = level[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_levels_level_to_var(level[i - 1])];
+        long q = level[i] == -1 ? -1 : (long) level_counts[mtbdd_levels_level_to_var(level[i])];
+        if (p < q) {
+            int t = level[i];
+            level[i] = level[i - 1];
+            level[i - 1] = t;
+            if (--i) continue;
+        }
+        i = j++;
+    }
+}
+
 
 
 /**
@@ -70,63 +112,39 @@ void sylvan_init_reorder(){
 TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
     // SHOULD run first gc
 
-    if (high == 0) {
-        high = sylvan_get_levels_count() - 1;
-    }
+    // if high == 0, then we sift all variables
+    if (high == 0)  high = mtbdd_levels_size() - 1;
 
     size_t before_size = llmsset_count_marked(nodes);
 
-    // now count all variable levels (parallel...)
-    size_t level_counts[sylvan_get_levels_count()];
-    for (size_t i = 0; i < sylvan_get_levels_count(); i++) level_counts[i] = 0;
-    sylvan_count_nodes(level_counts);
+    int level[mtbdd_levels_size()];
+    get_level_counts(level, 1);
 
-    for (size_t i = 0; i < sylvan_get_levels_count(); i++) printf("Level %zu has %zu nodes\n", i, level_counts[i]);
-
-    // we want to sort it
-    int level[sylvan_get_levels_count()];
-    for (unsigned int i = 0; i < sylvan_get_levels_count(); i++) {
-        if (level_counts[sylvan_get_var(i)] < 128) /* threshold */ level[i] = -1;
-        else level[i] = i;
-    }
-
-    // just use gnome sort because meh
-    unsigned int i = 1, j = 2;
-    while (i < sylvan_get_levels_count()) {
-        long p = level[i - 1] == -1 ? -1 : (long) level_counts[sylvan_get_var(level[i - 1])];
-        long q = level[i] == -1 ? -1 : (long) level_counts[sylvan_get_var(level[i])];
-        if (p < q) {
-            int t = level[i];
-            level[i] = level[i - 1];
-            level[i - 1] = t;
-            if (--i) continue;
-        }
-        i = j++;
-    }
-
-    printf("chosen order: ");
-    for (size_t i = 0; i < sylvan_get_levels_count(); i++) printf("%d ", level[i]);
-    printf("\n");
+//    printf("chosen order: ");
+//    for (size_t i = 0; i < sylvan_levels_get_count(); i++) printf("%d ", level[i]);
+//    printf("\n");
 
     size_t cursize = llmsset_count_marked(nodes);
 
-    for (unsigned int i = 0; i < sylvan_get_levels_count(); i++) {
+    for (unsigned int i = 0; i < mtbdd_levels_size(); i++) {
         int lvl = level[i];
         if (lvl == -1) break; // done
-        size_t pos = sylvan_get_var(lvl);
+        size_t pos = mtbdd_levels_level_to_var(lvl);
 
-//         printf("now moving level %u, currently at position %zu\n", lvl, pos);
+//        printf("now moving level %u, currently at position %zu\n", lvl, pos);
 
         size_t bestsize = cursize, bestpos = pos;
         size_t oldsize = cursize, oldpos = pos;
 
+        // optimum variable position search
+        // sift up
         for (; pos < high; pos++) {
             if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
                 printf("UH OH\n");
                 exit(-1);
             }
             size_t after = llmsset_count_marked(nodes);
-             printf("swap(DN): from %zu to %zu\n", cursize, after);
+            printf("swap(DN): from %zu to %zu\n", cursize, after);
             cursize = after;
             if (cursize < bestsize) {
                 bestsize = cursize;
@@ -134,6 +152,7 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
             }
             if (cursize >= 2 * bestsize) break;
         }
+        // sift down
         for (; pos > low; pos--) {
             if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
                 printf("UH OH\n");
@@ -148,15 +167,22 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
             }
             if (cursize >= 2 * bestsize) break;
         }
-        printf("best: %zu (old %zu) at %zu (old %zu)\n", bestpos, oldpos, bestsize, oldsize);
+
+        printf("best pos : %zu (old pos %zu) bestsize %zu (old bestsize %zu)\n", bestpos, oldpos, bestsize, oldsize);
+
+        // optimum variable position restoration
+        // sift up
         for (; pos < bestpos; pos++) {
             if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
+                // should not happen since we use chaining and not linear probing
                 printf("UH OH\n");
                 exit(-1);
             }
         }
+        // sift down
         for (; pos > bestpos; pos--) {
             if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
+                // should not happen since we use chaining and not linear probing
                 printf("UH OH\n");
                 exit(-1);
             }

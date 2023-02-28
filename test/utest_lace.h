@@ -235,6 +235,8 @@ cleanup:
     fclose(utest_state.output);
   }
 
+//  sylvan_stats_report(stdout);
+
   sylvan_quit();
   lace_stop();
 

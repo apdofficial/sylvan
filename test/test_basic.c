@@ -374,11 +374,11 @@ test_varswap()
 
     /* initialize 10 levels */
     mtbdd_levels_reset();
-    mtbdd_newlevels(10);
+    mtbdd_levels_new(10);
 
     /* test ithvar, switch 6 and 7 */
-    one = mtbdd_ithlevel(6);
-    two = mtbdd_ithlevel(7);
+    one = mtbdd_levels_ithlevel(6);
+    two = mtbdd_levels_ithlevel(7);
     test_assert(one == mtbdd_ithvar(6));
     test_assert(two == mtbdd_ithvar(7));
     test_assert(mtbdd_getvar(one) == 6);

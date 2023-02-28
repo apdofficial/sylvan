@@ -75,6 +75,12 @@ TASK_DECL_2(sylvan_var_swap_res_t, sylvan_varswap, uint32_t, int);
  * aborts with exit(1) if rehashing didn't work during recovery
  */
 TASK_DECL_1(sylvan_var_swap_res_t, sylvan_simple_varswap, uint32_t);
+/**
+ * @brief Swaps two consecutive variables in the entire forest.
+ * @details Very simply varswap, no iterative recovery, no nodes table resizing.
+ * \param var variable to swap
+ * \return sylvan_var_swap_res_t
+ */
 #define sylvan_simple_varswap(var) CALL(sylvan_simple_varswap, var)
 
 #ifdef __cplusplus
