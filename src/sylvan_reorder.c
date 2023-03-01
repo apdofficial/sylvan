@@ -32,14 +32,16 @@
  */
 #define BLOCKSIZE 128
 
-VOID_TASK_DECL_2(get_level_counts, int*, size_t);
+VOID_TASK_DECL_2(get_sorted_level_counts, int*, size_t);
 /**
- * @brief Count all variable levels (parallel...)
+ * @brief Count and sort all variable levels (parallel...)
+ *
+ * \details Order all the variables using gnome sort according to the number of entries in each level.
+ *
  * \param level_counts - array of size mtbdd_levels_size()
  * \param threshold - only count nodes from levels threshold
  */
-#define get_level_counts(level_counts, threshold) RUN(get_level_counts, level_counts, threshold)
-
+#define get_sorted_level_counts(level_counts, threshold) RUN(get_sorted_level_counts, level_counts, threshold)
 
 
 static int mtbdd_reorder_initialized = 0;
@@ -60,10 +62,7 @@ void sylvan_init_reorder(){
 }
 
 
-/**
- * Count all variable levels (parallel...)
- */
-VOID_TASK_IMPL_2(get_level_counts, int*, level, size_t, threshold) {
+VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold) {
     // we want to sort it
     size_t level_counts[mtbdd_levels_size()];
     for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
@@ -89,7 +88,6 @@ VOID_TASK_IMPL_2(get_level_counts, int*, level, size_t, threshold) {
         i = j++;
     }
 }
-
 
 VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t, cursize, size_t*, bestsize, size_t*, bestlvl) {
     size_t cur_lvl = mtbdd_levels_var_to_level(var);
@@ -151,8 +149,16 @@ VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestlvl) {
     }
 }
 
+
 VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
-    printf("DVO: Started dynamic variable ordering...\n");
+    printf("Started Rudell's sifting...\n");
+
+    // TODO: implement maxGrowth limit tuning parameter (look at (2006, Ebendt et al.) or CUDD)
+    // Rüdiger Ebendt and Rolf Drechsler. “Effect of improved lower bounds in dynamic BDD reordering”.
+    // In: IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems 25 (5 May 2006),
+    // pp. 902–908. ISSN: 02780070. DOI: 10. 1109/TCAD.2005.854632.
+    // TODO: implement maxSwap tuning parameter (look a CUDD)
+    // TODO: implement timeLimit tuning parameter (look at CUDD)
 
     // if high == 0, then we sift all variables
     if (high_lvl == 0)  high_lvl = mtbdd_levels_size() - 1;
@@ -160,7 +166,7 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
     size_t before_size = llmsset_count_marked(nodes);
 
     int level[mtbdd_levels_size()];
-    get_level_counts(level, 1);
+    get_sorted_level_counts(level, 1);
 
     size_t cursize = llmsset_count_marked(nodes);
 
@@ -191,6 +197,11 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
     printf("Result of sifting: from %zu to %zu nodes.\n", before_size, after_size);
 }
 
+
+/**
+ * OLD CODE STARTS HERE
+ */
+
 /**
  * Sifting in CUDD:
  * First: obtain number of nodes per variable, then sort.
@@ -220,7 +231,7 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
     size_t before_size = llmsset_count_marked(nodes);
 
     int level[mtbdd_levels_size()];
-    get_level_counts(level, 1);
+    get_sorted_level_counts(level, 1);
 
 //    printf("chosen order: ");
 //    for (size_t i = 0; i < sylvan_levels_get_count(); i++) printf("%d ", level[i]);

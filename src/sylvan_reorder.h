@@ -57,6 +57,25 @@ VOID_TASK_DECL_2(sift_to_lvl, size_t, size_t);
 #define sift_to_lvl(var, bestlvl) RUN(sift_to_lvl, var, bestlvl)
 
 VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
+/**
+  \brief Implementation of Rudell's sifting algorithm.
+
+  \details
+    <ol>
+    <li> Order all the variables according to the number of entries
+    in each unique table.
+    <li> Sift the variable up and down, remembering each time the
+    total size of the bdd size.
+    <li> Select the best permutation.
+    <li> Repeat 2 and 3 for all variables in given range.
+    </ol>
+
+  \param low_lvl - the lowest level to sift
+  \param high_lvl - the highest level to sift
+
+  @sideeffect order and number of variables is changed
+
+*/
 #define sylvan_sifting_new(low_lvl, high_lvl) CALL(sylvan_sifting_new, low_lvl, high_lvl)
 
 TASK_DECL_2(int, sylvan_sifting, uint32_t, uint32_t);
