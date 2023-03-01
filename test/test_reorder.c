@@ -10,113 +10,215 @@
 
 UTEST_STATE();
 
-//UTEST_TASK_0(test_reorder, basic_swaps) {
-//    BDD x1, x2, x3;
-//    uint32_t level_1 = 0;
-//    uint32_t level_2 = 1;
-//    uint32_t level_3 = 2;
-//
-//    // manually trigger sylvan garbage collection
-//    sylvan_gc();
-//    mtbdd_levels_reset();
-//    mtbdd_newlevels(3);
-//
-//    x1 = mtbdd_ithlevel(level_1);
-//    x2 = mtbdd_ithlevel(level_2);
-//    x3 = mtbdd_ithlevel(level_3);
-//
-//    ASSERT_NE(x1, mtbdd_invalid);
-//    ASSERT_NE(x2, mtbdd_invalid);
-//    ASSERT_NE(x3, mtbdd_invalid);
-//
-//    ASSERT_EQ(mtbdd_getvar(x1), level_1);
-//    ASSERT_EQ(mtbdd_getvar(x2), level_2);
-//    ASSERT_EQ(mtbdd_getvar(x3), level_3);
-//
-//    ASSERT_EQ(sylvan_simple_varswap(level_1), SYLVAN_VAR_SWAP_SUCCESS);
-//
-//    ASSERT_EQ(mtbdd_getvar(x1), level_2);
-//    ASSERT_EQ(mtbdd_getvar(x2), level_1);
-//    ASSERT_EQ(mtbdd_getvar(x3), level_3);
-//
-//    ASSERT_EQ(sylvan_simple_varswap(level_1), SYLVAN_VAR_SWAP_SUCCESS);
-//
-//    ASSERT_EQ(mtbdd_getvar(x1), level_1);
-//    ASSERT_EQ(mtbdd_getvar(x2), level_2);
-//    ASSERT_EQ(mtbdd_getvar(x3), level_3);
-//
-//}
-
-UTEST_TASK_0(test_reorder, basic_sifting) {
+UTEST_TASK_0(test_sifting, basic_manual_sifting) {
     uint32_t level_0 = 0;
-    uint32_t level_1 = 1;
-    uint32_t level_2 = 2;
+    uint32_t level_5 = 5;
 
     // manually trigger sylvan garbage collection
     sylvan_gc();
     mtbdd_levels_reset();
-    mtbdd_levels_new(3);
+    mtbdd_levels_new(7);
 
     // suppose f = x1 & x2 | x2 & ~x3
-#if 1
+#if 0
     // not optimal order x1 < x2 < x3 expect 6 nodes
-    printf("Using not optimal order: x1 < x2 < x3\n");
-    BDD x1 = mtbdd_levels_ithlevel(0);
-    BDD x2 = mtbdd_levels_ithlevel(1);
-    BDD x3 = mtbdd_levels_ithlevel(2);
-//    ASSERT_EQ(mtbdd_getlevel(x1), level_0);
-//    ASSERT_EQ(mtbdd_getlevel(x2), level_1);
-//    ASSERT_EQ(mtbdd_getlevel(x3), level_2);
+//    printf("Using not optimal order: x0 < x1 < x2 < x3 < x4 < x5\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x1 = mtbdd_levels_ithlevel(1);
+    BDD x2 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x4 = mtbdd_levels_ithlevel(4);
+    BDD x5 = mtbdd_levels_ithlevel(5);
 #else
     // optimal order x1 < x3 < x2 expect 5 nodes
-    printf("Using optimal order: x1 < x3 < x2\n");
-    BDD x1 = mtbdd_ithlevel(0);
-    BDD x3 = mtbdd_ithlevel(1);
-    BDD x2 = mtbdd_ithlevel(2);
-//    ASSERT_EQ(mtbdd_getlevel(x1), level_2);
-//    ASSERT_EQ(mtbdd_getlevel(x3), level_1);
-//    ASSERT_EQ(mtbdd_getlevel(x2), level_0);
+//    printf("Using optimal order: x0 < x2 < x1 < x3 < x5 < x4\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x2 = mtbdd_levels_ithlevel(1);
+    BDD x1 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x5 = mtbdd_levels_ithlevel(4);
+    BDD x4 = mtbdd_levels_ithlevel(5);
 #endif
 
+    // let f1 = x1 & x2 | x2 & ~x3
+    BDD f1 = sylvan_or(sylvan_and(x0, x1), sylvan_and(x1, sylvan_not(x2)));
+    // let f2 = x1 & x2 | x2 & ~x3
+    BDD f2 = sylvan_or(sylvan_and(x3, x4), sylvan_and(x4, sylvan_not(x5)));
 
-    // let f = x1 & x2 | x2 & ~x3
-    BDD f = sylvan_or(sylvan_and(x1, x2), sylvan_and(x2, sylvan_not(x3)));
-//    sylvan_gc();
+    BDD node_0 = mtbdd_levels_ithlevel(0);
+    uint32_t var_0  = mtbdd_getvar(node_0);
 
-//    size_t level_counts[sylvan_levels_get_count()];
-//    for (size_t i = 0; i < sylvan_levels_get_count(); i++) level_counts[i] = 0;
-//    sylvan_levels_count_nodes(level_counts);
-//
-//    for (size_t i = 0; i < sylvan_levels_get_count(); ++i){
-//        printf("lvl %zu: %zun\n", i, level_counts[i]);
-//    }
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
 
-    sylvan_sifting(0, 0);
-
-//    // assert the order is indeed the optimal order x3 < x1 < x2
-//    ASSERT_EQ(mtbdd_getvar(x3), level_0);
-//    ASSERT_EQ(mtbdd_getvar(x1), level_1);
-//    ASSERT_EQ(mtbdd_getvar(x2), level_2);
-
-    ASSERT_EQ(1, 1);
+    // sift var_0 to from level_0 to level_6
+    for (size_t lvl = level_0; lvl < level_5; lvl++) {
+        ASSERT_EQ(sylvan_simple_varswap(var_0), SYLVAN_VAR_SWAP_SUCCESS);
+    }
+    // check whether var_0 was swapped to level_6
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
 }
 
-VOID_TASK_0(gc_start){
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    printf("Starting garbage collection of %zu/%zu size\n", used, total);
+UTEST_TASK_0(test_sifting, basic_sift_up) {
+    uint32_t level_0 = 0;
+    uint32_t level_5 = 5;
+
+    // manually trigger sylvan garbage collection
+    sylvan_gc();
+    mtbdd_levels_reset();
+    mtbdd_levels_new(6);
+
+    // suppose f = x1 & x2 | x2 & ~x3
+#if 0
+    // not optimal order x1 < x2 < x3 expect 6 nodes
+//    printf("Using not optimal order: x0 < x1 < x2 < x3 < x4 < x5\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x1 = mtbdd_levels_ithlevel(1);
+    BDD x2 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x4 = mtbdd_levels_ithlevel(4);
+    BDD x5 = mtbdd_levels_ithlevel(5);
+#else
+    // optimal order x1 < x3 < x2 expect 5 nodes
+//    printf("Using optimal order: x0 < x2 < x1 < x3 < x5 < x4\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x2 = mtbdd_levels_ithlevel(1);
+    BDD x1 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x5 = mtbdd_levels_ithlevel(4);
+    BDD x4 = mtbdd_levels_ithlevel(5);
+#endif
+
+    // let f1 = x1 & x2 | x2 & ~x3
+    BDD f1 = sylvan_or(sylvan_and(x0, x1), sylvan_and(x1, sylvan_not(x2)));
+    // let f2 = x1 & x2 | x2 & ~x3
+    BDD f2 = sylvan_or(sylvan_and(x3, x4), sylvan_and(x4, sylvan_not(x5)));
+
+    BDD node_0 = mtbdd_levels_ithlevel(level_0);
+    uint32_t var_0  = mtbdd_getvar(node_0);
+
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
+
+    size_t cursize = llmsset_count_marked(nodes);
+    size_t bestsize = cursize;
+    size_t bestlvl = mtbdd_levels_var_to_level(var_0);
+
+    // sift var_0 to from level_0 to level_5
+    sift_up(var_0, level_5, cursize, &bestsize, &bestlvl);
+
+    // check whether var_0 was swapped to level_5
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
 }
 
-VOID_TASK_0(gc_end){
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    printf("Garbage collection done of %zu/%zu size\n", used, total);
-//    sylvan_sifting(0, 0);
+UTEST_TASK_0(test_sifting, basic_sift_down){
+    uint32_t level_0 = 0;
+    uint32_t level_5 = 5;
+
+    // manually trigger sylvan garbage collection
+    sylvan_gc();
+    mtbdd_levels_reset();
+    mtbdd_levels_new(6);
+
+    // suppose f = x1 & x2 | x2 & ~x3
+#if 0
+    // not optimal order x1 < x2 < x3 expect 6 nodes
+//    printf("Using not optimal order: x0 < x1 < x2 < x3 < x4 < x5\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x1 = mtbdd_levels_ithlevel(1);
+    BDD x2 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x4 = mtbdd_levels_ithlevel(4);
+    BDD x5 = mtbdd_levels_ithlevel(5);
+#else
+    // optimal order x1 < x3 < x2 expect 5 nodes
+//    printf("Using optimal order: x0 < x2 < x1 < x3 < x5 < x4\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x2 = mtbdd_levels_ithlevel(1);
+    BDD x1 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x5 = mtbdd_levels_ithlevel(4);
+    BDD x4 = mtbdd_levels_ithlevel(5);
+#endif
+
+    // let f1 = x1 & x2 | x2 & ~x3
+    BDD f1 = sylvan_or(sylvan_and(x0, x1), sylvan_and(x1, sylvan_not(x2)));
+    // let f2 = x1 & x2 | x2 & ~x3
+    BDD f2 = sylvan_or(sylvan_and(x3, x4), sylvan_and(x4, sylvan_not(x5)));
+
+    BDD node_0 = mtbdd_levels_ithlevel(level_5);
+    uint32_t var_0  = mtbdd_getvar(node_0);
+
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
+
+    size_t cursize = llmsset_count_marked(nodes);
+    size_t bestsize = cursize;
+    size_t bestlvl = mtbdd_levels_var_to_level(var_0);
+
+    // sift var_0 to from level_0 to level_5
+    sift_down(var_0, level_0, cursize, &bestsize, &bestlvl);
+
+    // check whether var_0 was swapped to level_5
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
+
+}
+
+UTEST_TASK_0(test_sifting, basic_sift_to_best_level){
+    uint32_t level_0 = 0;
+    uint32_t level_5 = 5;
+
+    // manually trigger sylvan garbage collection
+    sylvan_gc();
+    mtbdd_levels_reset();
+    mtbdd_levels_new(6);
+
+    // suppose f = x1 & x2 | x2 & ~x3
+#if 0
+    // not optimal order x1 < x2 < x3 expect 6 nodes
+//    printf("Using not optimal order: x0 < x1 < x2 < x3 < x4 < x5\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x1 = mtbdd_levels_ithlevel(1);
+    BDD x2 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x4 = mtbdd_levels_ithlevel(4);
+    BDD x5 = mtbdd_levels_ithlevel(5);
+#else
+    // optimal order x1 < x3 < x2 expect 5 nodes
+//    printf("Using optimal order: x0 < x2 < x1 < x3 < x5 < x4\n");
+    BDD x0 = mtbdd_levels_ithlevel(0);
+    BDD x2 = mtbdd_levels_ithlevel(1);
+    BDD x1 = mtbdd_levels_ithlevel(2);
+    BDD x3 = mtbdd_levels_ithlevel(3);
+    BDD x5 = mtbdd_levels_ithlevel(4);
+    BDD x4 = mtbdd_levels_ithlevel(5);
+#endif
+
+    // let f1 = x1 & x2 | x2 & ~x3
+    BDD f1 = sylvan_or(sylvan_and(x0, x1), sylvan_and(x1, sylvan_not(x2)));
+    // let f2 = x1 & x2 | x2 & ~x3
+    BDD f2 = sylvan_or(sylvan_and(x3, x4), sylvan_and(x4, sylvan_not(x5)));
+
+    BDD node_0 = mtbdd_levels_ithlevel(level_5);
+    uint32_t var_0  = mtbdd_getvar(node_0);
+
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
+
+    size_t cursize = llmsset_count_marked(nodes);
+    size_t bestsize = cursize;
+    size_t bestlvl = mtbdd_levels_var_to_level(var_0);
+
+    // sift var_0 to from level_0 to level_5
+    sift_down(var_0, level_0, cursize, &bestsize, &bestlvl);
+
+    // check whether var_0 was swapped to level_5
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
+
+    sift_to_lvl(var_0, level_5);
+
+    ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
 }
 
 int main(int argc, const char *const argv[]) {
     // Init Lace
-    lace_start(1, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
+    lace_start(0, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory
@@ -124,12 +226,8 @@ int main(int argc, const char *const argv[]) {
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
-
     sylvan_gc_disable();
 
-    // Set hooks for logging garbage collection
-//    sylvan_gc_hook_pregc(TASK(gc_start));
-//    sylvan_gc_hook_postgc(TASK(gc_end));
 
     return utest_lace_main(argc, argv);
 }

@@ -24,6 +24,9 @@
  * check if variables are "interacting" to make it a biiiit faster...
  */
 
+// TODO: separate declaration fomr implementation and add also sift down and restore best position
+
+
 /**
  * Block size tunes the granularity of the parallel distribution
  */
@@ -36,6 +39,8 @@ VOID_TASK_DECL_2(get_level_counts, int*, size_t);
  * \param threshold - only count nodes from levels threshold
  */
 #define get_level_counts(level_counts, threshold) RUN(get_level_counts, level_counts, threshold)
+
+
 
 static int mtbdd_reorder_initialized = 0;
 
@@ -64,9 +69,7 @@ VOID_TASK_IMPL_2(get_level_counts, int*, level, size_t, threshold) {
     for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
     mtbdd_levels_count_nodes(level_counts);
 
-
     // we want to sort it
-//    int level[sylvan_get_levels_count()];
     for (size_t i = 0; i < mtbdd_levels_size(); i++) {
         if (level_counts[mtbdd_levels_level_to_var(i)] < threshold) level[i] = -1;
         else level[i] = i;
@@ -88,6 +91,105 @@ VOID_TASK_IMPL_2(get_level_counts, int*, level, size_t, threshold) {
 }
 
 
+VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t, cursize, size_t*, bestsize, size_t*, bestlvl) {
+    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+
+    for (; cur_lvl < target_lvl; cur_lvl++) {
+        varswap_res_t res = sylvan_simple_varswap(var);
+        if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+            fprintf(stderr, "varswap failed due to: %d\n", res);
+            exit(-1);
+        }
+        size_t after = llmsset_count_marked(nodes);
+        cursize = after;
+        if (cursize < *bestsize) {
+            *bestsize = cursize;
+            *bestlvl = cur_lvl;
+        }
+        if (cursize >= 2 * (*bestsize)) break;
+    }
+}
+
+VOID_TASK_IMPL_5(sift_down, size_t, var, size_t, target_lvl, size_t, cursize, size_t*, bestsize, size_t*, bestlvl) {
+    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+
+    for (; cur_lvl > target_lvl; cur_lvl--) {
+        size_t prev_var = mtbdd_levels_level_to_var(cur_lvl-1);
+        varswap_res_t res = sylvan_simple_varswap(prev_var);
+        if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+            fprintf(stderr, "varswap failed due to: %d\n", res);
+            exit(-1);
+        }
+        size_t after = llmsset_count_marked(nodes);
+        cursize = after;
+        if (cursize < *bestsize) {
+            *bestsize = cursize;
+            *bestlvl = cur_lvl;
+        }
+        if (cursize >= 2 * (*bestsize)) break;
+    }
+}
+
+VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestlvl) {
+    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+    // sift up
+    for (; cur_lvl < bestlvl; cur_lvl++) {
+        varswap_res_t res = sylvan_simple_varswap(var);
+        if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+            fprintf(stderr, "varswap failed due to: %d\n", res);
+            exit(-1);
+        }
+    }
+    // sift down
+    for (; cur_lvl > bestlvl; cur_lvl--) {
+        size_t prev_var = mtbdd_levels_level_to_var(cur_lvl-1);
+        varswap_res_t res = sylvan_simple_varswap(prev_var);
+        if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+            fprintf(stderr, "varswap failed due to: %d\n", res);
+            exit(-1);
+        }
+    }
+}
+
+VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
+    printf("DVO: Started dynamic variable ordering...\n");
+
+    // if high == 0, then we sift all variables
+    if (high_lvl == 0)  high_lvl = mtbdd_levels_size() - 1;
+
+    size_t before_size = llmsset_count_marked(nodes);
+
+    int level[mtbdd_levels_size()];
+    get_level_counts(level, 1);
+
+    size_t cursize = llmsset_count_marked(nodes);
+
+    for (unsigned int i = 0; i < mtbdd_levels_size(); i++) {
+        int cur_lvl = level[i];
+        if (cur_lvl == -1) break; // done
+        if (cur_lvl < (int)low_lvl || cur_lvl > (int)high_lvl) continue; // skip levels that are not in range
+
+        size_t var = mtbdd_levels_level_to_var(cur_lvl);
+        size_t bestsize = cursize;
+        size_t bestlvl = mtbdd_levels_var_to_level(var);
+
+        if(cur_lvl > (int)(mtbdd_levels_size()/2)){
+            // sifting up first, then down if current level
+            // is un the upper half of the variable order
+            sift_up(var, high_lvl, cursize, &bestsize, &bestlvl);
+            sift_down(var, low_lvl, cursize, &bestsize, &bestlvl);
+        }else{
+            // otherwise, sifting down first, then up
+            sift_down(var, low_lvl, cursize, &bestsize, &bestlvl);
+            sift_up(var, high_lvl, cursize, &bestsize, &bestlvl);
+        }
+
+        sift_to_lvl(var, bestlvl);
+    }
+
+    size_t after_size = llmsset_count_marked(nodes);
+    printf("Result of sifting: from %zu to %zu nodes.\n", before_size, after_size);
+}
 
 /**
  * Sifting in CUDD:
@@ -134,17 +236,18 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
 //        printf("now moving level %u, currently at position %zu\n", lvl, pos);
 
         size_t bestsize = cursize, bestpos = pos;
-        size_t oldsize = cursize, oldpos = pos;
+//        size_t oldsize = cursize, oldpos = pos;
 
         // optimum variable position search
         // sift up
         for (; pos < high; pos++) {
-            if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
-                printf("UH OH\n");
+            varswap_res_t res = sylvan_simple_varswap(pos);
+            if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+                fprintf(stderr, "varswap failed due to: %d\n", res);
                 exit(-1);
             }
             size_t after = llmsset_count_marked(nodes);
-            printf("swap(DN): from %zu to %zu\n", cursize, after);
+//            printf("swap(DN): from %zu to %zu\n", cursize, after);
             cursize = after;
             if (cursize < bestsize) {
                 bestsize = cursize;
@@ -154,12 +257,13 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
         }
         // sift down
         for (; pos > low; pos--) {
-            if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
-                printf("UH OH\n");
+            varswap_res_t res = sylvan_simple_varswap(pos - 1);
+            if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+                fprintf(stderr, "varswap failed due to: %d\n", res);
                 exit(-1);
             }
             size_t after = llmsset_count_marked(nodes);
-            printf("swap(UP): from %zu to %zu\n", cursize, after);
+//            printf("swap(UP): from %zu to %zu\n", cursize, after);
             cursize = after;
             if (cursize < bestsize) {
                 bestsize = cursize;
@@ -168,22 +272,22 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
             if (cursize >= 2 * bestsize) break;
         }
 
-        printf("best pos : %zu (old pos %zu) bestsize %zu (old bestsize %zu)\n", bestpos, oldpos, bestsize, oldsize);
+//        printf("best pos : %zu (old pos %zu) bestsize %zu (old bestsize %zu)\n", bestpos, oldpos, bestsize, oldsize);
 
         // optimum variable position restoration
         // sift up
         for (; pos < bestpos; pos++) {
-            if (sylvan_simple_varswap(pos) != SYLVAN_VAR_SWAP_SUCCESS) {
-                // should not happen since we use chaining and not linear probing
-                printf("UH OH\n");
+            varswap_res_t res = sylvan_simple_varswap(pos);
+            if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+                fprintf(stderr, "varswap failed due to: %d\n", res);
                 exit(-1);
             }
         }
         // sift down
         for (; pos > bestpos; pos--) {
-            if (sylvan_simple_varswap(pos-1) != SYLVAN_VAR_SWAP_SUCCESS) {
-                // should not happen since we use chaining and not linear probing
-                printf("UH OH\n");
+            varswap_res_t res = sylvan_simple_varswap(pos - 1);
+            if (res != SYLVAN_VAR_SWAP_SUCCESS) {
+                fprintf(stderr, "varswap failed due to: %d\n", res);
                 exit(-1);
             }
         }
@@ -194,3 +298,5 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
 
     return 0;
 }
+
+

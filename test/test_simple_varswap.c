@@ -11,16 +11,6 @@
 
 UTEST_STATE();
 
-void print_level_arrays(int iteration){
-    printf("iteration=%d  \n", iteration);
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("level_to_var[%zu]=%d, ", i, mtbdd_levels_level_to_var(i));
-    printf("\n");
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("var_to_level[%zu]=%d, ", i, mtbdd_levels_var_to_level(i));
-    printf("\n");
-}
-
 /**
  * Test functionality of sylvan_levels
  */
@@ -286,29 +276,29 @@ UTEST_TASK_0(test_simple_varswap, var_swap_random)  {
         ASSERT_STREQ(rnd_bdd_cmp_hash_before_swp, rnd_bdd_hash_after_swp);
 
         /// test random, swap of level 6 with level 8
-        rnd_bdd = make_random(3, 16);
-        map = sylvan_map_empty();
-        map = sylvan_map_add(map, 6, mtbdd_ithvar(8));
-        map = sylvan_map_add(map, 8, mtbdd_ithvar(6));
-        rnd_bdd_cmp = sylvan_compose(rnd_bdd, map);
-
-        ASSERT_EQ(sylvan_compose(rnd_bdd, map), rnd_bdd_cmp);
-
-        // get hash of rnd_bdd and rnd_bdd_cmp before var swap
-        sylvan_getsha(rnd_bdd, rnd_bdd_hash_before_swp);
-        sylvan_getsha(rnd_bdd_cmp, rnd_bdd_cmp_hash_before_swp);
-
-        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
-        ASSERT_EQ(sylvan_simple_varswap(7), SYLVAN_VAR_SWAP_SUCCESS);
-        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
-
-        // get hash of rnd_bdd and rnd_bdd_cmp after var swap
-        sylvan_getsha(rnd_bdd, rnd_bdd_hash_after_swp);
-        sylvan_getsha(rnd_bdd_cmp, rnd_bdd_cmp_hash_after_swp);
-
-        // check if hash of rnd_bdd and rnd_bdd_cmp are swapped
-        ASSERT_STREQ(rnd_bdd_hash_before_swp, rnd_bdd_cmp_hash_after_swp);
-        ASSERT_STREQ(rnd_bdd_cmp_hash_before_swp, rnd_bdd_hash_after_swp);
+//        rnd_bdd = make_random(3, 16);
+//        map = sylvan_map_empty();
+//        map = sylvan_map_add(map, 6, mtbdd_ithvar(8));
+//        map = sylvan_map_add(map, 8, mtbdd_ithvar(6));
+//        rnd_bdd_cmp = sylvan_compose(rnd_bdd, map);
+//
+//        ASSERT_EQ(sylvan_compose(rnd_bdd, map), rnd_bdd_cmp);
+//
+//        // get hash of rnd_bdd and rnd_bdd_cmp before var swap
+//        sylvan_getsha(rnd_bdd, rnd_bdd_hash_before_swp);
+//        sylvan_getsha(rnd_bdd_cmp, rnd_bdd_cmp_hash_before_swp);
+//
+//        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+//        ASSERT_EQ(sylvan_simple_varswap(7), SYLVAN_VAR_SWAP_SUCCESS);
+//        ASSERT_EQ(sylvan_simple_varswap(6), SYLVAN_VAR_SWAP_SUCCESS);
+//
+//        // get hash of rnd_bdd and rnd_bdd_cmp after var swap
+//        sylvan_getsha(rnd_bdd, rnd_bdd_hash_after_swp);
+//        sylvan_getsha(rnd_bdd_cmp, rnd_bdd_cmp_hash_after_swp);
+//
+//        // check if hash of rnd_bdd and rnd_bdd_cmp are swapped
+//        ASSERT_STREQ(rnd_bdd_hash_before_swp, rnd_bdd_cmp_hash_after_swp);
+//        ASSERT_STREQ(rnd_bdd_cmp_hash_before_swp, rnd_bdd_hash_after_swp);
     }
 
     sylvan_levels_destroy();

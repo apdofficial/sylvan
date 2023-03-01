@@ -11,7 +11,6 @@
 #include <cstdint>
 
 #include <sylvan.h>
-//#include <sylvan_int.h>
 #include <sylvan_obj.hpp>
 
 #include <string>
@@ -35,8 +34,8 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 1; // autodetect
-static int verbose = 1;
+static int workers = 8; // autodetect
+static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
 static int reorder = 0;
 
@@ -530,7 +529,8 @@ VOID_TASK_0(parse)
 #endif
 
     sylvan_stats_report(stdout);
-    sylvan_sifting(0, 0);
+//    sylvan_sifting(0, 0);
+    sylvan_sifting_new(0, 0);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -675,10 +675,6 @@ VOID_TASK_0(parse)
     (void)F;
 }
 
-VOID_TASK_0(gc_mark)
-{
-}
-
 VOID_TASK_0(gc_start)
 {
     size_t used, total;
@@ -692,7 +688,7 @@ VOID_TASK_0(gc_end)
     sylvan_table_usage(&used, &total);
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
     INFO("Running the sifting algorithm.\n");
-    sylvan_sifting(0, 0);
+//    sylvan_sifting(0, 0);
 }
 
 int
@@ -719,7 +715,6 @@ main(int argc, char **argv)
         sylvan_gc_hook_pregc(TASK(gc_start));
         sylvan_gc_hook_postgc(TASK(gc_end));
     }
-    sylvan_gc_hook_pregc(TASK(gc_mark));
 
     if (aag_filename == NULL) {
         Abort("stream not yet supported\n");
@@ -733,7 +728,7 @@ main(int argc, char **argv)
 
     buf = (uint8_t*)mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     if(buf == MAP_FAILED) Abort("mmap failed\n");
-
+    sylvan_gc_disable();
     RUN(parse);
     
     // Report Sylvan statistics (if SYLVAN_STATS is set)

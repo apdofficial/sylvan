@@ -110,8 +110,6 @@ void
 mtbdd_levels_varswap(uint32_t var)
 {
 #if 0
-    // the variable itself is incremented but that does not
-    // necessarily mean that we get a successor variable
     level_to_var[var_to_level[var]] = var+1;
     level_to_var[var_to_level[var+1]] = var;
     uint32_t save = var_to_level[var];
