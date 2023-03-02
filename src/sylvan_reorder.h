@@ -26,31 +26,35 @@ extern "C" {
  */
 void sylvan_init_reorder(void);
 
-VOID_TASK_DECL_5(sift_up, size_t, size_t, size_t, size_t*, size_t*);
+VOID_TASK_DECL_5(sift_up, size_t, size_t, size_t*, size_t*, size_t*);
 /**
- * @brief Sift a variable up  from its current level to the target level.
+ * \brief Sift a variable up  from its current level to the target level.
  * \param var - variable to sift up
  * \param target_lvl - target level
  * \param cursize - current size of the bdd
  * \param bestsize - best size of the bdd (w.r.t. dynamic variable reordering)
  * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
+ *
+ * \sideeffect order of variables is changed
  */
 #define sift_up(var, target_lvl, cursize, bestsize, bestlvl) RUN(sift_up,var, target_lvl, cursize, bestsize, bestlvl)
 
-VOID_TASK_DECL_5(sift_down, size_t, size_t, size_t, size_t*, size_t*);
+VOID_TASK_DECL_5(sift_down, size_t, size_t, size_t*, size_t*, size_t*);
 /**
- * @brief Sift a variable down from its current level to the target level.
+ * \brief Sift a variable down from its current level to the target level.
  * \param var - variable to sift down
  * \param target_lvl - target level
  * \param cursize - current size of the bdd
  * \param bestsize - best size of the bdd (w.r.t. dynamic variable reordering)
  * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
+ *
+ * \sideeffect order of variables is changed
  */
 #define sift_down(var, target_lvl, cursize, bestsize, bestlvl) RUN(sift_down,var, target_lvl, cursize, bestsize, bestlvl)
 
 VOID_TASK_DECL_2(sift_to_lvl, size_t, size_t);
 /**
- * @brief Sift a variable to its best level.
+ * \brief Sift a variable to its best level.
  * \param var - variable to sift
  * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
  */
@@ -73,7 +77,7 @@ VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
   \param low_lvl - the lowest level to sift
   \param high_lvl - the highest level to sift
 
-  @sideeffect order and number of variables is changed
+  \sideeffect order and number of variables is changed
 
 */
 #define sylvan_sifting_new(low_lvl, high_lvl) CALL(sylvan_sifting_new, low_lvl, high_lvl)

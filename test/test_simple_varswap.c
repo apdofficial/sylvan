@@ -130,8 +130,20 @@ UTEST_TASK_0(test_simple_varswap, var_single_swap)  {
     ASSERT_EQ(mtbdd_levels_level_to_var(level_3), var_3);
     ASSERT_EQ(mtbdd_levels_level_to_var(level_4), var_4);
 
+    for (size_t i = 0; i < 10; ++i){
+        mtbddnode_t node = MTBDD_GETNODE(i);
+        printf("var: %u\n", mtbddnode_getvariable(node));
+    }
+
+    printf("swap var_3: %u\n", var_3);
+
     ASSERT_EQ(sylvan_simple_varswap(var_3), SYLVAN_VAR_SWAP_SUCCESS);
 
+    for (size_t i = 0; i < 10; ++i){
+        mtbddnode_t node = MTBDD_GETNODE(i);
+        printf("var: %u\n", mtbddnode_getvariable(node));
+    }
+    
     ASSERT_EQ(mtbdd_levels_var_to_level(var_4), level_3);
     ASSERT_EQ(mtbdd_levels_var_to_level(var_3), level_4);
 

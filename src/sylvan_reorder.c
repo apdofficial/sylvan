@@ -39,7 +39,9 @@ VOID_TASK_DECL_2(get_sorted_level_counts, int*, size_t);
  * \details Order all the variables using gnome sort according to the number of entries in each level.
  *
  * \param level_counts - array of size mtbdd_levels_size()
- * \param threshold - only count nodes from levels threshold
+ * \param threshold - only count levels which have at least threshold number of variables.
+ * If level is skipped assign it -1.
+ *
  */
 #define get_sorted_level_counts(level_counts, threshold) RUN(get_sorted_level_counts, level_counts, threshold)
 
@@ -63,7 +65,6 @@ void sylvan_init_reorder(){
 
 
 VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold) {
-    // we want to sort it
     size_t level_counts[mtbdd_levels_size()];
     for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
     mtbdd_levels_count_nodes(level_counts);
@@ -89,7 +90,7 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold) {
     }
 }
 
-VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t, cursize, size_t*, bestsize, size_t*, bestlvl) {
+VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t*, cursize, size_t*, bestsize, size_t*, bestlvl) {
     size_t cur_lvl = mtbdd_levels_var_to_level(var);
 
     for (; cur_lvl < target_lvl; cur_lvl++) {
@@ -99,16 +100,16 @@ VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t, cursize, size
             exit(-1);
         }
         size_t after = llmsset_count_marked(nodes);
-        cursize = after;
-        if (cursize < *bestsize) {
-            *bestsize = cursize;
+        *cursize = after;
+        if (*cursize < *bestsize) {
+            *bestsize = *cursize;
             *bestlvl = cur_lvl;
         }
-        if (cursize >= 2 * (*bestsize)) break;
+        if (*cursize >= 2 * (*bestsize)) break;
     }
 }
 
-VOID_TASK_IMPL_5(sift_down, size_t, var, size_t, target_lvl, size_t, cursize, size_t*, bestsize, size_t*, bestlvl) {
+VOID_TASK_IMPL_5(sift_down, size_t, var, size_t, target_lvl, size_t*, cursize, size_t*, bestsize, size_t*, bestlvl) {
     size_t cur_lvl = mtbdd_levels_var_to_level(var);
 
     for (; cur_lvl > target_lvl; cur_lvl--) {
@@ -119,12 +120,12 @@ VOID_TASK_IMPL_5(sift_down, size_t, var, size_t, target_lvl, size_t, cursize, si
             exit(-1);
         }
         size_t after = llmsset_count_marked(nodes);
-        cursize = after;
-        if (cursize < *bestsize) {
-            *bestsize = cursize;
+        *cursize = after;
+        if (*cursize < *bestsize) {
+            *bestsize = *cursize;
             *bestlvl = cur_lvl;
         }
-        if (cursize >= 2 * (*bestsize)) break;
+        if (*cursize >= 2 * (*bestsize)) break;
     }
 }
 
@@ -149,14 +150,11 @@ VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestlvl) {
     }
 }
 
-
 VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
     printf("Started Rudell's sifting...\n");
 
-    // TODO: implement maxGrowth limit tuning parameter (look at (2006, Ebendt et al.) or CUDD)
-    // Rüdiger Ebendt and Rolf Drechsler. “Effect of improved lower bounds in dynamic BDD reordering”.
-    // In: IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems 25 (5 May 2006),
-    // pp. 902–908. ISSN: 02780070. DOI: 10. 1109/TCAD.2005.854632.
+    // TODO: implement maxGrowth limit tuning parameter
+    //  (look at (2006, Ebendt et al. RT [12]) and CUDD)
     // TODO: implement maxSwap tuning parameter (look a CUDD)
     // TODO: implement timeLimit tuning parameter (look at CUDD)
 
@@ -165,31 +163,39 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
 
     size_t before_size = llmsset_count_marked(nodes);
 
+    // Count all the variables and order their levels according to the
+    // number of entries in each level (parallel operation)
     int level[mtbdd_levels_size()];
     get_sorted_level_counts(level, 1);
 
     size_t cursize = llmsset_count_marked(nodes);
 
+    // loop over all levels
     for (unsigned int i = 0; i < mtbdd_levels_size(); i++) {
         int cur_lvl = level[i];
-        if (cur_lvl == -1) break; // done
-        if (cur_lvl < (int)low_lvl || cur_lvl > (int)high_lvl) continue; // skip levels that are not in range
+        // done
+        if (cur_lvl == -1) break;
+        // skip levels that are not in range
+        if (cur_lvl < (int)low_lvl || cur_lvl > (int)high_lvl) continue;
 
         size_t var = mtbdd_levels_level_to_var(cur_lvl);
         size_t bestsize = cursize;
         size_t bestlvl = mtbdd_levels_var_to_level(var);
 
+        // search for the optimum variable position
         if(cur_lvl > (int)(mtbdd_levels_size()/2)){
-            // sifting up first, then down if current level
-            // is un the upper half of the variable order
-            sift_up(var, high_lvl, cursize, &bestsize, &bestlvl);
-            sift_down(var, low_lvl, cursize, &bestsize, &bestlvl);
+            // if current level is in the upper half of the variable order
+            // sifting up first, then down
+            sift_up(var, high_lvl, &cursize, &bestsize, &bestlvl);
+            sift_down(var, low_lvl, &cursize, &bestsize, &bestlvl);
         }else{
-            // otherwise, sifting down first, then up
-            sift_down(var, low_lvl, cursize, &bestsize, &bestlvl);
-            sift_up(var, high_lvl, cursize, &bestsize, &bestlvl);
+            // if current level is NOT in the upper half of the variable order
+            // sifting down first, then up
+            sift_down(var, low_lvl, &cursize, &bestsize, &bestlvl);
+            sift_up(var, high_lvl, &cursize, &bestsize, &bestlvl);
         }
 
+        // optimum variable position restoration
         sift_to_lvl(var, bestlvl);
     }
 
@@ -244,10 +250,10 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
         if (lvl == -1) break; // done
         size_t pos = mtbdd_levels_level_to_var(lvl);
 
-//        printf("now moving level %u, currently at position %zu\n", lvl, pos);
+        printf("now moving level %u, currently at position %zu\n", lvl, pos);
 
         size_t bestsize = cursize, bestpos = pos;
-//        size_t oldsize = cursize, oldpos = pos;
+        size_t oldsize = cursize, oldpos = pos;
 
         // optimum variable position search
         // sift up
@@ -283,7 +289,7 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
             if (cursize >= 2 * bestsize) break;
         }
 
-//        printf("best pos : %zu (old pos %zu) bestsize %zu (old bestsize %zu)\n", bestpos, oldpos, bestsize, oldsize);
+        printf("best pos : %zu (old pos %zu) bestsize %zu (old bestsize %zu)\n", bestpos, oldpos, bestsize, oldsize);
 
         // optimum variable position restoration
         // sift up

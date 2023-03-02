@@ -15,6 +15,8 @@ VOID_TASK_DECL_3(call_sylvan_var_swap_p0, uint32_t, size_t, size_t);
    \param count ending index
 */
 #define call_sylvan_var_swap_p0(var, first, count) CALL(call_sylvan_var_swap_p0, var, first, count)
+
+
 TASK_DECL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, size_t, size_t);
 /*!
    \brief Adjacent variable swap phase 1
@@ -25,6 +27,8 @@ TASK_DECL_3(uint64_t, call_sylvan_var_swap_p1, uint32_t, size_t, size_t);
    \return number of nodes that were marked
 */
 #define call_sylvan_var_swap_p1(var, first, count) CALL(call_sylvan_var_swap_p1, var, first, count)
+
+
 VOID_TASK_DECL_4(call_sylvan_var_swap_p2, uint32_t, size_t, size_t, volatile varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 2

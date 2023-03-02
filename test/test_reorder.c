@@ -103,7 +103,7 @@ UTEST_TASK_0(test_sifting, basic_sift_up) {
     size_t bestlvl = mtbdd_levels_var_to_level(var_0);
 
     // sift var_0 to from level_0 to level_5
-    sift_up(var_0, level_5, cursize, &bestsize, &bestlvl);
+    sift_up(var_0, level_5, &cursize, &bestsize, &bestlvl);
 
     // check whether var_0 was swapped to level_5
     ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);
@@ -154,7 +154,7 @@ UTEST_TASK_0(test_sifting, basic_sift_down){
     size_t bestlvl = mtbdd_levels_var_to_level(var_0);
 
     // sift var_0 to from level_0 to level_5
-    sift_down(var_0, level_0, cursize, &bestsize, &bestlvl);
+    sift_down(var_0, level_0, &cursize, &bestsize, &bestlvl);
 
     // check whether var_0 was swapped to level_5
     ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
@@ -206,7 +206,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level){
     size_t bestlvl = mtbdd_levels_var_to_level(var_0);
 
     // sift var_0 to from level_0 to level_5
-    sift_down(var_0, level_0, cursize, &bestsize, &bestlvl);
+    sift_down(var_0, level_0, &cursize, &bestsize, &bestlvl);
 
     // check whether var_0 was swapped to level_5
     ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_0);
