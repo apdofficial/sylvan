@@ -26,31 +26,37 @@ extern "C" {
  */
 void sylvan_init_reorder(void);
 
-VOID_TASK_DECL_5(sift_up, size_t, size_t, size_t*, size_t*, size_t*);
+VOID_TASK_DECL_6(sift_up, size_t, size_t, float, size_t*, size_t*, size_t*);
 /**
- * \brief Sift a variable up  from its current level to the target level.
+ * \brief Sift given variable up from its current level to the target level.
+ *
  * \param var - variable to sift up
- * \param target_lvl - target level
- * \param cursize - current size of the bdd
- * \param bestsize - best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
+ * \param targetLvl - target level
+ * \param maxGrowth - some maximum % growth (from the start of a sift of a part. variable)
+ * \param curSize - pointer to current size of the bdd
+ * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
+ * \param bestLvl - pointer to best level of the variable (w.r.t. dynamic variable reordering)
  *
  * \sideeffect order of variables is changed
  */
-#define sift_up(var, target_lvl, cursize, bestsize, bestlvl) RUN(sift_up,var, target_lvl, cursize, bestsize, bestlvl)
+#define sift_up(var, targetLvl, maxGrowth, curSize, bestSize, bestLvl) \
+                    RUN(sift_up, var, targetLvl, maxGrowth, curSize, bestSize, bestLvl)
 
-VOID_TASK_DECL_5(sift_down, size_t, size_t, size_t*, size_t*, size_t*);
+VOID_TASK_DECL_6(sift_down, size_t, size_t, float, size_t*, size_t*, size_t*);
 /**
- * \brief Sift a variable down from its current level to the target level.
+ * \brief Sift given variable down from its current level to the target level.
+ *
  * \param var - variable to sift down
- * \param target_lvl - target level
- * \param cursize - current size of the bdd
- * \param bestsize - best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
+ * \param targetLvl - target level
+ * \param maxGrowth - some maximum % growth (from the start of a sift of a part. variable)
+ * \param curSize - pointer to current size of the bdd
+ * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
+ * \param bestLvl - pointer to best level of the variable (w.r.t. dynamic variable reordering)
  *
  * \sideeffect order of variables is changed
  */
-#define sift_down(var, target_lvl, cursize, bestsize, bestlvl) RUN(sift_down,var, target_lvl, cursize, bestsize, bestlvl)
+#define sift_down(var, targetLvl, maxGrowth, curSize, bestSize, bestLvl) \
+                    RUN(sift_down, var, targetLvl, maxGrowth, curSize, bestSize, bestLvl)
 
 VOID_TASK_DECL_2(sift_to_lvl, size_t, size_t);
 /**

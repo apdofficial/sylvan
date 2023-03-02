@@ -90,49 +90,65 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold) {
     }
 }
 
-VOID_TASK_IMPL_5(sift_up, size_t, var, size_t, target_lvl, size_t*, cursize, size_t*, bestsize, size_t*, bestlvl) {
-    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+VOID_TASK_IMPL_6(sift_up,
+        size_t,  var,
+        size_t,  targetLvl,
+        float,   maxGrowth,
+        size_t*, curSize,
+        size_t*, bestSize,
+        size_t*, bestLvl
+){
+    size_t curLvl = mtbdd_levels_var_to_level(var);
 
-    for (; cur_lvl < target_lvl; cur_lvl++) {
+    for (; curLvl < targetLvl; curLvl++) {
         varswap_res_t res = sylvan_simple_varswap(var);
         if (res != SYLVAN_VAR_SWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
             exit(-1);
         }
-        size_t after = llmsset_count_marked(nodes);
-        *cursize = after;
-        if (*cursize < *bestsize) {
-            *bestsize = *cursize;
-            *bestlvl = cur_lvl;
+        size_t afterSwpSize = llmsset_count_marked(nodes);
+        *curSize = afterSwpSize;
+        if (*curSize < *bestSize) {
+            *bestSize = *curSize;
+            *bestLvl = curLvl;
         }
-        if (*cursize >= 2 * (*bestsize)) break;
+        if ((float)(*curSize) >= maxGrowth * (float)(*bestSize)) break;
     }
+    //TODO: return varswap_res_t
 }
 
-VOID_TASK_IMPL_5(sift_down, size_t, var, size_t, target_lvl, size_t*, cursize, size_t*, bestsize, size_t*, bestlvl) {
-    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+VOID_TASK_IMPL_6(sift_down,
+        size_t,  var,
+        size_t,  targetLvl,
+        float,   maxGrowth,
+        size_t*, curSize,
+        size_t*, bestSize,
+        size_t*, bestLvl
+){
+    size_t curLvl = mtbdd_levels_var_to_level(var);
 
-    for (; cur_lvl > target_lvl; cur_lvl--) {
-        size_t prev_var = mtbdd_levels_level_to_var(cur_lvl-1);
+    for (; curLvl > targetLvl; curLvl--) {
+        size_t prev_var = mtbdd_levels_level_to_var(curLvl-1);
         varswap_res_t res = sylvan_simple_varswap(prev_var);
         if (res != SYLVAN_VAR_SWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
             exit(-1);
         }
-        size_t after = llmsset_count_marked(nodes);
-        *cursize = after;
-        if (*cursize < *bestsize) {
-            *bestsize = *cursize;
-            *bestlvl = cur_lvl;
+        size_t afterSwpSize = llmsset_count_marked(nodes);
+        *curSize = afterSwpSize;
+        if (*curSize < *bestSize) {
+            *bestSize = *curSize;
+            *bestLvl = curLvl;
         }
-        if (*cursize >= 2 * (*bestsize)) break;
+        if ((float)(*curSize) >= maxGrowth * (float)(*bestSize)) break;
     }
+    //TODO: return varswap_res_t
 }
 
-VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestlvl) {
-    size_t cur_lvl = mtbdd_levels_var_to_level(var);
+VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestLvl) {
+    size_t curLvl = mtbdd_levels_var_to_level(var);
     // sift up
-    for (; cur_lvl < bestlvl; cur_lvl++) {
+    for (; curLvl < bestLvl; curLvl++) {
         varswap_res_t res = sylvan_simple_varswap(var);
         if (res != SYLVAN_VAR_SWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
@@ -140,9 +156,9 @@ VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestlvl) {
         }
     }
     // sift down
-    for (; cur_lvl > bestlvl; cur_lvl--) {
-        size_t prev_var = mtbdd_levels_level_to_var(cur_lvl-1);
-        varswap_res_t res = sylvan_simple_varswap(prev_var);
+    for (; curLvl > bestLvl; curLvl--) {
+        size_t prevVar = mtbdd_levels_level_to_var(curLvl-1);
+        varswap_res_t res = sylvan_simple_varswap(prevVar);
         if (res != SYLVAN_VAR_SWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
             exit(-1);
@@ -157,6 +173,8 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
     //  (look at (2006, Ebendt et al. RT [12]) and CUDD)
     // TODO: implement maxSwap tuning parameter (look a CUDD)
     // TODO: implement timeLimit tuning parameter (look at CUDD)
+
+    float maxGrowth = 1.2f;
 
     // if high == 0, then we sift all variables
     if (high_lvl == 0)  high_lvl = mtbdd_levels_size() - 1;
@@ -186,13 +204,13 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
         if(cur_lvl > (int)(mtbdd_levels_size()/2)){
             // if current level is in the upper half of the variable order
             // sifting up first, then down
-            sift_up(var, high_lvl, &cursize, &bestsize, &bestlvl);
-            sift_down(var, low_lvl, &cursize, &bestsize, &bestlvl);
+            sift_up(var, high_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
+            sift_down(var, low_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
         }else{
             // if current level is NOT in the upper half of the variable order
             // sifting down first, then up
-            sift_down(var, low_lvl, &cursize, &bestsize, &bestlvl);
-            sift_up(var, high_lvl, &cursize, &bestsize, &bestlvl);
+            sift_down(var, low_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
+            sift_up(var, high_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
         }
 
         // optimum variable position restoration
