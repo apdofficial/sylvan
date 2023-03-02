@@ -148,6 +148,7 @@ sylvan_levels_destroy(void)
 
 VOID_TASK_IMPL_3(mtbdd_levels_count_nodes, size_t*, arr, size_t, first, size_t, count)
 {
+    // Divide-and-conquer if count above COUNT_NODES_BLOCK_SIZE
     if (count > COUNT_NODES_BLOCK_SIZE) {
         SPAWN(mtbdd_levels_count_nodes, arr, first, count / 2);
         CALL(mtbdd_levels_count_nodes, arr, first + count / 2, count - count / 2);

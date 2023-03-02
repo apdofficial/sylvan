@@ -52,7 +52,7 @@ UTEST_TASK_0(test_sifting, basic_manual_sifting) {
 
     // sift var_0 to from level_0 to level_6
     for (size_t lvl = level_0; lvl < level_5; lvl++) {
-        ASSERT_EQ(sylvan_simple_varswap(var_0), SYLVAN_VAR_SWAP_SUCCESS);
+        ASSERT_EQ(sylvan_simple_varswap(var_0), SYLVAN_VARSWAP_SUCCESS);
     }
     // check whether var_0 was swapped to level_6
     ASSERT_EQ(mtbdd_levels_var_to_level(var_0), level_5);

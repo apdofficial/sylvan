@@ -12,20 +12,29 @@ extern "C" {
 
 typedef enum varswap_res {
     /// the operation was aborted and rolled back
-    SYLVAN_VAR_SWAP_ROLLBACK = 1,
+    SYLVAN_VARSWAP_ROLLBACK = 1,
     /// success
-    SYLVAN_VAR_SWAP_SUCCESS = 0,
+    SYLVAN_VARSWAP_SUCCESS = 0,
     //// cannot rehash in phase 1, no marked nodes remaining
-    SYLVAN_VAR_SWAP_P1_REHASH_FAIL = -1,
+    SYLVAN_VARSWAP_P0_CLEAR_FAIL = -1,
+    //// cannot rehash in phase 1, no marked nodes remaining
+    SYLVAN_VARSWAP_P1_REHASH_FAIL = -2,
     /// cannot rehash in phase 1, and marked nodes remaining
-    SYLVAN_VAR_SWAP_P1_REHASH_FAIL_MARKED = -2,
+    SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED = -3,
     /// cannot rehash in phase 2, no marked nodes remaining
-    SYLVAN_VAR_SWAP_P2_REHASH_FAIL = -3,
+    SYLVAN_VARSWAP_P2_REHASH_FAIL = -4,
     /// cannot create node in phase 2 (ergo marked nodes remaining)
-    SYLVAN_VAR_SWAP_P2_CREATE_FAIL = -4,
+    SYLVAN_VARSWAP_P2_CREATE_FAIL = -5,
     /// cannot rehash and cannot create node in phase 2
-    SYLVAN_VAR_SWAP_P2_REHASH_AND_CREATE_FAIL = -5,
+    SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
 } varswap_res_t;
+
+/**
+ * Print result message based on the given result.
+ * @param tag printed a prefix of the result message
+ * @param result of type varswap_res_t
+ */
+void sylvan_print_varswap_res(char *tag, varswap_res_t result);
 
  /**
   * @brief Swaps two consecutive variables in the entire forest.
