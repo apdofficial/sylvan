@@ -72,7 +72,7 @@ void sylvan_print_varswap_res(char *tag, varswap_res_t result);
   *
   */
 TASK_DECL_2(varswap_res_t, sylvan_varswap, uint32_t, int);
-#define sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
+#define _sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
 
 
 /**

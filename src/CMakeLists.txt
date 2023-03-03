@@ -17,9 +17,9 @@ target_sources(sylvan
     sylvan_stats.c
     sylvan_table.c
     sylvan_zdd.c
-        sylvan_varswap.c
-        sylvan_levels.c
-        sylvan_reorder.c
+    sylvan_varswap.c
+    sylvan_levels.c
+    sylvan_reorder.c
   PUBLIC
     sylvan.h
     sylvan_bdd.h
@@ -39,14 +39,14 @@ target_sources(sylvan
     sylvan_tls.h
     sylvan_zdd.h
     sylvan_zdd_int.h
-        sylvan_varswap.h
-        sylvan_levels.h
-        sylvan_reorder.h
+    sylvan_varswap.h
+    sylvan_levels.h
+    sylvan_reorder.h
 )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
 target_compile_features(sylvan PUBLIC c_std_11 cxx_std_11)
-target_compile_options(sylvan PRIVATE -Wall -Wextra -Werror -fno-strict-aliasing -Wno-deprecated)
+target_compile_options(sylvan PRIVATE -Wall -Wextra -Werror -fno-strict-aliasing -Wno-deprecated -Wno-unused)
 target_include_directories(sylvan PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(sylvan PUBLIC m pthread lace)
 

@@ -17,6 +17,8 @@
 #include <sylvan_int.h>
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
+#include "sylvan_reorder.h"
+
 
 /*
  * TODO
@@ -24,9 +26,10 @@
  * check if variables are "interacting" to make it a biiiit faster...
  */
 
-// TODO: separate declaration fomr implementation and add also sift down and restore best position
 
-#define DEBUG_SIFTING 1
+static int debug_sifting = 0;
+static int mtbdd_reorder_initialized = 0;
+
 
 /**
  * Block size tunes the granularity of the parallel distribution
@@ -46,8 +49,39 @@ VOID_TASK_DECL_2(get_sorted_level_counts, int*, size_t);
  */
 #define get_sorted_level_counts(level_counts, threshold) RUN(get_sorted_level_counts, level_counts, threshold)
 
+void sylvan_sifting_enable_debug(void) {
+    debug_sifting = 1;
+}
 
-static int mtbdd_reorder_initialized = 0;
+void sylvan_sifting_disable_debug(void) {
+    debug_sifting = 0;
+}
+
+void print_real_var_ordering(void) {
+    printf("real var:   ");
+    for (size_t i = 0; i < mtbdd_levels_size(); ++i){
+//        printf("l%zu: ",i);
+        BDD node = mtbdd_levels_ithlevel(i);
+//        printf("v%d ", mtbdd_levels_level_to_var(i));
+        printf("v%d ", sylvan_var(node));
+//        printf("(n%llu), ", node);
+//        printf("(v%d->l%u), ", var, mtbdd_levels_var_to_level(var));
+    }
+    printf("\n");
+}
+
+void print_levels_var_ordering(void) {
+    printf("levels var: ");
+    for (size_t i = 0; i < mtbdd_levels_size(); ++i){
+//        printf("l%zu: ",i);
+//        BDD node = mtbdd_levels_ithlevel(i);
+        printf("v%d ", mtbdd_levels_level_to_var(i));
+//        printf("rv%d ", sylvan_var(node));
+//        printf("(n%llu), ", node);
+//        printf("(v%d->l%u), ", var, mtbdd_levels_var_to_level(var));
+    }
+    printf("\n");
+}
 
 static void reorder_quit()
 {
@@ -90,9 +124,9 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold)
     clock_t t = clock();
     mtbdd_levels_count_nodes(level_counts);
 
-#if DEBUG_SIFTING
-    printf("mtbdd_levels_count_nodes()  took %f seconds to execute \n", (((double)(clock() - t))/CLOCKS_PER_SEC));
-#endif
+    if(debug_sifting){
+        printf("mtbdd_levels_count_nodes()  took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+    }
 
     // set levels below the threshold to -1
     for (int i = 0; i < (int)mtbdd_levels_size(); i++) {
@@ -107,81 +141,92 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold)
     t = clock();
     gnome_sort(level, level_counts);
 
-#if DEBUG_SIFTING
-    printf("gnome_sort()                took %f seconds to execute \n", (((double)(clock() - t))/CLOCKS_PER_SEC));
-#endif
+    if(debug_sifting) {
+        printf("gnome_sort()                took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+    }
+
 }
 
 
 VOID_TASK_IMPL_6(sift_up,
-        size_t,  var,
-        size_t,  targetLvl,
+        size_t,  pos,
+        size_t,  high,
         float,   maxGrowth,
         size_t*, curSize,
         size_t*, bestSize,
-        size_t*, bestLvl
+        size_t*, bestPos
 ){
-    size_t curLvl = mtbdd_levels_var_to_level(var);
-
-    for (; curLvl < targetLvl; curLvl++) {
-        varswap_res_t res = sylvan_simple_varswap(var);
+    if (debug_sifting){
+        print_levels_var_ordering();
+        print_real_var_ordering();
+        printf("sift_up: v%zu to %zu\n", pos, high);
+    }
+    for (; pos < high; pos++) {
+        varswap_res_t res = sylvan_simple_varswap(pos);
         if (res != SYLVAN_VARSWAP_SUCCESS) {
-            sylvan_print_varswap_res("sylvan_simple_varswap failed due to: ", res);
+            sylvan_print_varswap_res("sylvan_simple_varswap failed due to: \n", res);
             exit(-1);
         }
-        size_t afterSwpSize = llmsset_count_marked(nodes);
-        *curSize = afterSwpSize;
+        *curSize = llmsset_count_marked(nodes);
         if (*curSize < *bestSize) {
+            if(debug_sifting){
+                printf("Improved size from %zu to %zu\n", *bestSize, *curSize);
+            }
             *bestSize = *curSize;
-            *bestLvl = curLvl;
+            *bestPos = pos;
         }
         if ((float)(*curSize) >= maxGrowth * (float)(*bestSize)) break;
     }
     //TODO: return varswap_res_t
+    if(debug_sifting){
+        print_levels_var_ordering();
+    }
+
 }
 
 VOID_TASK_IMPL_6(sift_down,
-        size_t,  var,
-        size_t,  targetLvl,
+        size_t,  pos,
+        size_t,  low,
         float,   maxGrowth,
         size_t*, curSize,
         size_t*, bestSize,
-        size_t*, bestLvl
+        size_t*, bestPos
 ){
-    size_t curLvl = mtbdd_levels_var_to_level(var);
-
-    for (; curLvl > targetLvl; curLvl--) {
-        size_t prev_var = mtbdd_levels_level_to_var(curLvl-1);
+    if (debug_sifting){
+        print_levels_var_ordering();
+        print_real_var_ordering();
+        printf("sift_down: v%zu to %zu\n", pos, low);
+    }
+    for (; pos > low; pos--) {
+        size_t prev_var = mtbdd_levels_level_to_var(pos-1);
         varswap_res_t res = sylvan_simple_varswap(prev_var);
         if (res != SYLVAN_VARSWAP_SUCCESS) {
-            sylvan_print_varswap_res("sylvan_simple_varswap failed due to: ", res);
+            sylvan_print_varswap_res("sylvan_simple_varswap failed due to: \n", res);
             exit(-1);
         }
-        size_t afterSwpSize = llmsset_count_marked(nodes);
-        *curSize = afterSwpSize;
+        *curSize = llmsset_count_marked(nodes);
         if (*curSize < *bestSize) {
             *bestSize = *curSize;
-            *bestLvl = curLvl;
+            *bestPos = pos;
         }
         if ((float)(*curSize) >= maxGrowth * (float)(*bestSize)) break;
+    }
+    if(debug_sifting){
+        print_levels_var_ordering();
     }
     //TODO: return varswap_res_t
 }
 
-VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestLvl) {
-    size_t curLvl = mtbdd_levels_var_to_level(var);
-    // sift up
-    for (; curLvl < bestLvl; curLvl++) {
-        varswap_res_t res = sylvan_simple_varswap(var);
+VOID_TASK_IMPL_2(sift_to_pos, size_t, pos, size_t, bestPos) {
+    for (; pos < bestPos; pos++) {
+        varswap_res_t res = sylvan_simple_varswap(pos);
         if (res != SYLVAN_VARSWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
             exit(-1);
         }
     }
-    // sift down
-    for (; curLvl > bestLvl; curLvl--) {
-        size_t prevVar = mtbdd_levels_level_to_var(curLvl-1);
-        varswap_res_t res = sylvan_simple_varswap(prevVar);
+    for (; pos > bestPos; pos--) {
+        varswap_res_t res = sylvan_simple_varswap(pos-1);
         if (res != SYLVAN_VARSWAP_SUCCESS) {
             fprintf(stderr, "varswap failed due to: %d\n", res);
             exit(-1);
@@ -189,18 +234,21 @@ VOID_TASK_IMPL_2(sift_to_lvl, size_t, var, size_t, bestLvl) {
     }
 }
 
-VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
-    printf("Started sifting...\n");
-    clock_t startTime = clock();
-
+VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low, uint32_t, high)
+{
     // TODO: implement maxGrowth limit tuning parameter (look at (Ebendt et al. in RT [12]) and CUDD)
     // TODO: implement maxSwap tuning parameter (look a CUDD)
     // TODO: implement timeLimit tuning parameter (look at CUDD)
 
-    // if high == 0, then we sift all variables
-    if (high_lvl == 0)  high_lvl = mtbdd_levels_size() - 1;
+    if(debug_sifting) {
+        printf("Started sifting...\n");
+    }
 
+    clock_t startTime = clock();
     size_t before_size = llmsset_count_marked(nodes);
+
+    // if high == 0, then we sift all variables
+    if (high == 0)  high = mtbdd_levels_size() - 1;
 
     // Count all the variables and order their levels according to the
     // number of entries in each level (parallel operation)
@@ -209,19 +257,17 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
 
     size_t cursize = llmsset_count_marked(nodes);
 
+
     // loop over all levels
     for (unsigned int i = 0; i < mtbdd_levels_size(); i++) {
-        int cur_lvl = level[i];
-        // done
-        if (cur_lvl == -1) break;
-        // skip levels that are not in range
-        if (cur_lvl < (int)low_lvl || cur_lvl > (int)high_lvl) continue;
+        int lvl = level[i];
+        if (lvl == -1) break; // done
+        size_t pos = mtbdd_levels_level_to_var(lvl);
+        size_t bestsize = cursize, bestpos = pos;
 
         //TODO: check terminating conditions (maxSwap, timeLimit, etc.)
 
-        size_t var = mtbdd_levels_level_to_var(cur_lvl);
-        size_t bestsize = cursize;
-        size_t bestlvl = mtbdd_levels_var_to_level(var);
+        printf("sifting variable %zu from %d to %d\n", pos, i, lvl);
 
         clock_t t = clock();
 
@@ -229,32 +275,36 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
         float maxGrowth = 1.2f;
 
         // search for the optimum variable position
-        if(cur_lvl > (int)(mtbdd_levels_size()/2)){
+        if(lvl > (int)(mtbdd_levels_size()/2)){
             // if current level is in the upper half of the variable order
             // sifting up first, then down
-            sift_up(var, high_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
-            sift_down(var, low_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
+            sift_up(pos, high, maxGrowth, &cursize, &bestsize, &bestpos);
+            sift_down(pos, low, maxGrowth, &cursize, &bestsize, &bestpos);
         }else{
             // if current level is NOT in the upper half of the variable order
             // sifting down first, then up
-            sift_down(var, low_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
-            sift_up(var, high_lvl, maxGrowth, &cursize, &bestsize, &bestlvl);
+            sift_down(pos, low, maxGrowth, &cursize, &bestsize, &bestpos);
+            sift_up(pos, high, maxGrowth, &cursize, &bestsize, &bestpos);
         }
-#if DEBUG_SIFTING
-        printf("sift_up/sift_down:  took %f seconds to execute \n", (((double)(clock() - t))/CLOCKS_PER_SEC));
-#endif
+        if(debug_sifting){
+//            printf("sift_up/sift_down:          took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+        }
         t = clock();
         // optimum variable position restoration
-        sift_to_lvl(var, bestlvl);
-#if DEBUG_SIFTING
-        printf("sift_to_lvl         took %f seconds to execute \n", (((double)(clock() - t))/CLOCKS_PER_SEC));
-#endif
+        sift_to_pos(pos, bestpos);
+        if(debug_sifting){
+//            printf("sift_to_lvl                 took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+            printf("bestpos: %zu  bestsize %zu\n", bestpos, bestsize);
+            print_levels_var_ordering();
+            printf("\n");
+        }
     }
-#if DEBUG_SIFTING
-    printf("sifting             took %f seconds to execute \n", (((double)(clock() - startTime))/CLOCKS_PER_SEC));
-#endif
-    size_t after_size = llmsset_count_marked(nodes);
-    printf("sifting finished:   from %zu to %zu nodes\n", before_size, after_size);
+
+//    if(debug_sifting){
+        printf("sifting                     took %f seconds\n", (((double)(clock() - startTime))/CLOCKS_PER_SEC));
+        size_t after_size = llmsset_count_marked(nodes);
+        printf("sifting finished:           from %zu to %zu nodes\n", before_size, after_size);
+//    }
 }
 
 
@@ -265,7 +315,7 @@ VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low_lvl, uint32_t, high_lvl) {
  * Only variables between "lower" and "upper" that are not "bound"
  *
  * Sifting a variable between "low" and "high:
- * go to closest end first.
+ * go to the closest end first.
  * siftingUp/siftingDown --> siftingBackward
  *
  * Parameters
@@ -365,5 +415,6 @@ TASK_IMPL_2(int, sylvan_sifting, uint32_t, low, uint32_t, high) {
 
     return 0;
 }
+
 
 

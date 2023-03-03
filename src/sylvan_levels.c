@@ -85,8 +85,7 @@ mtbdd_levels_level_to_var(uint32_t level)
 uint32_t
 mtbdd_levels_node_to_level(MTBDD node)
 {
-    uint32_t var  = mtbdd_getvar(node);
-    return mtbdd_levels_var_to_level(var);
+    return mtbdd_levels_var_to_level(mtbdd_getvar(node));
 }
 
 /**
@@ -109,13 +108,36 @@ mtbdd_levels_gc_add_mark_managed_refs(void)
 void
 mtbdd_levels_varswap(uint32_t var)
 {
-#if 0
+//    printf("mtbdd_levels_varswap(v%d)\n", var);
+#if 1
+    // mtbdd_levels_new(5)
+    // var_to_level = { 0, 1, 2, 3, 4 }
+    // level_to_var = { 0, 1, 2, 3, 4 }
+    // level_to_var[0] == 0
+    //
+    // mtbdd_levels_varswap(0)
+    // var_to_level = { 1, 0, 2, 3, 4 }
+    // level_to_var = { 1, 0, 2, 3, 4 }
+    // var_to_level[0] == 1
+    // level_to_var[1] == 0
+
     level_to_var[var_to_level[var]] = var+1;
     level_to_var[var_to_level[var+1]] = var;
     uint32_t save = var_to_level[var];
     var_to_level[var] = var_to_level[var+1];
     var_to_level[var+1] = save;
 #else
+    // mtbdd_levels_new(5)
+    // var_to_level = { 0, 1, 2, 3, 4 }
+    // level_to_var = { 0, 1, 2, 3, 4 }
+    // level_to_var[0] == 0
+    //
+    // mtbdd_levels_varswap(0)
+    // var_to_level = { 1, 0, 2, 3, 4 }
+    // level_to_var = { 1, 0, 2, 3, 4 }
+    // var_to_level[0] == 1
+    // level_to_var[1] == 0
+
     uint32_t curr_level = var_to_level[var];
     uint32_t curr_var = var;
 
@@ -128,7 +150,10 @@ mtbdd_levels_varswap(uint32_t var)
     var_to_level[curr_var] = next_level;
     var_to_level[next_var] = curr_level;
 #endif
+//    print_levels_var_ordering();
+//    print_real_var_ordering();
 }
+
 
 void
 sylvan_levels_destroy(void)

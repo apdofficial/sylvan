@@ -6,13 +6,17 @@
 
 __thread uint64_t seed = 1;
 
-void print_level_arrays(int iteration){
-    printf("iteration=%d  \n", iteration);
+void print_level_arrays(int iter){
+    printf("iter=%d  \n", iter);
     for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("level_to_var[%zu]=%d, ", i, mtbdd_levels_level_to_var(i));
+        printf("l%zu=v%d, ", i, mtbdd_levels_level_to_var(i));
     printf("\n");
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("var_to_level[%zu]=%d, ", i, mtbdd_levels_var_to_level(i));
+    for (size_t i = 0; i < mtbdd_levels_size(); ++i){
+        MTBDD node = mtbdd_levels_ithlevel(i);
+        uint32_t var = sylvan_var(node);
+        printf("l%zu[n%llu, v%u], ", i, node,  var);
+    }
+
     printf("\n");
 }
 

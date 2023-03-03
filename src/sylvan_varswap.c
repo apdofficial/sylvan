@@ -4,42 +4,42 @@
 #include "sylvan_levels.h"
 
 
-VOID_TASK_DECL_4(call_sylvan_var_swap_p0, uint32_t, size_t, size_t, volatile varswap_res_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 0
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
-   \param var variable to be swapped
-   \param first starting index
-   \param count ending index
+   \param var variable label to be swapped
+   \param first starting index in the unique table
+   \param count ending index number of nodes to consider in the unique table
    \param result pointer to sylvan_var_swap_res_t
 */
-#define call_sylvan_var_swap_p0(var, first, count, result) CALL(call_sylvan_var_swap_p0, var, first, count, result)
+#define sylvan_varswap_p0(var, first, count, result) CALL(sylvan_varswap_p0, var, first, count, result)
 
 
-TASK_DECL_4(uint64_t, call_sylvan_var_swap_p1, uint32_t, size_t, size_t, volatile varswap_res_t*);
+TASK_DECL_4(uint64_t, sylvan_varswap_p1, uint32_t, size_t, size_t, volatile varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 1
    \details Handle all trivial cases where no node is created, mark cases that are not trivial.
-   \param var variable to be swapped
-   \param first starting index
-   \param count ending index
+   \param var variable label to be swapped
+   \param first starting index in the unique table
+   \param count ending index number of nodes to consider in the unique table
    \param result pointer to sylvan_var_swap_res_t
    \return number of nodes that were marked
 */
-#define call_sylvan_var_swap_p1(var, first, count, result) CALL(call_sylvan_var_swap_p1, var, first, count, result)
+#define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
 
 
-VOID_TASK_DECL_4(call_sylvan_var_swap_p2, uint32_t, size_t, size_t, volatile varswap_res_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 2
    \details Handle the not so trivial cases. (creates new nodes)
-   \param var variable to be swapped
-   \param first starting index
-   \param count ending index
-   \param result sylvan_var_swap_res_t
+   \param var variable label to be swapped
+   \param first starting index in the unique table
+   \param count ending index number of nodes to consider in the unique table
+   \param result pointer to sylvan_var_swap_res_tw
 */
-#define call_sylvan_var_swap_p2(var, first, count, result) CALL(call_sylvan_var_swap_p2, var, first, count, result)
+#define sylvan_varswap_p2(var, first, count, result) CALL(sylvan_varswap_p2, var, first, count, result)
 
 void sylvan_print_varswap_res(char *tag, varswap_res_t result){
     size_t msgLen = 100;
@@ -130,21 +130,18 @@ mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
     return index;
 }
 
-TASK_IMPL_2(varswap_res_t, sylvan_varswap,
-            uint32_t, var,
-            int, recovery
-){
+TASK_IMPL_2(varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery){
     varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
     // first clear hashes of nodes with <var> and <var+1>
-    call_sylvan_var_swap_p0(var, 0, nodes->table_size, &result);
+    sylvan_varswap_p0(var, 0, nodes->table_size, &result);
     // handle all trivial cases, mark cases that are not trivial
-    uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size, &result);
+    uint64_t marked_count = sylvan_varswap_p1(var, 0, nodes->table_size, &result);
 
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
         varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
-        call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+        sylvan_varswap_p2(var, 0, nodes->table_size, &result);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) return result;
     }
@@ -152,32 +149,31 @@ TASK_IMPL_2(varswap_res_t, sylvan_varswap,
     (void)recovery;
 }
 
-TASK_IMPL_1(varswap_res_t, sylvan_simple_varswap,
-            uint32_t, var
-){
+TASK_IMPL_1(varswap_res_t, sylvan_simple_varswap, uint32_t, var){
+    printf("swap v%d\n", var);
     varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
     // ensure that the cache is cleared
     sylvan_clear_cache();
     // first clear hashes of nodes with <var> and <var+1>
-    call_sylvan_var_swap_p0(var, 0, nodes->table_size, &result);
+    sylvan_varswap_p0(var, 0, nodes->table_size, &result);
     // handle all trivial cases, mark cases that are not trivial
-    uint64_t marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size, &result);
+    uint64_t marked_count = sylvan_varswap_p1(var, 0, nodes->table_size, &result);
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+        sylvan_varswap_p2(var, 0, nodes->table_size, &result);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) {
             printf("Recovery time!\n");
             // clear hashes again of nodes with <var> and <var+1>
-            call_sylvan_var_swap_p0(var, 0, nodes->table_size, &result);
+            sylvan_varswap_p0(var, 0, nodes->table_size, &result);
             // handle all trivial cases, mark cases that are not trivial
-            marked_count = call_sylvan_var_swap_p1(var, 0, nodes->table_size, &result);
+            marked_count = sylvan_varswap_p1(var, 0, nodes->table_size, &result);
 
             if (marked_count > 0 && result == SYLVAN_VARSWAP_SUCCESS){
                 // do the not so trivial cases (but won't create new nodes this time)
-                call_sylvan_var_swap_p2(var, 0, nodes->table_size, &result);
+                sylvan_varswap_p2(var, 0, nodes->table_size, &result);
                 if (result != SYLVAN_VARSWAP_SUCCESS) {
                     // actually, we should not see this!
                     fprintf(stderr, "sylvan: recovery varswap failed!\n");
@@ -205,17 +201,17 @@ TASK_IMPL_1(varswap_res_t, sylvan_simple_varswap,
  * Initialize variable swapping.
  * Removes exactly the nodes that will be changed from the hash table.
  */
-VOID_TASK_IMPL_4(call_sylvan_var_swap_p0,
+VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  uint32_t, var,
-                 size_t, first,
+                 size_t, first,/**  **/
                  size_t, count,
                  volatile varswap_res_t*, result
 ){
     // go recursive if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
-        SPAWN(call_sylvan_var_swap_p0, var, first, count / 2, result);
-        CALL(call_sylvan_var_swap_p0, var, first + count / 2, count - count / 2, result);
-        SYNC(call_sylvan_var_swap_p0);
+        SPAWN(sylvan_varswap_p0, var, first, count / 2, result);
+        CALL(sylvan_varswap_p0, var, first + count / 2, count - count / 2, result);
+        SYNC(sylvan_varswap_p0);
         return;
     }
 
@@ -253,17 +249,17 @@ VOID_TASK_IMPL_4(call_sylvan_var_swap_p0,
  * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
  * nodes are rehashed.
  */
-TASK_IMPL_4(uint64_t, call_sylvan_var_swap_p1,
-        uint32_t, var,
-        size_t, start,
-        size_t, count,
-        volatile varswap_res_t*, result
+TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
+            uint32_t, var,
+            size_t, start,
+            size_t, count,
+            volatile varswap_res_t*, result
 ){
     // Divide-and-conquer if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
-        SPAWN(call_sylvan_var_swap_p1, var, start, count / 2, result);
-        uint64_t res1 = CALL(call_sylvan_var_swap_p1, var, start + count / 2, count - count / 2, result);
-        uint64_t res2 = SYNC(call_sylvan_var_swap_p1);
+        SPAWN(sylvan_varswap_p1, var, start, count / 2, result);
+        uint64_t res1 = CALL(sylvan_varswap_p1, var, start + count / 2, count - count / 2, result);
+        uint64_t res2 = SYNC(sylvan_varswap_p1);
         return res1 + res2;
     }
 
@@ -364,17 +360,17 @@ TASK_IMPL_4(uint64_t, call_sylvan_var_swap_p1,
  * Returns 0 if there was no error, or 1 if nodes could not be
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
-VOID_TASK_IMPL_4(call_sylvan_var_swap_p2,
-        uint32_t, var,
-        size_t, first,
-        size_t, count,
-        volatile varswap_res_t*, result
+VOID_TASK_IMPL_4(sylvan_varswap_p2,
+                 uint32_t, var,
+                 size_t, first,
+                 size_t, count,
+                 volatile varswap_res_t*, result
 ){
     /* divide and conquer (if count above BLOCKSIZE) */
     if (count > BLOCKSIZE) {
-        SPAWN(call_sylvan_var_swap_p2, var, first, count / 2, result);
-        CALL(call_sylvan_var_swap_p2, var, first + count / 2, count - count / 2, result);
-        SYNC(call_sylvan_var_swap_p2);
+        SPAWN(sylvan_varswap_p2, var, first, count / 2, result);
+        CALL(sylvan_varswap_p2, var, first + count / 2, count - count / 2, result);
+        SYNC(sylvan_varswap_p2);
         return;
     }
 

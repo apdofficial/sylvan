@@ -26,6 +26,15 @@ extern "C" {
  */
 void sylvan_init_reorder(void);
 
+void sylvan_sifting_enable_debug(void);
+
+void sylvan_sifting_disable_debug(void);
+
+void print_real_var_ordering(void);
+
+void print_levels_var_ordering(void);
+
+
 VOID_TASK_DECL_6(sift_up, size_t, size_t, float, size_t*, size_t*, size_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
@@ -58,13 +67,13 @@ VOID_TASK_DECL_6(sift_down, size_t, size_t, float, size_t*, size_t*, size_t*);
 #define sift_down(var, targetLvl, maxGrowth, curSize, bestSize, bestLvl) \
                     RUN(sift_down, var, targetLvl, maxGrowth, curSize, bestSize, bestLvl)
 
-VOID_TASK_DECL_2(sift_to_lvl, size_t, size_t);
+VOID_TASK_DECL_2(sift_to_pos, size_t, size_t);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
  * \param bestlvl - best level of the variable (w.r.t. dynamic variable reordering)
  */
-#define sift_to_lvl(var, bestlvl) RUN(sift_to_lvl, var, bestlvl)
+#define sift_to_pos(pos, bestPos) RUN(sift_to_pos, pos, bestPos)
 
 VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
 /**
@@ -86,10 +95,10 @@ VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
   \sideeffect order and number of variables is changed
 
 */
-#define sylvan_sifting_new(low_lvl, high_lvl) CALL(sylvan_sifting_new, low_lvl, high_lvl)
+#define sylvan_sifting_new(low, high) CALL(sylvan_sifting_new, low, high)
 
 TASK_DECL_2(int, sylvan_sifting, uint32_t, uint32_t);
-#define sylvan_sifting(low, high) CALL(sylvan_sifting, low, high)
+#define __sylvan_sifting(low, high) CALL(sylvan_sifting, low, high)
 
 #ifdef __cplusplus
 }
