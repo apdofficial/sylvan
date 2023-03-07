@@ -3,7 +3,7 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 
-#define ENABLE_ERROR_LOGS   0 // critical errors that cause varswap to fail
+#define ENABLE_ERROR_LOGS   1 // critical errors that cause varswap to fail
 #define ENABLE_INFO_LOGS    0 // useful information w.r.t. varswap
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
