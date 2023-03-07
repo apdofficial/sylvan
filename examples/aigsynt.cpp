@@ -34,7 +34,7 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 8; // autodetect
+static int workers = 4; // autodetect
 static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
 static int reorder = 0;
@@ -198,7 +198,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
         make_gate(lookup[lft], gates, gatelhs, gatelft, gatergt, lookup);
         l = gates[lookup[lft]];
     } else {
-        l = mtbdd_levels_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
+        l = mtbdd_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
     }
     if (rgt == 0) {
         r = sylvan_false;
@@ -206,7 +206,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
         make_gate(lookup[rgt], gates, gatelhs, gatelft, gatergt, lookup);
         r = gates[lookup[rgt]];
     } else {
-        r = mtbdd_levels_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
+        r = mtbdd_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
     }
     if (gatelft[a]&1) l = sylvan_not(l);
     if (gatergt[a]&1) r = sylvan_not(r);
@@ -217,7 +217,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
     size_t used, total;
     sylvan_table_usage(&used, &total);
     if (did_gc or 2*used > total) {
-        sylvan_sifting(0, 0);
+        sylvan_sifting_new(0, 0);
         did_gc = 0;
     }
 #endif
@@ -583,7 +583,7 @@ VOID_TASK_0(parse)
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
         if (lookup[l_next[l]/2] == -1) {
-            nxt = mtbdd_levels_ithlevel(level_to_var[l_next[l] / 2]);
+            nxt = mtbdd_ithlevel(level_to_var[l_next[l] / 2]);
         } else {
             nxt = gates[lookup[l_next[l]/2]];
         }
@@ -596,7 +596,7 @@ VOID_TASK_0(parse)
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
     if (lookup[outputs[0]/2] == -1) {
-        Unsafe = mtbdd_levels_ithlevel(level_to_var[outputs[0] / 2]);
+        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0] / 2]);
     } else {
         Unsafe = gates[lookup[outputs[0]/2]];
     }
@@ -690,7 +690,7 @@ VOID_TASK_0(gc_end)
     sylvan_table_usage(&used, &total);
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
     INFO("Running the sifting algorithm.\n");
-//    sylvan_sifting(0, 0);
+//    sylvan_sifting_new(0, 0);
 }
 
 int

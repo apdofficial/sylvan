@@ -10,9 +10,7 @@ static MTBDD *levels = NULL;           // array holding the 1-node BDD for each 
 static size_t levels_count = 0;        // number of created levels
 static size_t levels_size = 0;         // size of the 3 arrays
 
-
-void
-mtbdd_levels_new(size_t amount)
+void mtbdd_levels_new(size_t amount)
 {
     if (levels_count + amount >= levels_size) {
 #if 0
@@ -36,22 +34,17 @@ mtbdd_levels_new(size_t amount)
     }
 }
 
-
-void
-mtbdd_levels_reset(void)
+void mtbdd_levels_reset(void)
 {
     levels_count = 0;
 }
 
-size_t
-mtbdd_levels_size(void)
+size_t mtbdd_levels_size(void)
 {
     return levels_count;
 }
 
-
-MTBDD
-mtbdd_levels_ithlevel(uint32_t level)
+MTBDD mtbdd_ithlevel(uint32_t level)
 {
     if (level < levels_count) {
         return levels[level_to_var[level]];
@@ -59,7 +52,6 @@ mtbdd_levels_ithlevel(uint32_t level)
         return mtbdd_invalid;
     }
 }
-
 
 uint32_t mtbdd_levels_var_to_level(uint32_t var)
 {
@@ -70,9 +62,7 @@ uint32_t mtbdd_levels_var_to_level(uint32_t var)
     }
 }
 
-
-uint32_t
-mtbdd_levels_level_to_var(uint32_t level)
+uint32_t mtbdd_levels_level_to_var(uint32_t level)
 {
     if (level < levels_count){
         return level_to_var[level];
@@ -81,9 +71,7 @@ mtbdd_levels_level_to_var(uint32_t level)
     }
 }
 
-
-uint32_t
-mtbdd_levels_node_to_level(MTBDD node)
+uint32_t mtbdd_levels_node_to_level(MTBDD node)
 {
     return mtbdd_levels_var_to_level(mtbdd_getvar(node));
 }
@@ -99,27 +87,31 @@ VOID_TASK_0(mtbdd_gc_mark_managed_refs)
     }
 }
 
-void
-mtbdd_levels_gc_add_mark_managed_refs(void)
+void mtbdd_levels_gc_add_mark_managed_refs(void)
 {
     sylvan_gc_add_mark(TASK(mtbdd_gc_mark_managed_refs));
 }
 
-void
-mtbdd_levels_varswap(uint32_t var)
+void mtbdd_levels_varswap(uint32_t var)
 {
-//    printf("mtbdd_levels_varswap(v%d)\n", var);
 #if 1
-    // mtbdd_levels_new(5)
-    // var_to_level = { 0, 1, 2, 3, 4 }
-    // level_to_var = { 0, 1, 2, 3, 4 }
+    // mtbdd_levels_new(3)
+    // var_to_level = { 0, 1, 2}
+    // level_to_var = { 0, 1, 2}
+    // level_to_var[0] == 0
     // level_to_var[0] == 0
     //
     // mtbdd_levels_varswap(0)
-    // var_to_level = { 1, 0, 2, 3, 4 }
-    // level_to_var = { 1, 0, 2, 3, 4 }
+    // var_to_level = { 1, 0, 2 }
+    // level_to_var = { 1, 0, 2 }
     // var_to_level[0] == 1
     // level_to_var[1] == 0
+    //
+    // mtbdd_levels_varswap(1)
+    // var_to_level = { 2, 0, 1 }
+    // level_to_var = { 2, 0, 1 }
+    // var_to_level[2] == 0
+    // level_to_var[0] == 2
 
     level_to_var[var_to_level[var]] = var+1;
     level_to_var[var_to_level[var+1]] = var;
@@ -150,13 +142,10 @@ mtbdd_levels_varswap(uint32_t var)
     var_to_level[curr_var] = next_level;
     var_to_level[next_var] = curr_level;
 #endif
-//    print_levels_var_ordering();
-//    print_real_var_ordering();
 }
 
 
-void
-sylvan_levels_destroy(void)
+void sylvan_levels_destroy(void)
 {
      if (levels_size != 0) {
         free(levels);

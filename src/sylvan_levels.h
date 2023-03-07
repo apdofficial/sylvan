@@ -51,7 +51,7 @@ void mtbdd_levels_reset(void);
  * however, after a swap they can point to a different variable
  * \param level for which the BDD needs to be returned
  */
-MTBDD mtbdd_levels_ithlevel(uint32_t level);
+MTBDD mtbdd_ithlevel(uint32_t level);
 
 /**
  * \brief  Get the current level of the given internal variable <var>

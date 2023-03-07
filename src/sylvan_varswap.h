@@ -29,6 +29,11 @@ typedef enum varswap_res {
     SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
 } varswap_res_t;
 
+void sylvan_varswap_init(void);
+
+void sylvan_varswap_quit(void);
+
+
 /**
  * Print result message based on the given result.
  * @param tag printed a prefix of the result message
@@ -72,7 +77,7 @@ void sylvan_print_varswap_res(char *tag, varswap_res_t result);
   *
   */
 TASK_DECL_2(varswap_res_t, sylvan_varswap, uint32_t, int);
-#define _sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
+#define sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
 
 
 /**
