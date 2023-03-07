@@ -34,7 +34,7 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 4; // autodetect
+static int workers = 0; // autodetect
 static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
 static int reorder = 0;
@@ -531,9 +531,7 @@ VOID_TASK_0(parse)
     sylvan_stats_report(stdout);
 
     sylvan_gc();
-//    sylvan_sifting(0, 0, 8);
-    sylvan_sifting_new(0, 0, 8);
-    sylvan_gc();
+    sylvan_sifting_new(0, 0);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {

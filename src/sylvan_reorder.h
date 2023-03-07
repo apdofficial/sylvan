@@ -22,11 +22,34 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
+   \brief Type of termination handler.
+*/
+typedef int (*varswap_termination_cb)(void);
+
+/**
+   @brief Sifting configuration.
+*/
+typedef struct sifting_config sifting_config_t;
+
+/**
  * Sylvan dynamic variable reordering
  */
 void sylvan_init_reorder(void);
 
-VOID_TASK_DECL_6(sift_up, size_t*, size_t, float, size_t*, size_t*, size_t*);
+void sylvan_set_reordering_termination_cb(varswap_termination_cb callback);
+
+void sylvan_set_reordering_threshold(size_t threshold);
+
+void sylvan_set_reordering_max_growth(float max_growth);
+
+void sylvan_set_reordering_max_swap(size_t max_swap);
+
+void sylvan_set_reordering_max_var(size_t max_var);
+
+void sylvan_set_reordering_time_limit(size_t time_limit);
+
+
+VOID_TASK_DECL_5(sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
  *
@@ -39,10 +62,9 @@ VOID_TASK_DECL_6(sift_up, size_t*, size_t, float, size_t*, size_t*, size_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sift_down(var, high, maxGrowth, curSize, bestSize, bestPos) \
-                    RUN(sift_down, var, high, maxGrowth, curSize, bestSize, bestPos)
+#define sift_down(var, high, curSize, bestSize, bestPos) RUN(sift_down, var, high, curSize, bestSize, bestPos)
 
-VOID_TASK_DECL_6(sift_down, size_t*, size_t, float, size_t*, size_t*, size_t*);
+VOID_TASK_DECL_5(sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
 /**
  * \brief Sift given variable down from its current level to the target level.
  *
@@ -55,8 +77,7 @@ VOID_TASK_DECL_6(sift_down, size_t*, size_t, float, size_t*, size_t*, size_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sift_up(var, low, maxGrowth, curSize, bestSize, bestPos) \
-                    RUN(sift_up, var, low, maxGrowth, curSize, bestSize, bestPos)
+#define sift_up(var, low, curSize, bestSize, bestPos) RUN(sift_up, var, low, curSize, bestSize, bestPos)
 
 VOID_TASK_DECL_2(sift_to_pos, size_t, size_t);
 /**
@@ -66,7 +87,7 @@ VOID_TASK_DECL_2(sift_to_pos, size_t, size_t);
  */
 #define sift_to_pos(var, targetPos) RUN(sift_to_pos, var, targetPos)
 
-VOID_TASK_DECL_3(sylvan_sifting_new, uint32_t, uint32_t, size_t);
+VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
 /**
   \brief Implementation of Rudell's sifting algorithm.
 
@@ -81,15 +102,14 @@ VOID_TASK_DECL_3(sylvan_sifting_new, uint32_t, uint32_t, size_t);
     </ol>
   \param low - the lowest position to sift
   \param high - the highest position to sift
-  \param levelCountThreshold - consider only levels with number of nodes larger than levelCountThreshold
 
   \sideeffect order and number of variables is changed
 
 */
-#define sylvan_sifting_new(low, high, levelCountThreshold) CALL(sylvan_sifting_new, low, high, levelCountThreshold)
+#define sylvan_sifting_new(low, high)  CALL(sylvan_sifting_new, low, high)
 
-VOID_TASK_DECL_3(sylvan_sifting, uint32_t, uint32_t, size_t);
-#define sylvan_sifting(low, high, levelCountThreshold) CALL(sylvan_sifting, low, high, levelCountThreshold)
+VOID_TASK_DECL_2(sylvan_sifting, uint32_t, uint32_t);
+#define sylvan_sifting(low, high) CALL(sylvan_sifting, low, high)
 
 #ifdef __cplusplus
 }
