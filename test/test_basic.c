@@ -569,8 +569,8 @@ TASK_0(int, runtests)
     for (int j=0;j<10;j++) if (test_compose()) return 1;
     printf("Testing operators.\n");
     for (int j=0;j<10;j++) if (test_operators()) return 1;
+    printf("Testing varswap.\n");
     for (int j=0;j<10;j++) if (test_varswap()) return 1;
-
     printf("Testing ldd.\n");
     if (test_ldd()) return 1;
 

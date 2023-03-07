@@ -3,8 +3,8 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 
-#define ENABLE_ERROR_LOGS   1 // critical errors that cause varswap to fail
-#define ENABLE_INFO_LOGS    0 // useful information w.r.t. varswap
+#define ENABLE_ERROR_LOGS   0 // critical errors that cause varswap to fail
+#define ENABLE_INFO_LOGS    0 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
 /* Obtain current wallclock time */
@@ -259,7 +259,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var+1)) {
             if (llmsset_clear_one(nodes, first) != 0){
-                LOG_ERROR("sylvan_varswap_p0: llmsset_clear_one(nodes, %u) failed!\n", nvar);
+                LOG_ERROR("sylvan_varswap_p0: llmsset_clear_one(%u) failed!\n", nvar);
 //                *result = SYLVAN_VARSWAP_P0_CLEAR_FAIL;
             }
         }
@@ -313,7 +313,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             // if <var+1>, then replace with <var> and rehash
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, first) != 0){
-                LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
 //                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
@@ -327,7 +327,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             mtbddnode_setmark(node, 0);
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 0){
-                LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_clear_one(%zu) failed!\n", first);
 //                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
@@ -346,7 +346,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
                     // next in chain wasn't <var+1>...
                     mtbddnode_setvariable(node, var+1);
                     if (llmsset_rehash_bucket(nodes, first) != 0){
-                        LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                        LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
 //                        *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                     }
                 } else {
@@ -376,7 +376,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             } else {
                 mtbddnode_setvariable(node, var+1);
                 if (llmsset_rehash_bucket(nodes, first) != 0){
-                    LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                    LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
 //                    *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                 }
             }
@@ -442,7 +442,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             } else {
                 mtbddnode_makemapnode(node, var, f0, f01);
                 if (llmsset_rehash_bucket(nodes, first) != 0){
-                    LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                    LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
 //                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }
             }
@@ -479,7 +479,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 // update node, which also removes the mark
                 mtbddnode_makenode(node, var, f0, f1);
                 if (llmsset_rehash_bucket(nodes, first) != 0){
-                    LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(nodes, %zu) failed!\n", first);
+                    LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
 //                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }
             }

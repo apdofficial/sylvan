@@ -36,7 +36,7 @@ static int mtbdd_reorder_initialized = 0;
 #define BLOCKSIZE 128
 
 #define ENABLE_ERROR_LOGS   1 // critical errors that cause sifting to fail
-#define ENABLE_INFO_LOGS    1 // useful information w.r.t. sifting
+#define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
 /* Obtain current wallclock time */

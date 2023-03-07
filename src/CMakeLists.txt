@@ -1,6 +1,14 @@
 add_library(sylvan STATIC)
 add_library(sylvan::sylvan ALIAS sylvan)
 
+option(SYLVAN_USE_CHAINING "Unique table uses chaining instead of linear probing" ON)
+
+if(SYLVAN_USE_CHAINING)
+    target_sources(sylvan PRIVATE sylvan_table_chaining.c)
+else()
+    target_sources(sylvan PRIVATE sylvan_table_probing.c)
+endif()
+
 target_sources(sylvan
   PRIVATE
     sha2.c
@@ -15,7 +23,6 @@ target_sources(sylvan
     sylvan_refs.c
     sylvan_sl.c
     sylvan_stats.c
-    sylvan_table.c
     sylvan_zdd.c
     sylvan_varswap.c
     sylvan_levels.c
@@ -35,13 +42,13 @@ target_sources(sylvan
     sylvan_mtbdd_int.h
     sylvan_obj.hpp
     sylvan_stats.h
-    sylvan_table.h
     sylvan_tls.h
     sylvan_zdd.h
     sylvan_zdd_int.h
     sylvan_varswap.h
     sylvan_levels.h
     sylvan_reorder.h
+    sylvan_table.h
 )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})

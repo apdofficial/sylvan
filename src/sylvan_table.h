@@ -66,16 +66,13 @@ typedef struct llmsset
     llmsset_equals_cb equals_cb;    // custom equals function
     llmsset_create_cb create_cb;    // custom create function
     llmsset_destroy_cb destroy_cb;  // custom destroy function
+    int16_t           threshold;    // number of iterations for insertion until returning error
 } *llmsset_t;
 
 /**
  * Retrieve a pointer to the data associated with the 42-bit value.
  */
-static inline void*
-llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
-{
-    return dbs->data + index * 24 + 8;
-}
+void* llmsset_index_to_ptr(const llmsset_t dbs, size_t index);
 
 /**
  * Create the set.
@@ -112,18 +109,7 @@ llmsset_get_size(const llmsset_t dbs)
  * Typically called during garbage collection, after clear and before rehash.
  * Returns 0 if dbs->table_size > dbs->max_size!
  */
-static inline void
-llmsset_set_size(llmsset_t dbs, size_t size)
-{
-    /* check bounds (don't be rediculous) */
-    if (size > 128 && size <= dbs->max_size) {
-        dbs->table_size = size;
-#if LLMSSET_MASK
-        /* Warning: if size is not a power of two, you will get interesting behavior */
-        dbs->mask = dbs->table_size/2 - 1;
-#endif
-    }
-}
+void llmsset_set_size(llmsset_t dbs, size_t size);
 
 /**
  * Core function: find existing data or add new.
@@ -141,9 +127,9 @@ uint64_t llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b
 /**
  * To perform garbage collection, the user is responsible that no lookups are performed during the process.
  *
- * 1) call llmsset_clear 
+ * 1) call llmsset_clear
  * 2) call llmsset_mark for every bucket to rehash
- * 3) call llmsset_rehash 
+ * 3) call llmsset_rehash
  */
 VOID_TASK_DECL_1(llmsset_clear, llmsset_t);
 #define llmsset_clear(dbs) RUN(llmsset_clear, dbs)
