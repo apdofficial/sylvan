@@ -109,12 +109,13 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold)
     for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
 
     clock_t t = clock();
-    mtbdd_levels_count_nodes(level_counts)
+    mtbdd_levels_count_nodes(level_counts);
 
     LOG_INFO("mtbdd_levels_count_nodes()  took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
 
     // set levels below the threshold to -1
     for (int i = 0; i < (int)mtbdd_levels_size(); i++) {
+        LOG_DEBUG("level %d contains %zu nodes\n", i, level_counts[i]);
         if (level_counts[mtbdd_levels_level_to_var(i)] < threshold) {
             level[i] = -1;
         }
@@ -125,7 +126,7 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold)
 
     t = clock();
     gnome_sort(level, level_counts);
-    LOG_INFO("gnome_sort()                took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+    LOG_INFO("gnome_sort                  took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
 }
 
 VOID_TASK_IMPL_6(sift_down,
@@ -139,12 +140,14 @@ VOID_TASK_IMPL_6(sift_down,
     for (; *pos < high; *pos = *pos + 1){
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos);
         if (res != SYLVAN_VARSWAP_SUCCESS){
-            LOG_ERROR("sift_up: failed due to %d\n", res);
+            LOG_ERROR("sift(UP): failed due to %d\n", res);
             break;
         }
-        *curSize = llmsset_count_marked(nodes);
+        size_t after = llmsset_count_marked(nodes);
+        LOG_DEBUG("sift(UP): from %zu to %zu\n", *curSize, after);
+        *curSize = after;
         if (*curSize < *bestSize) {
-            LOG_DEBUG("sift_up:   Improved size from %zu to %zu\n", *bestSize, *curSize);
+            LOG_DEBUG("sift(UP):   Improved size from %zu to %zu\n", *bestSize, *curSize);
             *bestSize = *curSize;
             *bestPos = *pos;
         }
@@ -167,12 +170,14 @@ VOID_TASK_IMPL_6(sift_up,
     for (; *pos > low; *pos = *pos - 1) {
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos - 1);
         if (res != SYLVAN_VARSWAP_SUCCESS){
-            LOG_ERROR("sift_down: failed due to %d\n", res);
+            LOG_ERROR("sift(DN): failed due to %d\n", res);
             break;
         }
-        *curSize = llmsset_count_marked(nodes);
+        size_t after = llmsset_count_marked(nodes);
+        LOG_DEBUG("sift(DN): from %zu to %zu\n", *curSize, after);
+        *curSize = after;
         if (*curSize < *bestSize){
-            LOG_DEBUG("sift_down: Improved size from %zu to %zu\n", *bestSize, *curSize);
+            LOG_DEBUG("sift(DN): Improved size from %zu to %zu\n", *bestSize, *curSize);
             *bestSize = *curSize;
             *bestPos = *pos;
         }
@@ -313,35 +318,36 @@ VOID_TASK_IMPL_3(sylvan_sifting,
     for (size_t i = 0; i < mtbdd_levels_size(); i++) printf("%d ", level[i]);
     printf("\n");
 #endif
+    size_t curSize = llmsset_count_marked(nodes);
 
-    size_t cursize = llmsset_count_marked(nodes);
-
-    for (unsigned int i=0; i<mtbdd_levels_size(); i++) {
+    for (size_t i=0; i<mtbdd_levels_size(); i++) {
         int lvl = level[i];
         if (lvl == -1) break; // done
         size_t pos = mtbdd_levels_level_to_var(lvl);
 
         LOG_DEBUG("now moving level %u, currently at position %zu\n", lvl, pos);
 
-        size_t bestsize = cursize;
-        size_t bestpos = pos;
-        size_t oldsize = cursize;
-        size_t oldpos = pos;
+        size_t bestSize = curSize;
+        size_t bestPos = pos;
+        size_t oldSize = curSize;
+        size_t oldPos = pos;
 
         for (; pos<high; pos++) {
             sylvan_varswap_res_t res = sylvan_simple_varswap(pos);
             if (res != SYLVAN_VARSWAP_SUCCESS) {
-                LOG_ERROR("swap(UP): failed due to %d\n", res);
+                LOG_ERROR("sift(DN): failed due to %d\n", res);
                 break;
             }
             size_t after = llmsset_count_marked(nodes);
-            LOG_DEBUG("swap(UP): from %zu to %zu\n", cursize, after);
-            cursize = after;
-            if (cursize < bestsize) {
-                bestsize = cursize;
-                bestpos = pos;
+            LOG_DEBUG("sift(DN): from %zu to %zu\n", curSize, after);
+            curSize = after;
+            if (curSize < bestSize) {
+                LOG_DEBUG("sift(DN): improved size\n");
+                bestSize = curSize;
+                bestPos = pos;
             }
-            if ((float)cursize >= maxGrowth * (float)bestsize) {
+
+            if ((float)curSize >= maxGrowth * (float)bestSize) {
                 pos++;
                 break;
             }
@@ -349,30 +355,31 @@ VOID_TASK_IMPL_3(sylvan_sifting,
         for (; pos>low; pos--) {
             sylvan_varswap_res_t res = sylvan_simple_varswap(pos - 1);
             if (res != SYLVAN_VARSWAP_SUCCESS) {
-                LOG_ERROR("swap(DN): failed due to %d\n", res);
+                LOG_ERROR("sift(UP): failed due to %d\n", res);
                 break;
             }
             size_t after = llmsset_count_marked(nodes);
-            LOG_DEBUG("swap(DN): from %zu to %zu\n", cursize, after);
-            cursize = after;
-            if (cursize < bestsize) {
-                bestsize = cursize;
-                bestpos = pos;
+            LOG_DEBUG("sift(UP): from %zu to %zu\n", curSize, after);
+            curSize = after;
+            if (curSize < bestSize) {
+                LOG_DEBUG("sift(UP): improved size\n");
+                bestSize = curSize;
+                bestPos = pos;
             }
-            if ((float)cursize >= maxGrowth * (float)bestsize) {
+            if ((float)curSize >= maxGrowth * (float)bestSize) {
                 pos--;
                 break;
             }
         }
-        LOG_DEBUG("best: %zu (old %zu) at %zu (old %zu)\n", bestpos, oldpos, bestsize, oldsize);
-        for (; pos<bestpos; pos++) {
+        LOG_DEBUG("bestPos: %zu (old %zu) bestSize %zu (old %zu)\n", bestPos, oldPos, bestSize, oldSize);
+        for (; pos < bestPos; pos++) {
             sylvan_varswap_res_t res = sylvan_simple_varswap(pos);
             if (res != SYLVAN_VARSWAP_SUCCESS) {
                 LOG_ERROR("swap(bestPos): failed due to %d\n", res);
                 break;
             }
         }
-        for (; pos>bestpos; pos--) {
+        for (; pos > bestPos; pos--) {
             sylvan_varswap_res_t res = sylvan_simple_varswap(pos - 1);
             if (res != SYLVAN_VARSWAP_SUCCESS) {
                 LOG_ERROR("swap(bestPos): failed due to %d\n", res);

@@ -93,46 +93,44 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
 
 UTEST_TASK_0(test_sifting, basic_sift)
 {
-    size_t level_counts[mtbdd_levels_size()];
-
-    // manually trigger sylvan garbage collection
     sylvan_gc();
-    mtbdd_levels_reset();
-    mtbdd_levels_new(7);
 
-    // suppose f = n1 & n2 | n2 & ~n3
-#if 1
-    // not optimal order n0 < n1 < n2 expect 6 nodes
+    mtbdd_levels_reset();
+    mtbdd_levels_new(6);
+
     BDD n0 = mtbdd_ithlevel(0);
     BDD n1 = mtbdd_ithlevel(1);
     BDD n2 = mtbdd_ithlevel(2);
-    BDD n3 = mtbdd_ithlevel(4);
-    BDD n4 = mtbdd_ithlevel(5);
-    BDD n5 = mtbdd_ithlevel(6);
-#else
-    // optimal order n0 < n2 < n1 expect 5 nodes
-    BDD n0 = mtbdd_ithlevel(0);
-    BDD n2 = mtbdd_ithlevel(1);
-    BDD n1 = mtbdd_ithlevel(2);
     BDD n3 = mtbdd_ithlevel(3);
-    BDD n5 = mtbdd_ithlevel(4);
-    BDD n4 = mtbdd_ithlevel(5);
-#endif
+    BDD n4 = mtbdd_ithlevel(4);
+    BDD n5 = mtbdd_ithlevel(5);
 
-    // let f1 = n0 & n1 | n1 & ~n2
-    MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_and(n1, sylvan_not(n2)));
+#if 1
+    // not optimal order
+    MTBDD f = sylvan_or(sylvan_and(n0, n3), sylvan_or(sylvan_and(n1, n4), sylvan_and(n2, n5)));
     mtbdd_protect(&f);
+#else
+    // optimal order
+    MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
+    mtbdd_protect(&f);
+#endif
+    printf("Size before sifting: %zu\n ", llmsset_count_marked(nodes));
 
     printf("v%d ", mtbdd_getvar(n0));
     printf("v%d ", mtbdd_getvar(n1));
-    printf("v%d \n", mtbdd_getvar(n2));
+    printf("v%d ", mtbdd_getvar(n2));
+    printf("v%d ", mtbdd_getvar(n3));
+    printf("v%d ", mtbdd_getvar(n4));
+    printf("v%d \n", mtbdd_getvar(n5));
 
-    sylvan_gc();
-    sylvan_sifting_new(0, 0, 1);
+    sylvan_sifting_new(0, 0, 0);
 
     printf("v%d ", mtbdd_getvar(n0));
     printf("v%d ", mtbdd_getvar(n1));
-    printf("v%d \n", mtbdd_getvar(n2));
+    printf("v%d ", mtbdd_getvar(n2));
+    printf("v%d ", mtbdd_getvar(n3));
+    printf("v%d ", mtbdd_getvar(n4));
+    printf("v%d \n", mtbdd_getvar(n5));
     
     ASSERT_EQ(1, 1);
 }
