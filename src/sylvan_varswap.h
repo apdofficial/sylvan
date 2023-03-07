@@ -10,7 +10,7 @@ extern "C" {
  */
 #define BLOCKSIZE 128
 
-typedef enum varswap_res {
+typedef enum sylvan_varswap_res {
     /// the operation was aborted and rolled back
     SYLVAN_VARSWAP_ROLLBACK = 1,
     /// success
@@ -27,7 +27,7 @@ typedef enum varswap_res {
     SYLVAN_VARSWAP_P2_CREATE_FAIL = -5,
     /// cannot rehash and cannot create node in phase 2
     SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
-} varswap_res_t;
+} sylvan_varswap_res_t;
 
 void sylvan_varswap_init(void);
 
@@ -39,7 +39,7 @@ void sylvan_varswap_quit(void);
  * @param tag printed a prefix of the result message
  * @param result of type varswap_res_t
  */
-void sylvan_print_varswap_res(char *tag, varswap_res_t result);
+void sylvan_print_varswap_res(char *tag, sylvan_varswap_res_t result);
 
  /**
   * @brief Swaps two consecutive variables in the entire forest.
@@ -76,7 +76,7 @@ void sylvan_print_varswap_res(char *tag, varswap_res_t result);
   * @return varswap_res_t
   *
   */
-TASK_DECL_2(varswap_res_t, sylvan_varswap, uint32_t, int);
+TASK_DECL_2(sylvan_varswap_res_t, sylvan_varswap, uint32_t, int);
 #define sylvan_varswap(var, recovery) CALL(sylvan_varswap, var, recovery)
 
 
@@ -88,12 +88,12 @@ TASK_DECL_2(varswap_res_t, sylvan_varswap, uint32_t, int);
  * returns 1 if we had to rollback.
  * aborts with exit(1) if rehashing didn't work during recovery
  */
-TASK_DECL_1(varswap_res_t, sylvan_simple_varswap, uint32_t);
+TASK_DECL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t);
 /**
  * @brief Swaps two consecutive variables in the entire forest.
  * @details Very simply varswap, no iterative recovery, no nodes table resizing.
  * \param var variable to swap
- * \return sylvan_var_swap_res_t
+ * \return sylvan_varswap_res_t
  */
 #define sylvan_simple_varswap(var) CALL(sylvan_simple_varswap, var)
 

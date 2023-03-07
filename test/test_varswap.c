@@ -310,5 +310,5 @@ int main(int argc, const char *const argv[])
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    return utest_lace_main(argc, argv);
+    return utest_lace_main(argc, argv); // we handle Sylvan and Lace terminations here.
 }

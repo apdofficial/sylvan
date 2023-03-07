@@ -531,7 +531,8 @@ VOID_TASK_0(parse)
     sylvan_stats_report(stdout);
 
     sylvan_gc();
-    sylvan_sifting_new(0, 0);
+//    sylvan_sifting(0, 0, 8);
+    sylvan_sifting_new(0, 0, 8);
     sylvan_gc();
 
 #if 0

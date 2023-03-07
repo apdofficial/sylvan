@@ -3,9 +3,9 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 
-#define ENABLE_ERROR_LOGS   0
-#define ENABLE_INFO_LOGS    1
-#define ENABLE_DEBUG_LOGS   1
+#define ENABLE_ERROR_LOGS   0 // critical errors that cause varswap to fail
+#define ENABLE_INFO_LOGS    0 // useful information w.r.t. varswap
+#define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
 /* Obtain current wallclock time */
 static double wctime()
@@ -31,7 +31,7 @@ void sylvan_varswap_quit(void)
 }
 
 
-VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile varswap_res_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile sylvan_varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 0
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
@@ -44,7 +44,7 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile varswap_r
 #define sylvan_varswap_p0(var, first, count, result) CALL(sylvan_varswap_p0, var, first, count, result)
 
 
-TASK_DECL_4(uint64_t, sylvan_varswap_p1, uint32_t, size_t, size_t, volatile varswap_res_t*);
+TASK_DECL_4(uint64_t, sylvan_varswap_p1, uint32_t, size_t, size_t, volatile sylvan_varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 1
    \details Handle all trivial cases where no node is created, mark cases that are not trivial.
@@ -57,7 +57,7 @@ TASK_DECL_4(uint64_t, sylvan_varswap_p1, uint32_t, size_t, size_t, volatile vars
 #define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
 
 
-VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile varswap_res_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile sylvan_varswap_res_t*);
 /*!
    \brief Adjacent variable swap phase 2
    \details Handle the not so trivial cases. (creates new nodes)
@@ -68,7 +68,7 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile varswap_r
 */
 #define sylvan_varswap_p2(var, first, count, result) CALL(sylvan_varswap_p2, var, first, count, result)
 
-void sylvan_print_varswap_res(char *tag, varswap_res_t result)
+void sylvan_print_varswap_res(char *tag, sylvan_varswap_res_t result)
 {
     size_t msgLen = 100;
     char msg[msgLen];
@@ -156,9 +156,9 @@ MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
     return index;
 }
 
-TASK_IMPL_2(varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery)
+TASK_IMPL_2(sylvan_varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery)
 {
-    varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
+    sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(var, 0, nodes->table_size, &result);
@@ -167,7 +167,7 @@ TASK_IMPL_2(varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery)
 
     if (marked_count != 0) {
         // do the not so trivial cases (creates new nodes)
-        varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
+        sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
         sylvan_varswap_p2(var, 0, nodes->table_size, &result);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) return result;
@@ -176,9 +176,9 @@ TASK_IMPL_2(varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery)
     (void)recovery;
 }
 
-TASK_IMPL_1(varswap_res_t, sylvan_simple_varswap, uint32_t, var)
+TASK_IMPL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t, var)
 {
-    varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
+    sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
     // ensure that the cache is cleared
     sylvan_clear_cache();
@@ -234,7 +234,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  uint32_t, var, /** variable label **/
                  size_t, first, /** index in the unique table **/
                  size_t, count, /** index in the unique table **/
-                 volatile varswap_res_t*, result
+                 volatile sylvan_varswap_res_t*, result
 ){
     // go recursive if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
@@ -282,7 +282,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             uint32_t, var, /** variable label **/
             size_t, first,  /** starting node index in the unique table **/
             size_t, count, /** number of nodes to visit form the starting index **/
-            volatile varswap_res_t*, result
+            volatile sylvan_varswap_res_t*, result
 ){
     // Divide-and-conquer if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
@@ -400,7 +400,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  uint32_t, var,
                  size_t, first,
                  size_t, count,
-                 volatile varswap_res_t*, result
+                 volatile sylvan_varswap_res_t*, result
 ){
     /* divide and conquer (if count above BLOCKSIZE) */
     if (count > BLOCKSIZE) {
