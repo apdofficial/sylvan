@@ -20,6 +20,10 @@ target_sources(lddmc PRIVATE getrss.c getrss.h)
 add_example(ldd2bdd ldd2bdd.c)
 target_sources(ldd2bdd PRIVATE getrss.c getrss.h)
 
+add_example(hashmap_cmp hashmap_cmp.c)
+target_compile_options(hashmap_cmp PRIVATE -Wno-unused-parameter)
+target_sources(hashmap_cmp PRIVATE getrss.c getrss.h)
+
 add_example(nqueens nqueens.c)
 
 add_example(simple simple.cpp)

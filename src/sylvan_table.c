@@ -25,6 +25,8 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+#define LIMITED_PROBE_SEQUENCE 0
+
 #ifndef cas
 #define cas(ptr, old, new) (__sync_bool_compare_and_swap((ptr),(old),(new)))
 #endif
@@ -131,7 +133,10 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
     const uint64_t step = (((hash_rehash >> 20) | 1) << 3);
     const uint64_t hash = hash_rehash & MASK_HASH;
     uint64_t idx, last, cidx = 0;
+
+#if LIMITED_PROBE_SEQUENCE
     int i=0;
+#endif
 
 #if LLMSSET_MASK
     last = idx = hash_rehash & dbs->mask;
@@ -188,8 +193,9 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
         // find next idx on probe sequence
         idx = (idx & CL_MASK) | ((idx+1) & CL_MASK_R);
         if (idx == last) {
+#if LIMITED_PROBE_SEQUENCE
             if (++i == dbs->threshold) return 0; // failed to find empty spot in probe sequence
-
+#endif
             // go to next cache line in probe sequence
             hash_rehash += step;
 
