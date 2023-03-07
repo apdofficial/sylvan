@@ -134,9 +134,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
     const uint64_t hash = hash_rehash & MASK_HASH;
     uint64_t originalIdx, idx, last, cidx = 0;
 
-#if LIMITED_PROBE_SEQUENCE
     int i=0;
-#endif
 
 #if LLMSSET_MASK
     last = idx = hash_rehash & dbs->mask;
@@ -197,7 +195,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
 #if LIMITED_PROBE_SEQUENCE
             if (++i == dbs->threshold) return 0; // failed to find empty spot in probe sequence
 #else
-            if (idx == originalIdx) return 0; // failed to find empty spot in probe sequence
+
 #endif
             // go to next cache line in probe sequence
             hash_rehash += step;

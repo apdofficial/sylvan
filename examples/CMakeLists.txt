@@ -27,11 +27,9 @@ add_example(simple simple.cpp)
 add_example(aigsynt aigsynt.cpp)
 target_compile_options(aigsynt PRIVATE -Wno-unused-parameter)
 
-
 add_example(hashmap_cmp hashmap_cmp.c)
 target_compile_options(hashmap_cmp PRIVATE -Wno-unused-parameter)
 target_sources(hashmap_cmp PRIVATE getrss.c getrss.h)
-
 
 # Check if we have Meddly
 find_library(MEDDLY_FOUND meddly)

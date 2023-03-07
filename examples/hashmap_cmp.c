@@ -38,10 +38,9 @@ TASK_0(int, run)
         double usedBuckets = llmsset_count_marked(nodes);
         double allBuckets = llmsset_get_size(nodes);
         double usage = (usedBuckets/allBuckets)*100;
-//        printf("table usage %.1f%% | runtime: %.2fns\n", usage,  (wctime()-t_sample)*1000*100);
-        printf("%.2f, %.2f\n", usage,  (wctime()-t_sample)*1000*100);
+        double runtime = (wctime()-t_sample)*1000*100;
+        printf("table usage %.1f%% | runtime: %.2fns\n", usage,  runtime);
     }
-
     return EXIT_SUCCESS;
 }
 
