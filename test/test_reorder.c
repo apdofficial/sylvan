@@ -91,7 +91,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
 }
 
-UTEST_TASK_0(test_sifting, basic_sift)
+UTEST_TASK_0(test_sifting, sifting)
 {
     sylvan_gc();
 
@@ -114,7 +114,19 @@ UTEST_TASK_0(test_sifting, basic_sift)
     MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
     mtbdd_protect(&f);
 #endif
+
     printf("Size before sifting: %zu\n ", llmsset_count_marked(nodes));
+
+    sylvan_gc();
+
+    sylvan_sifting(0, 0, 0);
+
+    ASSERT_EQ(mtbdd_getvar(n0), 0U);
+    ASSERT_EQ(mtbdd_getvar(n1), 1U);
+    ASSERT_EQ(mtbdd_getvar(n3), 2U);
+    ASSERT_EQ(mtbdd_getvar(n2), 3U);
+    ASSERT_EQ(mtbdd_getvar(n4), 4U);
+    ASSERT_EQ(mtbdd_getvar(n5), 5U);
 
     printf("v%d ", mtbdd_getvar(n0));
     printf("v%d ", mtbdd_getvar(n1));
@@ -122,19 +134,52 @@ UTEST_TASK_0(test_sifting, basic_sift)
     printf("v%d ", mtbdd_getvar(n3));
     printf("v%d ", mtbdd_getvar(n4));
     printf("v%d \n", mtbdd_getvar(n5));
+}
+
+UTEST_TASK_0(test_sifting, sifting_new)
+{
+    sylvan_gc();
+
+    mtbdd_levels_reset();
+    mtbdd_levels_new(6);
+
+    BDD n0 = mtbdd_ithlevel(0);
+    BDD n1 = mtbdd_ithlevel(1);
+    BDD n2 = mtbdd_ithlevel(2);
+    BDD n3 = mtbdd_ithlevel(3);
+    BDD n4 = mtbdd_ithlevel(4);
+    BDD n5 = mtbdd_ithlevel(5);
+
+#if 1
+    // not optimal order
+    MTBDD f = sylvan_or(sylvan_and(n0, n3), sylvan_or(sylvan_and(n1, n4), sylvan_and(n2, n5)));
+    mtbdd_protect(&f);
+#else
+    // optimal order
+    MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
+    mtbdd_protect(&f);
+#endif
+
+    printf("Size before sifting: %zu\n ", llmsset_count_marked(nodes));
+
+    sylvan_gc();
 
     sylvan_sifting_new(0, 0, 0);
 
+    ASSERT_EQ(mtbdd_getvar(n0), 0U);
+    ASSERT_EQ(mtbdd_getvar(n1), 1U);
+    ASSERT_EQ(mtbdd_getvar(n3), 2U);
+    ASSERT_EQ(mtbdd_getvar(n2), 3U);
+    ASSERT_EQ(mtbdd_getvar(n4), 4U);
+    ASSERT_EQ(mtbdd_getvar(n5), 5U);
+
     printf("v%d ", mtbdd_getvar(n0));
     printf("v%d ", mtbdd_getvar(n1));
     printf("v%d ", mtbdd_getvar(n2));
     printf("v%d ", mtbdd_getvar(n3));
     printf("v%d ", mtbdd_getvar(n4));
     printf("v%d \n", mtbdd_getvar(n5));
-    
-    ASSERT_EQ(1, 1);
 }
-
 
 
 int main(int argc, const char *const argv[])
