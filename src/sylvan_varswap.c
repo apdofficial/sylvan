@@ -314,7 +314,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, first) != 1){
                 LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
-//                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
         } else if (nvar != var) {
@@ -328,7 +328,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 1){
                 LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_clear_one(%zu) failed!\n", first);
-//                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
         }
@@ -347,7 +347,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
                     mtbddnode_setvariable(node, var+1);
                     if (llmsset_rehash_bucket(nodes, first) != 1){
                         LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
-//                        *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+                        *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                     }
                 } else {
                     // mark for phase 2
@@ -377,7 +377,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
                 mtbddnode_setvariable(node, var+1);
                 if (llmsset_rehash_bucket(nodes, first) != 1){
                     LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
-//                    *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+                    *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                 }
             }
         }
@@ -443,7 +443,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 mtbddnode_makemapnode(node, var, f0, f01);
                 if (llmsset_rehash_bucket(nodes, first) != 1){
                     LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
-//                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
+                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }
             }
         } else {
@@ -480,7 +480,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 mtbddnode_makenode(node, var, f0, f1);
                 if (llmsset_rehash_bucket(nodes, first) != 1){
                     LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
-//                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
+                    *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }
             }
         }
