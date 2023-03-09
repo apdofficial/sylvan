@@ -29,6 +29,23 @@ typedef enum sylvan_varswap_res {
     SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
 } sylvan_varswap_res_t;
 
+/**
+ * @brief Provide description for given result.
+ *
+ * @details Requires buffer with length at least equal to 100
+ *
+ * @param tag
+ * @param result based on which the description is determined
+ * @param buf buffer into which the description will be copied
+ * @param buf_len
+ */
+void sylvan_varswap_res_description(sylvan_varswap_res_t result, char *buf, size_t buf_len);
+
+static inline int is_varswap_res_success(sylvan_varswap_res_t result)
+{
+    return result == SYLVAN_VARSWAP_SUCCESS || result == SYLVAN_VARSWAP_ROLLBACK;
+}
+
 TASK_DECL_1(sylvan_varswap_res_t, sylvan_varswap, uint32_t);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
@@ -54,7 +71,7 @@ TASK_DECL_1(sylvan_varswap_res_t, sylvan_varswap, uint32_t);
   * If the parameter <recovery> is set, then phase 1 only rehashes nodes that have variable "var+1".
   * Phase 2 will not abort on the first error, but try to finish as many nodes as possible.
   *
-  * Return sylvan_var_swap_err_t
+  * Return sylvan_varswap_res_t
   *
   * See the implementation of sylvan_simple_varswap for notes on recovery/rollback.
   *

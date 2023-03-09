@@ -7,9 +7,9 @@
 #define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
-#define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, "\r " s,  ##__VA_ARGS__); }
-#define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, "\r " s,  ##__VA_ARGS__); }
-#define LOG_INFO(s, ...)    { if (ENABLE_INFO_LOGS)  fprintf(stdout, "\r " s,  ##__VA_ARGS__); }
+#define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, s,  ##__VA_ARGS__); }
+#define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, s,  ##__VA_ARGS__); }
+#define LOG_INFO(s, ...)    { if (ENABLE_INFO_LOGS)  fprintf(stdout, s,  ##__VA_ARGS__); }
 
 
 VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile sylvan_varswap_res_t*);
@@ -49,37 +49,35 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, volatile sylvan_va
 */
 #define sylvan_varswap_p2(var, first, count, result) CALL(sylvan_varswap_p2, var, first, count, result)
 
-void sylvan_print_varswap_res(char *tag, sylvan_varswap_res_t result)
+void sylvan_varswap_res_description(sylvan_varswap_res_t result, char *buf, size_t buf_len)
 {
-    size_t msgLen = 100;
-    char msg[msgLen];
+    assert(buf_len >= 100);
     switch (result) {
         case SYLVAN_VARSWAP_ROLLBACK:
-            sprintf(msg, "SYLVAN_VARSWAP_ROLLBACK: the operation was aborted and rolled back");
+            sprintf(buf, "SYLVAN_VARSWAP_ROLLBACK: the operation was aborted and rolled back");
             break;
         case SYLVAN_VARSWAP_SUCCESS:
-            sprintf(msg, "SYLVAN_VARSWAP_SUCCESS: success");
+            sprintf(buf, "SYLVAN_VARSWAP_SUCCESS: success");
             break;
         case SYLVAN_VARSWAP_P1_REHASH_FAIL:
-            sprintf(msg, "SYLVAN_VARSWAP_P1_REHASH_FAIL: cannot rehash in phase 1, no marked nodes remaining");
+            sprintf(buf, "SYLVAN_VARSWAP_P1_REHASH_FAIL: cannot rehash in phase 1, no marked nodes remaining");
             break;
         case SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED:
-            sprintf(msg, "SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED: cannot rehash in phase 1, and marked nodes remaining");
+            sprintf(buf, "SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED: cannot rehash in phase 1, and marked nodes remaining");
             break;
         case SYLVAN_VARSWAP_P2_REHASH_FAIL:
-            sprintf(msg, "SYLVAN_VARSWAP_P2_REHASH_FAIL: cannot rehash in phase 2, no marked nodes remaining");
+            sprintf(buf, "SYLVAN_VARSWAP_P2_REHASH_FAIL: cannot rehash in phase 2, no marked nodes remaining");
             break;
         case SYLVAN_VARSWAP_P2_CREATE_FAIL:
-            sprintf(msg, "SYLVAN_VARSWAP_P2_CREATE_FAIL: cannot create node in phase 2 (ergo marked nodes remaining)");
+            sprintf(buf, "SYLVAN_VARSWAP_P2_CREATE_FAIL: cannot create node in phase 2 (ergo marked nodes remaining)");
             break;
         case SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL:
-            sprintf(msg, "SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL: cannot rehash and cannot create node in phase 2");
+            sprintf(buf, "SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL: cannot rehash and cannot create node in phase 2");
             break;
         default:
-            sprintf(msg, "SYLVAN_VARSWAP: UNKNOWN ERROR");
+            sprintf(buf, "SYLVAN_VARSWAP: UNKNOWN ERROR");
             break;
     }
-    printf("%s: %s\n", tag, msg);
 }
 
 /**

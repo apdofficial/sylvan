@@ -6,14 +6,6 @@
 
 #include <sylvan_int.h>
 
-/* Obtain current wallclock time */
-static double wctime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec + 1E-6 * tv.tv_usec);
-}
-
 static char* to_h(double size, char *buf)
 {
     const char* units[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
@@ -26,20 +18,15 @@ static char* to_h(double size, char *buf)
 TASK_0(int, run)
 {
     for (size_t i = 0; i < 100000000; i += 1) {
-        double t_sample = wctime();
+        clock_t start = clock();
         for (size_t j = 0; j < 100000; ++j) {
-            MTBDD v = mtbdd_ithvar(i);
-            if (v == mtbdd_invalid) {
-                printf("table is full\n");
-                break;
-            }
+            mtbdd_ithvar(i);
             i += 1;
         }
         double usedBuckets = llmsset_count_marked(nodes);
-        double allBuckets = llmsset_get_size(nodes);
+        size_t allBuckets = llmsset_get_size(nodes);
         double usage = (usedBuckets/allBuckets)*100;
-        double runtime = (wctime()-t_sample)*1000*100;
-        printf("table usage %.1f%% | runtime: %.2fns\n", usage,  runtime);
+        printf("table usage %.1f%% | runtime: %.2zuns\n", usage, clock_ns_elapsed(start));
     }
     return EXIT_SUCCESS;
 }

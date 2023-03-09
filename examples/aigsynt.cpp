@@ -34,7 +34,7 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 2; // autodetect
+static int workers = 1; // autodetect
 static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
 static int reorder = 0;
@@ -78,18 +78,9 @@ parse_opt(int key, char *arg, struct argp_state *state)
 
 static struct argp argp = { options, parse_opt, "<aag_file>", 0, 0, 0, 0 };
 
-/* Obtain current wallclock time */
-static double
-wctime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec + 1E-6 * tv.tv_usec);
-}
-
-static double t_start;
-#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
-#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
+static clock_t t_start;
+#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, clock_sec_elapsed(t_start), ##__VA_ARGS__)
+#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, clock_sec_elapsed(t_start), ##__VA_ARGS__); exit(-1); }
 
 /**
  * Global stuff
@@ -689,14 +680,13 @@ VOID_TASK_0(gc_end)
     sylvan_table_usage(&used, &total);
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
     INFO("Running the sifting algorithm.\n");
-//    sylvan_sifting_new(0, 0);
 }
 
 int
 main(int argc, char **argv)
 {
     // Load start time (for the output)
-    t_start = wctime();
+    t_start = clock();
 
     // Parse arguments
     argp_parse(&argp, argc, argv, 0, 0, 0);
@@ -705,8 +695,8 @@ main(int argc, char **argv)
     lace_start(workers, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
-    // Give 2 GB memory
-    sylvan_set_limits(2LL*1LL<<30, 1, 15);
+    // Give 4 GB memory
+    sylvan_set_limits(4LL*1LL<<30, 1, 10);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

@@ -17,6 +17,8 @@
 #ifndef SYLVAN_VAR_REORDER_H
 #define SYLVAN_VAR_REORDER_H
 
+#include "sylvan_varswap.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -30,24 +32,23 @@ void sylvan_init_reorder(void);
 
 void sylvan_quit_reorder(void);
 
-__attribute__((unused))
+__attribute__((unused)) __attribute__((unused))
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
 __attribute__((unused))
 void sylvan_set_reorder_threshold(size_t threshold);
 
-__attribute__((unused))
+__attribute__((unused)) __attribute__((unused))
 void sylvan_set_reorder_maxgrowth(float max_growth);
 
-__attribute__((unused))
+__attribute__((unused)) __attribute__((unused))
 void sylvan_set_reorder_maxswap(size_t max_swap);
 
-__attribute__((unused))
+__attribute__((unused)) __attribute__((unused))
 void sylvan_set_reorder_maxvar(size_t max_var);
 
 __attribute__((unused))
 void sylvan_set_reorder_timelimit(size_t time_limit);
-
 
 TASK_DECL_5(sylvan_varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
 /**
@@ -103,7 +104,7 @@ VOID_TASK_DECL_2(sylvan_reorder, uint32_t, uint32_t);
   \param low - the lowest position to sift
   \param high - the highest position to sift
 
-  \sideeffect order and number of variables is changed
+  \sideeffect order and number of variables might change
 */
 #define sylvan_reorder(low, high)  CALL(sylvan_reorder, low, high)
 

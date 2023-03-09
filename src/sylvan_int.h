@@ -41,6 +41,9 @@ namespace sylvan {
 extern "C" {
 #endif /* __cplusplus */
 
+#define SYLVAN_SUCCESS 1
+#define SYLVAN_FAIL    0
+
 /**
  * Nodes table.
  */
