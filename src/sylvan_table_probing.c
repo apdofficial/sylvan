@@ -168,7 +168,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
 
         if (hash == (v & MASK_HASH)) {
             uint64_t d_idx = v & MASK_INDEX;
-            uint64_t *d_ptr = ((uint64_t*)dbs->data) + 2*d_idx;
+            uint64_t *d_ptr = ((uint64_t*)dbs->data) + 2*d_idx; // ptr type 8bytes, * 8 byts we have nodes of 16 bytes
             if (custom) {
                 if (dbs->equals_cb(a, b, d_ptr[0], d_ptr[1])) {
                     if (cidx != 0) {

@@ -46,7 +46,7 @@ struct sifting_config
     float                       max_growth;             // coefficient used to calculate maximum growth
     size_t                      max_swap;               // maximum number of swaps per sifting
     size_t                      total_num_swap;         // number of swaps completed
-    size_t                      max_var;                // maximum number of vars sifted
+    size_t                      max_var;                // maximum number of vars swapped per sifting
     size_t                      total_num_var;          // maximum number of vars sifted
     unsigned long               time_limit;	            // time limit in milliseconds
 };
@@ -78,6 +78,9 @@ VOID_TASK_DECL_2(get_sorted_level_counts, int*, size_t);
  */
 #define get_sorted_level_counts(level_counts, threshold) RUN(get_sorted_level_counts, level_counts, threshold)
 
+// might not be entirely accurate
+// look at better oprions
+// research  on how performance it is
 /* Obtain current wallclock time */
 static double wctime()
 {
@@ -138,7 +141,12 @@ void sylvan_init_reorder()
     mtbdd_levels_gc_add_mark_managed_refs();
 }
 
-static void gnome_sort(int *level, const size_t *level_counts)
+/**
+ * Sort level counts using gnome sort.
+ * @param level
+ * @param level_counts
+ */
+static void sort_level_counts(int *level, const size_t *level_counts)
 {
     unsigned int i = 1;
     unsigned int j = 2;
@@ -177,23 +185,23 @@ VOID_TASK_IMPL_2(get_sorted_level_counts, int*, level, size_t, threshold)
     }
 
     t = clock();
-    gnome_sort(level, level_counts);
-    LOG_DEBUG("gnome_sort                  took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
+    sort_level_counts(level, level_counts);
+    LOG_DEBUG("sort_level_counts                  took %f seconds\n", (((double)(clock() - t))/CLOCKS_PER_SEC));
 }
 
-VOID_TASK_IMPL_5(sift_down,
-                 size_t*, pos,
-                 size_t, high,
-                 size_t*, curSize,
-                 size_t*, bestSize,
-                 size_t*, bestPos
-){
+TASK_IMPL_5(sylvan_varswap_res_t, sift_down,
+            size_t*, pos,
+            size_t, high,
+            size_t*, curSize,
+            size_t*, bestSize,
+            size_t*, bestPos)
+{
     for (; *pos < high; *pos = *pos + 1){
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos);
         configs.total_num_swap++;
         if (res != SYLVAN_VARSWAP_SUCCESS){
             LOG_ERROR("sift(UP): failed due to %d\n", res);
-            break;
+            return res;
         }
         size_t after = llmsset_count_marked(nodes);
         LOG_DEBUG("sift(UP): from %zu to %zu\n", *curSize, after);
@@ -205,26 +213,26 @@ VOID_TASK_IMPL_5(sift_down,
         }
         if ((float)(*curSize) >= configs.max_growth * (float)(*bestSize)) {
             *pos = *pos + 1;
-            break;
+            return SYLVAN_VARSWAP_SUCCESS;
         }
     }
-    //TODO: return varswap_res_t
+    return SYLVAN_VARSWAP_SUCCESS;
 }
 
-VOID_TASK_IMPL_5(sift_up,
-                 size_t*, pos,
-                 size_t, low,
-                 size_t*, curSize,
-                 size_t*, bestSize,
-                 size_t*, bestPos
-){
+TASK_IMPL_5(sylvan_varswap_res_t, sift_up,
+            size_t*, pos,
+            size_t, low,
+            size_t*, curSize,
+            size_t*, bestSize,
+            size_t*, bestPos)
+{
     for (; *pos > low; *pos = *pos - 1) {
         if(configs.total_num_var > configs.max_var) break;
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos - 1);
         configs.total_num_swap++;
         if (res != SYLVAN_VARSWAP_SUCCESS){
             LOG_ERROR("sift(DN): failed due to %d\n", res);
-            break;
+            return res;
         }
         size_t after = llmsset_count_marked(nodes);
         LOG_DEBUG("sift(DN): from %zu to %zu\n", *curSize, after);
@@ -236,20 +244,20 @@ VOID_TASK_IMPL_5(sift_up,
         }
         if ((float)(*curSize) >= configs.max_growth * (float)(*bestSize)) {
             *pos = *pos - 1;
-            break;
+            return SYLVAN_VARSWAP_SUCCESS;
         }
     }
-    //TODO: return varswap_res_t
+    return SYLVAN_VARSWAP_SUCCESS;
 }
 
-VOID_TASK_IMPL_2(sift_to_pos, size_t, pos, size_t, targetPos)
+TASK_IMPL_2(sylvan_varswap_res_t, sift_to_pos, size_t, pos, size_t, targetPos)
 {
     for (; pos < targetPos; pos++){
         sylvan_varswap_res_t res = sylvan_simple_varswap(pos);
         configs.total_num_swap++;
         if (res != SYLVAN_VARSWAP_SUCCESS){
             LOG_ERROR("sift_to_pos: failed due to %d\n", res);
-            break;
+            return res;
         }
     }
     for (; pos > targetPos; pos--){
@@ -257,9 +265,10 @@ VOID_TASK_IMPL_2(sift_to_pos, size_t, pos, size_t, targetPos)
         configs.total_num_swap++;
         if (res != SYLVAN_VARSWAP_SUCCESS){
             LOG_ERROR("sift_to_pos: failed due to %d\n", res);
-            break;
+            return res;
         }
     }
+    return SYLVAN_VARSWAP_SUCCESS;
 }
 
 VOID_TASK_IMPL_2(sylvan_sifting_new, uint32_t, low,uint32_t, high)

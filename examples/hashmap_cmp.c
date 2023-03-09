@@ -25,9 +25,9 @@ static char* to_h(double size, char *buf)
 
 TASK_0(int, run)
 {
-    for (size_t i = 0; i < 100000; i += 1) {
+    for (size_t i = 0; i < 100000000; i += 1) {
         double t_sample = wctime();
-        for (size_t j = 0; j < 1000; ++j) {
+        for (size_t j = 0; j < 100000; ++j) {
             MTBDD v = mtbdd_ithvar(i);
             if (v == mtbdd_invalid) {
                 printf("table is full\n");
@@ -49,12 +49,12 @@ int main(int argc, char **argv)
     // Init Lace
     lace_start(4, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
-    long long memoryCap = 4LL*1024LLU*1024LLU*1024LLU;
+    long long memoryCap = 1LL*1024LLU*1024LLU*1024LLU;
     char buf[32];
     to_h(memoryCap, buf);
     printf("Setting Sylvan main tables memory to %s\n", buf);
 
-    sylvan_set_limits(memoryCap, 1, 10);
+    sylvan_set_limits(memoryCap, 1, 0);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

@@ -234,8 +234,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  uint32_t, var, /** variable label **/
                  size_t, first, /** index in the unique table **/
                  size_t, count, /** index in the unique table **/
-                 volatile sylvan_varswap_res_t*, result
-){
+                 volatile sylvan_varswap_res_t*, result)
+{
     // go recursive if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p0, var, first, count / 2, result);
@@ -282,8 +282,8 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             uint32_t, var, /** variable label **/
             size_t, first,  /** starting node index in the unique table **/
             size_t, count, /** number of nodes to visit form the starting index **/
-            volatile sylvan_varswap_res_t*, result
-){
+            volatile sylvan_varswap_res_t*, result)
+{
     // Divide-and-conquer if count above BLOCKSIZE
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p1, var, first, count / 2, result);
@@ -400,8 +400,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  uint32_t, var,
                  size_t, first,
                  size_t, count,
-                 volatile sylvan_varswap_res_t*, result
-){
+                 volatile sylvan_varswap_res_t*, result)
+{
     /* divide and conquer (if count above BLOCKSIZE) */
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p2, var, first, count / 2, result);

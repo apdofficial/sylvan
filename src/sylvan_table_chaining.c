@@ -255,11 +255,12 @@ llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 int
 llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
 {
-    volatile uint64_t *dptr = ((uint64_t*)dbs->data) + 3*didx;
+    // unique table 2 arrays: hashes | data
+    volatile uint64_t *dptr = ((uint64_t*)dbs->data) + 3*didx; // first 8 bytes are chaining
 
     uint64_t d = *dptr;
     if (d & MASK_INDEX) {
-        while (!cas(dptr, d, (uint64_t)-1)) {
+        while (!cas(dptr, d, (uint64_t)-1)) { // settgin ptr to not in use(-1)
             d = *dptr;
         }
         d &= MASK_INDEX; // <d> now contains the next bucket in the chain
@@ -269,7 +270,7 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
 
     const uint64_t hash = is_custom_bucket(dbs, didx) ?
         dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
-        sylvan_tabhash16(dptr[1], dptr[2], 14695981039346656037LLU);
+        sylvan_tabhash16(dptr[1], dptr[2], 14695981039346656037LLU); // use hash to find where it should be hashed
 
 #if LLMSSET_MASK
     volatile uint64_t *fptr = &dbs->table[hash & dbs->mask];
@@ -281,11 +282,15 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
         uint64_t idx = *fptr;
 
         if (idx == didx) { // we are head
-            *fptr = d;
+            *fptr = d; // next part of the chain
             return 1;
         }
 
         for (;;) {
+            // can not be used in combination with look up (find or insert)
+
+            // item was not actually in the hash table (node that was not hashed)
+            // if you use clear one on the same thing twice it goues wrong
             if (idx == 0) return 0; // wasn't in???
 
             uint64_t *ptr = ((uint64_t*)dbs->data) + 3*idx;

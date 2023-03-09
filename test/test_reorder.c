@@ -28,8 +28,8 @@ UTEST_TASK_0(test_sifting, basic_sift_up)
 
     size_t pos = mtbdd_getvar(n0);
 
-    // sift var 0 to from level 0 to level 3
-    sift_down(&pos, 3, &cursize, &bestsize, &bestPos);
+    sylvan_varswap_res_t res = sift_down(&pos, 3, &cursize, &bestsize, &bestPos);
+    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n0), 3u);
 
@@ -54,7 +54,8 @@ UTEST_TASK_0(test_sifting, basic_sift_down)
 
     size_t pos = mtbdd_getvar(n5);
 
-    sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
+    sylvan_varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
+    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
 
@@ -79,7 +80,8 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
 
     size_t pos = mtbdd_getvar(n5);
 
-    sift_up(&pos, 0, &cursize, &bestsize, &bestlvl);
+    sylvan_varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestlvl);
+    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
 
@@ -112,7 +114,7 @@ UTEST_TASK_0(test_sifting, sifting) {
 #endif
 
     sylvan_set_reordering_threshold(0);
-    sylvan_sifting(0, 0);
+    sylvan_sifting_new(0, 0);
 
     ASSERT_EQ(mtbdd_getvar(n0), 0U);
     ASSERT_EQ(mtbdd_getvar(n1), 1U);

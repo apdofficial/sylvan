@@ -49,7 +49,7 @@ void sylvan_set_reordering_max_var(size_t max_var);
 void sylvan_set_reordering_time_limit(size_t time_limit);
 
 
-VOID_TASK_DECL_5(sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_5(sylvan_varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
  *
@@ -64,7 +64,7 @@ VOID_TASK_DECL_5(sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
  */
 #define sift_down(var, high, curSize, bestSize, bestPos) RUN(sift_down, var, high, curSize, bestSize, bestPos)
 
-VOID_TASK_DECL_5(sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_5(sylvan_varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
 /**
  * \brief Sift given variable down from its current level to the target level.
  *
@@ -79,7 +79,7 @@ VOID_TASK_DECL_5(sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
  */
 #define sift_up(var, low, curSize, bestSize, bestPos) RUN(sift_up, var, low, curSize, bestSize, bestPos)
 
-VOID_TASK_DECL_2(sift_to_pos, size_t, size_t);
+TASK_DECL_2(sylvan_varswap_res_t, sift_to_pos, size_t, size_t);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
