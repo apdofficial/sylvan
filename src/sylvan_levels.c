@@ -25,7 +25,7 @@ void mtbdd_levels_new(size_t amount)
         var_to_level = realloc(var_to_level, sizeof(uint32_t[levels_size]));
         level_to_var = realloc(level_to_var, sizeof(uint32_t[levels_size]));
     }
-    for (size_t i=0; i<amount; i++) {
+    for (size_t i = 0; i < amount; i++) {
         // reminder: makenode(var, low, high)
         levels[levels_count] = mtbdd_makenode(levels_count, mtbdd_false, mtbdd_true);
         var_to_level[levels_count] = levels_count;
@@ -55,7 +55,7 @@ MTBDD mtbdd_ithlevel(uint32_t level)
 
 uint32_t mtbdd_levels_var_to_level(uint32_t var)
 {
-    if (var < levels_count){
+    if (var < levels_count) {
         return var_to_level[var];
     } else {
         return var;
@@ -64,7 +64,7 @@ uint32_t mtbdd_levels_var_to_level(uint32_t var)
 
 uint32_t mtbdd_levels_level_to_var(uint32_t level)
 {
-    if (level < levels_count){
+    if (level < levels_count) {
         return level_to_var[level];
     } else {
         return level;
@@ -82,7 +82,7 @@ uint32_t mtbdd_levels_node_to_level(MTBDD node)
  */
 VOID_TASK_0(mtbdd_gc_mark_managed_refs)
 {
-    for (size_t i=0; i<levels_count; i++) {
+    for (size_t i = 0; i < levels_count; i++) {
         llmsset_mark(nodes, MTBDD_STRIPMARK(levels[i]));
     }
 }
@@ -113,11 +113,11 @@ void mtbdd_levels_varswap(uint32_t var)
     // var_to_level[2] == 0
     // level_to_var[0] == 2
 
-    level_to_var[var_to_level[var]] = var+1;
-    level_to_var[var_to_level[var+1]] = var;
+    level_to_var[var_to_level[var]] = var + 1;
+    level_to_var[var_to_level[var + 1]] = var;
     uint32_t save = var_to_level[var];
-    var_to_level[var] = var_to_level[var+1];
-    var_to_level[var+1] = save;
+    var_to_level[var] = var_to_level[var + 1];
+    var_to_level[var + 1] = save;
 #else
     // mtbdd_levels_new(5)
     // var_to_level = { 0, 1, 2, 3, 4 }
@@ -147,7 +147,7 @@ void mtbdd_levels_varswap(uint32_t var)
 
 void sylvan_levels_destroy(void)
 {
-     if (levels_size != 0) {
+    if (levels_size != 0) {
         free(levels);
         levels = NULL;
         free(var_to_level);
@@ -169,7 +169,7 @@ VOID_TASK_IMPL_3(mtbdd_levels_count_nodes, size_t*, arr, size_t, first, size_t, 
         SYNC(mtbdd_levels_count_nodes);
     } else {
         size_t tmp[mtbdd_levels_size()], i;
-        for (i=0; i < mtbdd_levels_size(); i++) tmp[i] = 0;
+        for (i = 0; i < mtbdd_levels_size(); i++) tmp[i] = 0;
 
         const size_t end = first + count;
 
@@ -181,7 +181,7 @@ VOID_TASK_IMPL_3(mtbdd_levels_count_nodes, size_t*, arr, size_t, first, size_t, 
         }
         /* these are atomic operations on a hot location with false sharing inside another
            thread's program stack... can't get much worse! */
-        for (i=0; i < mtbdd_levels_size(); i++) __sync_add_and_fetch(&arr[i], tmp[i]);
+        for (i = 0; i < mtbdd_levels_size(); i++) __sync_add_and_fetch(&arr[i], tmp[i]);
     }
 }
 

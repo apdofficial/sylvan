@@ -30,7 +30,7 @@ VOID_TASK_DECL_3(mtbdd_levels_count_nodes, size_t*, size_t, size_t);
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define mtbdd_levels_count_nodes(level_counts) RUN(mtbdd_levels_count_nodes, level_counts, 0, nodes->table_size);
+#define mtbdd_levels_count_nodes(level_counts) RUN(mtbdd_levels_count_nodes, level_counts, 0, nodes->table_size)
 
 
 /**

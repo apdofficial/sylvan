@@ -531,7 +531,7 @@ VOID_TASK_0(parse)
     sylvan_stats_report(stdout);
 
     sylvan_gc();
-    sylvan_sifting_new(0, 0);
+    sylvan_reorder(0, 0);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {

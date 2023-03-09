@@ -24,29 +24,29 @@ extern "C" {
 /**
    \brief Type of termination handler.
 */
-typedef int (*varswap_termination_cb)();
+typedef int (*reorder_termination_cb)();
 
-/**
-   @brief Sifting configuration.
-*/
-typedef struct sifting_config sifting_config_t;
-
-/**
- * Sylvan dynamic variable reordering
- */
 void sylvan_init_reorder(void);
 
-void sylvan_set_reordering_termination_cb(varswap_termination_cb callback);
+void sylvan_quit_reorder(void);
 
-void sylvan_set_reordering_threshold(size_t threshold);
+__attribute__((unused))
+void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
-void sylvan_set_reordering_max_growth(float max_growth);
+__attribute__((unused))
+void sylvan_set_reorder_threshold(size_t threshold);
 
-void sylvan_set_reordering_max_swap(size_t max_swap);
+__attribute__((unused))
+void sylvan_set_reorder_maxgrowth(float max_growth);
 
-void sylvan_set_reordering_max_var(size_t max_var);
+__attribute__((unused))
+void sylvan_set_reorder_maxswap(size_t max_swap);
 
-void sylvan_set_reordering_time_limit(size_t time_limit);
+__attribute__((unused))
+void sylvan_set_reorder_maxvar(size_t max_var);
+
+__attribute__((unused))
+void sylvan_set_reorder_timelimit(size_t time_limit);
 
 
 TASK_DECL_5(sylvan_varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
@@ -87,7 +87,7 @@ TASK_DECL_2(sylvan_varswap_res_t, sift_to_pos, size_t, size_t);
  */
 #define sift_to_pos(var, targetPos) RUN(sift_to_pos, var, targetPos)
 
-VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
+VOID_TASK_DECL_2(sylvan_reorder, uint32_t, uint32_t);
 /**
   \brief Implementation of Rudell's sifting algorithm.
 
@@ -104,12 +104,8 @@ VOID_TASK_DECL_2(sylvan_sifting_new, uint32_t, uint32_t);
   \param high - the highest position to sift
 
   \sideeffect order and number of variables is changed
-
 */
-#define sylvan_sifting_new(low, high)  CALL(sylvan_sifting_new, low, high)
-
-VOID_TASK_DECL_2(sylvan_sifting, uint32_t, uint32_t);
-#define sylvan_sifting(low, high) CALL(sylvan_sifting, low, high)
+#define sylvan_reorder(low, high)  CALL(sylvan_reorder, low, high)
 
 #ifdef __cplusplus
 }

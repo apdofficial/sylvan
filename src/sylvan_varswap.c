@@ -7,28 +7,9 @@
 #define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
-/* Obtain current wallclock time */
-static double wctime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec + 1E-6 * tv.tv_usec);
-}
-static double t_start = 0.0;
-
-#define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); }
-#define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); }
-#define LOG_INFO(s, ...)    { if (ENABLE_INFO_LOGS)  fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); }
-
-void sylvan_varswap_init(void)
-{
-    t_start = wctime();
-}
-
-void sylvan_varswap_quit(void)
-{
-    t_start = 0.0;
-}
+#define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, "\r " s,  ##__VA_ARGS__); }
+#define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, "\r " s,  ##__VA_ARGS__); }
+#define LOG_INFO(s, ...)    { if (ENABLE_INFO_LOGS)  fprintf(stdout, "\r " s,  ##__VA_ARGS__); }
 
 
 VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, volatile sylvan_varswap_res_t*);
@@ -109,7 +90,8 @@ MTBDD mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high)
 {
     struct mtbddnode n;
     uint64_t index;
-    int mark, created;
+    int mark;
+    int created;
 
     if (low == high) return low;
 
@@ -156,27 +138,8 @@ MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
     return index;
 }
 
-TASK_IMPL_2(sylvan_varswap_res_t, sylvan_varswap, uint32_t, var, int, recovery)
-{
-    sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
-    // first clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(var, 0, nodes->table_size, &result);
-    // handle all trivial cases, mark cases that are not trivial
-    uint64_t marked_count = sylvan_varswap_p1(var, 0, nodes->table_size, &result);
-
-    if (marked_count != 0) {
-        // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
-        sylvan_varswap_p2(var, 0, nodes->table_size, &result);
-
-        if (result != SYLVAN_VARSWAP_SUCCESS) return result;
-    }
-    return SYLVAN_VARSWAP_SUCCESS;
-    (void)recovery;
-}
-
-TASK_IMPL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t, var)
+TASK_IMPL_1(sylvan_varswap_res_t, sylvan_varswap, uint32_t, var)
 {
     sylvan_varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
 
@@ -198,7 +161,7 @@ TASK_IMPL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t, var)
             // handle all trivial cases, mark cases that are not trivial
             marked_count = sylvan_varswap_p1(var, 0, nodes->table_size, &result);
 
-            if (marked_count > 0 && result == SYLVAN_VARSWAP_SUCCESS){
+            if (marked_count > 0 && result == SYLVAN_VARSWAP_SUCCESS) {
                 // do the not so trivial cases (but won't create new nodes this time)
                 sylvan_varswap_p2(var, 0, nodes->table_size, &result);
                 if (result != SYLVAN_VARSWAP_SUCCESS) {
@@ -206,7 +169,7 @@ TASK_IMPL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t, var)
                     LOG_ERROR("sylvan: recovery varswap failed!\n");
                     return SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL;
                 }
-            }else{
+            } else {
                 return SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED;
             }
 
@@ -217,7 +180,6 @@ TASK_IMPL_1(sylvan_varswap_res_t, sylvan_simple_varswap, uint32_t, var)
 
     mtbdd_levels_varswap(var);
 
-    // do some kind of clear-and-mark ???
     sylvan_clear_and_mark();
     sylvan_rehash_all();
 
@@ -236,7 +198,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  size_t, count, /** index in the unique table **/
                  volatile sylvan_varswap_res_t*, result)
 {
-    // go recursive if count above BLOCKSIZE
+    // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p0, var, first, count / 2, result);
         CALL(sylvan_varswap_p0, var, first + count / 2, count - count / 2, result);
@@ -257,10 +219,9 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
-        if (nvar == var || nvar == (var+1)) {
-            if (llmsset_clear_one(nodes, first) != 1){
+        if (nvar == var || nvar == (var + 1)) {
+            if (llmsset_clear_one(nodes, first) != 1) {
                 LOG_ERROR("sylvan_varswap_p0: llmsset_clear_one(%u) failed!\n", nvar);
-                *result = SYLVAN_VARSWAP_P0_CLEAR_FAIL;
             }
         }
     }
@@ -284,7 +245,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             size_t, count, /** number of nodes to visit form the starting index **/
             volatile sylvan_varswap_res_t*, result)
 {
-    // Divide-and-conquer if count above BLOCKSIZE
+    // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p1, var, first, count / 2, result);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + count / 2, count - count / 2, result);
@@ -309,10 +270,10 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
 
-        if (nvar == (var+1)) {
+        if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
             mtbddnode_setvariable(node, var);
-            if (llmsset_rehash_bucket(nodes, first) != 1){
+            if (llmsset_rehash_bucket(nodes, first) != 1) {
                 LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
                 *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
@@ -326,7 +287,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             // marked node, remove mark and rehash (we are apparently recovering)
             mtbddnode_setmark(node, 0);
             llmsset_rehash_bucket(nodes, first);
-            if (llmsset_rehash_bucket(nodes, first) != 1){
+            if (llmsset_rehash_bucket(nodes, first) != 1) {
                 LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_clear_one(%zu) failed!\n", first);
                 *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
@@ -337,15 +298,15 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
                 // we are at the end of a chain
-                mtbddnode_setvariable(node, var+1);
+                mtbddnode_setvariable(node, var + 1);
                 llmsset_rehash_bucket(nodes, first);
             } else {
                 // not the end of a chain, so f0 is the next in chain
                 uint32_t vf0 = mtbdd_getvar(f0);
-                if (vf0 > var+1) {
+                if (vf0 > var + 1) {
                     // next in chain wasn't <var+1>...
-                    mtbddnode_setvariable(node, var+1);
-                    if (llmsset_rehash_bucket(nodes, first) != 1){
+                    mtbddnode_setvariable(node, var + 1);
+                    if (llmsset_rehash_bucket(nodes, first) != 1) {
                         LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
                         *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                     }
@@ -360,13 +321,13 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             MTBDD f0 = mtbddnode_getlow(node);
             if (!mtbdd_isleaf(f0)) {
                 uint32_t vf0 = mtbdd_getvar(f0);
-                if (vf0 == var || vf0 == var+1) p2 = 1;
+                if (vf0 == var || vf0 == var + 1) p2 = 1;
             }
             if (!p2) {
                 MTBDD f1 = mtbddnode_gethigh(node);
                 if (!mtbdd_isleaf(f1)) {
                     uint32_t vf1 = mtbdd_getvar(f1);
-                    if (vf1 == var || vf1 == var+1) p2 = 1;
+                    if (vf1 == var || vf1 == var + 1) p2 = 1;
                 }
             }
             if (p2) {
@@ -374,8 +335,8 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
                 mtbddnode_setmark(node, 1);
                 marked++;
             } else {
-                mtbddnode_setvariable(node, var+1);
-                if (llmsset_rehash_bucket(nodes, first) != 1){
+                mtbddnode_setvariable(node, var + 1);
+                if (llmsset_rehash_bucket(nodes, first) != 1) {
                     LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
                     *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                 }
@@ -402,7 +363,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  size_t, count,
                  volatile sylvan_varswap_res_t*, result)
 {
-    /* divide and conquer (if count above BLOCKSIZE) */
+    // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         SPAWN(sylvan_varswap_p2, var, first, count / 2, result);
         CALL(sylvan_varswap_p2, var, first + count / 2, count - count / 2, result);
@@ -434,14 +395,14 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mtbddnode_t n0 = MTBDD_GETNODE(f0);
             MTBDD f00 = node_getlow(f0, n0);
             MTBDD f01 = node_gethigh(f0, n0);
-            f0 = mtbdd_varswap_makemapnode(var+1, f00, f1);
+            f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
             if (f0 == mtbdd_invalid) {
                 LOG_ERROR("sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
                 *result = SYLVAN_VARSWAP_P2_CREATE_FAIL;
                 return;
             } else {
                 mtbddnode_makemapnode(node, var, f0, f01);
-                if (llmsset_rehash_bucket(nodes, first) != 1){
+                if (llmsset_rehash_bucket(nodes, first) != 1) {
                     LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
                     *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }
@@ -469,8 +430,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             }
 
             // compute new f0 and f1
-            f0 = mtbdd_varswap_makenode(var+1, f00, f10);
-            f1 = mtbdd_varswap_makenode(var+1, f01, f11);
+            f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+            f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
             if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
                 *result = SYLVAN_VARSWAP_P2_CREATE_FAIL;
                 LOG_ERROR("sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
@@ -478,7 +439,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             } else {
                 // update node, which also removes the mark
                 mtbddnode_makenode(node, var, f0, f1);
-                if (llmsset_rehash_bucket(nodes, first) != 1){
+                if (llmsset_rehash_bucket(nodes, first) != 1) {
                     LOG_ERROR("sylvan_varswap_p2: llmsset_clear_one(%zu) failed!\n", first);
                     *result = SYLVAN_VARSWAP_P2_REHASH_FAIL;
                 }

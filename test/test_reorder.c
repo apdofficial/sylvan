@@ -113,8 +113,8 @@ UTEST_TASK_0(test_sifting, sifting) {
     mtbdd_protect(&f);
 #endif
 
-    sylvan_set_reordering_threshold(0);
-    sylvan_sifting_new(0, 0);
+    sylvan_set_reorder_threshold(0);
+    sylvan_reorder(0, 0);
 
     ASSERT_EQ(mtbdd_getvar(n0), 0U);
     ASSERT_EQ(mtbdd_getvar(n1), 1U);
@@ -128,11 +128,11 @@ UTEST_TASK_0(test_sifting, sifting) {
 int main(int argc, const char *const argv[])
 {
     // Init Lace
-    lace_start(2, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
+    lace_start(2, 1000000); // 2 workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory
-    sylvan_set_limits(2LL*1LL<<30, 1, 15);
+    sylvan_set_limits(2LL*1LL<<30, 1, 5);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

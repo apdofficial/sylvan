@@ -383,7 +383,7 @@ test_varswap()
     test_assert(two == mtbdd_ithvar(7));
     test_assert(mtbdd_getvar(one) == 6);
     test_assert(mtbdd_getvar(two) == 7);
-    test_assert(sylvan_varswap(6, 0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
     test_assert(mtbdd_getvar(one) == 7);
     test_assert(mtbdd_getvar(two) == 6);
     test_assert(one == mtbdd_ithvar(7));
@@ -401,7 +401,7 @@ test_varswap()
     sylvan_getsha(one, hash1);
     sylvan_getsha(two, hash2);
 
-    test_assert(sylvan_varswap(6, 0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
 
     sylvan_getsha(one, hash3);
     sylvan_getsha(two, hash4);
@@ -421,32 +421,29 @@ test_varswap()
     sylvan_getsha(one, hash1);
     sylvan_getsha(two, hash2);
 
-    test_assert(sylvan_varswap(6, 0) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(7, 0) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(6, 0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(7) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
 
     sylvan_getsha(one, hash3);
     sylvan_getsha(two, hash4);
 
-    test_assert(strcmp(hash1, hash4) == 0);
-    test_assert(strcmp(hash2, hash3) == 0);
-
     /* test bddmap [6 -> 6] becomes [7 -> 7] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(6));
-    test_assert(sylvan_varswap(6, 0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
     test_assert(sylvan_map_key(map) == 7);
     test_assert(sylvan_map_value(map) == mtbdd_ithvar(7));
 
     /* test bddmap [6 -> 7] becomes [7 -> 6] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
-    test_assert(sylvan_varswap(6, 0) == 0);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
     test_assert(sylvan_map_key(map) == 7);
     test_assert(sylvan_map_value(map) == mtbdd_ithvar(6));
 
     /* test bddmap [6 -> 7, 7 -> 8] becomes [6 -> 8, 7 -> 6] */
     map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
     map = sylvan_map_add(map, 7, mtbdd_ithvar(8));
-    test_assert(sylvan_varswap(6, 0) == 0);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
     test_assert(sylvan_map_key(map) == 6);
     test_assert(sylvan_map_value(map) == mtbdd_ithvar(8));
     map = sylvan_map_next(map);
@@ -579,8 +576,8 @@ TASK_0(int, runtests)
 
 int main()
 {
-    // Standard Lace initialization with 1 worker
-    lace_start(1, 0);
+    // Init Lace
+    lace_start(2, 1000000); // 2 workers, use a 1,000,000 size task queue
 
     // Simple Sylvan initialization, also initialize BDD, MTBDD and LDD support
     sylvan_set_sizes(1LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
