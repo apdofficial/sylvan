@@ -4,7 +4,7 @@
 #include "sylvan_levels.h"
 
 #define ENABLE_ERROR_LOGS   1 // critical errors that cause varswap to fail
-#define ENABLE_INFO_LOGS    0 // useful information w.r.t. dynamic reordering
+#define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
 /* Obtain current wallclock time */
@@ -260,7 +260,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         if (nvar == var || nvar == (var+1)) {
             if (llmsset_clear_one(nodes, first) != 1){
                 LOG_ERROR("sylvan_varswap_p0: llmsset_clear_one(%u) failed!\n", nvar);
-//                *result = SYLVAN_VARSWAP_P0_CLEAR_FAIL;
+                *result = SYLVAN_VARSWAP_P0_CLEAR_FAIL;
             }
         }
     }
