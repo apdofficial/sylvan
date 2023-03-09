@@ -24,7 +24,7 @@ extern "C" {
 /**
    \brief Type of termination handler.
 */
-typedef int (*varswap_termination_cb)(void);
+typedef int (*varswap_termination_cb)();
 
 /**
    @brief Sifting configuration.

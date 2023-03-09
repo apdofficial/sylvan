@@ -172,6 +172,7 @@ int llmsset_clear_one(const llmsset_t dbs, uint64_t index);
 
 /**
  * Retrieve number of marked buckets.
+ * Returns 1 if successful, or 0 if not.
  */
 TASK_DECL_1(size_t, llmsset_count_marked, llmsset_t);
 #define llmsset_count_marked(dbs) RUN(llmsset_count_marked, dbs)

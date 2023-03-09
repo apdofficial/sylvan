@@ -34,7 +34,7 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 0; // autodetect
+static int workers = 2; // autodetect
 static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
 static int reorder = 0;

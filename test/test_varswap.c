@@ -301,7 +301,7 @@ UTEST_TASK_0(test_simple_varswap, bddmap)
 int main(int argc, const char *const argv[])
 {
     // Init Lace
-    lace_start(0, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
+    lace_start(2, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory

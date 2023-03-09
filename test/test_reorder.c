@@ -88,8 +88,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
 }
 
-UTEST_TASK_0(test_sifting, sifting)
-{
+UTEST_TASK_0(test_sifting, sifting) {
     sylvan_gc();
 
     mtbdd_levels_reset();
@@ -112,8 +111,6 @@ UTEST_TASK_0(test_sifting, sifting)
     mtbdd_protect(&f);
 #endif
 
-    printf("Size before sifting: %zu\n ", llmsset_count_marked(nodes));
-
     sylvan_set_reordering_threshold(0);
     sylvan_sifting(0, 0);
 
@@ -123,20 +120,13 @@ UTEST_TASK_0(test_sifting, sifting)
     ASSERT_EQ(mtbdd_getvar(n2), 3U);
     ASSERT_EQ(mtbdd_getvar(n4), 4U);
     ASSERT_EQ(mtbdd_getvar(n5), 5U);
-
-    printf("v%d ", mtbdd_getvar(n0));
-    printf("v%d ", mtbdd_getvar(n1));
-    printf("v%d ", mtbdd_getvar(n2));
-    printf("v%d ", mtbdd_getvar(n3));
-    printf("v%d ", mtbdd_getvar(n4));
-    printf("v%d \n", mtbdd_getvar(n5));
 }
 
 
 int main(int argc, const char *const argv[])
 {
     // Init Lace
-    lace_start(0, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
+    lace_start(2, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory

@@ -41,7 +41,7 @@ static double t_start = 0.0;
 struct sifting_config
 {
     varswap_termination_cb      termination_cb;         // termination callback
-    double                      t_start_sifting;        // start spu time of the sifting
+    double                      t_start_sifting;        // start time of the sifting
     size_t                      level_count_threshold;  // threshold for number of nodes per level
     float                       max_growth;             // coefficient used to calculate maximum growth
     size_t                      max_swap;               // maximum number of swaps per sifting
@@ -189,8 +189,6 @@ VOID_TASK_IMPL_5(sift_down,
                  size_t*, bestPos
 ){
     for (; *pos < high; *pos = *pos + 1){
-        double elapsed = (wctime()-configs.t_start_sifting)*1000;
-        if(elapsed > (double)configs.time_limit) break;
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos);
         configs.total_num_swap++;
         if (res != SYLVAN_VARSWAP_SUCCESS){
@@ -221,8 +219,6 @@ VOID_TASK_IMPL_5(sift_up,
                  size_t*, bestPos
 ){
     for (; *pos > low; *pos = *pos - 1) {
-        double elapsed = (wctime()-configs.t_start_sifting)*1000;
-        if(elapsed > (double)configs.time_limit) break;
         if(configs.total_num_var > configs.max_var) break;
         sylvan_varswap_res_t res = sylvan_simple_varswap(*pos - 1);
         configs.total_num_swap++;
