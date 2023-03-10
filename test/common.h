@@ -9,7 +9,7 @@ __thread uint64_t seed = 1;
 void print_level_arrays(int iter){
     printf("iter=%d  \n", iter);
     for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("l%zu=v%d, ", i, mtbdd_levels_level_to_var(i));
+        printf("l%zu=v%d, ", i, mtbdd_level_to_var(i));
     printf("\n");
     for (size_t i = 0; i < mtbdd_levels_size(); ++i){
         MTBDD node = mtbdd_ithlevel(i);

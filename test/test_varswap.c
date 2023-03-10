@@ -34,8 +34,8 @@ UTEST_TASK_0(test_simple_varswap, levels)
     ASSERT_NE(n1, mtbdd_invalid);
 
     // assert functionality of node to level
-    ASSERT_EQ(mtbdd_levels_node_to_level(n0), 0u);
-    ASSERT_EQ(mtbdd_levels_node_to_level(n1), 1u);
+    ASSERT_EQ(mtbdd_node_to_level(n0), 0u);
+    ASSERT_EQ(mtbdd_node_to_level(n1), 1u);
     // assert correct size of levels
     ASSERT_EQ(mtbdd_levels_size(), (size_t)num_of_levels);
 
@@ -55,7 +55,7 @@ UTEST_TASK_0(test_simple_varswap, levels)
 
     size_t level_counts[mtbdd_levels_size()];
     for (size_t i = 0; i < mtbdd_levels_size(); ++i) level_counts[i] = 0;
-    mtbdd_levels_count_nodes(level_counts);
+    mtbdd_count_levels(level_counts);
 
     for (size_t i = 1; i < mtbdd_levels_size(); ++i) ASSERT_EQ(level_counts[i], 1u);
 
@@ -63,7 +63,7 @@ UTEST_TASK_0(test_simple_varswap, levels)
     ASSERT_EQ(mtbdd_ithlevel(-1), mtbdd_invalid);
     ASSERT_EQ(mtbdd_ithlevel(num_of_levels), mtbdd_invalid);
     ASSERT_EQ(mtbdd_ithlevel(num_of_levels + 1), mtbdd_invalid);
-    ASSERT_EQ(mtbdd_levels_level_to_var(mtbdd_levels_size()), mtbdd_levels_size());
+    ASSERT_EQ(mtbdd_level_to_var(mtbdd_levels_size()), mtbdd_levels_size());
 
     /// test exit procedure
     mtbdd_levels_reset();

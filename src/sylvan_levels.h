@@ -22,7 +22,7 @@ extern "C" {
  */
 #define COUNT_NODES_BLOCK_SIZE 4096
 
-VOID_TASK_DECL_3(mtbdd_levels_count_nodes, size_t*, size_t, size_t);
+VOID_TASK_DECL_3(mtbdd_count_levels, size_t*, size_t, size_t);
 /**
  * @brief Count the number of nodes per real variable level in parallel.
  * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
@@ -30,8 +30,20 @@ VOID_TASK_DECL_3(mtbdd_levels_count_nodes, size_t*, size_t, size_t);
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define mtbdd_levels_count_nodes(level_counts) RUN(mtbdd_levels_count_nodes, level_counts, 0, nodes->table_size)
+#define mtbdd_count_levels(level_counts) RUN(mtbdd_count_levels, level_counts, 0, nodes->table_size)
 
+VOID_TASK_DECL_2(mtbdd_count_sort_levels, int*, size_t);
+/**
+ * @brief Count and sort all variable levels (parallel...)
+ *
+ * \details Order all the variables using gnome sort according to the number of entries in each level.
+ *
+ * \param level_counts - array of size mtbdd_levels_size()
+ * \param threshold - only count levels which have at least threshold number of variables.
+ * If level is skipped assign it -1.
+ *
+ */
+#define mtbdd_count_sort_levels(levels, threshold) RUN(mtbdd_count_sort_levels, levels, threshold)
 
 /**
  * @brief Create the next <amount> levels
@@ -57,13 +69,13 @@ MTBDD mtbdd_ithlevel(uint32_t level);
  * \brief  Get the current level of the given internal variable <var>
  * \param var for which the level needs to be returned
  */
-uint32_t mtbdd_levels_var_to_level(uint32_t var);
+uint32_t mtbdd_var_to_level(uint32_t var);
 
 /**
  * @brief Get the current internal variable of the given level
  * \param level for which the variable needs be returned
  */
-uint32_t mtbdd_levels_level_to_var(uint32_t level);
+uint32_t mtbdd_level_to_var(uint32_t level);
 
 /**
  * \brief  Get the number of created levels
@@ -74,7 +86,7 @@ size_t mtbdd_levels_size(void);
  * \brief  Return the level of the given internal node.
  * \param node for which the level needs to be returned
  */
-uint32_t mtbdd_levels_node_to_level(MTBDD node);
+uint32_t mtbdd_node_to_level(MTBDD node);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.

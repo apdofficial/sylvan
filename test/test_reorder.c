@@ -74,7 +74,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
 
     size_t cursize = llmsset_count_marked(nodes);
     size_t bestsize = cursize;
-    size_t bestlvl = mtbdd_levels_var_to_level(0);
+    size_t bestlvl = mtbdd_var_to_level(0);
 
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
 
