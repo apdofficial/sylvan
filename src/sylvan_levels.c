@@ -123,6 +123,7 @@ void sylvan_levels_destroy(void)
  */
 static inline void sort_level_counts(int *levels, const size_t *level_counts)
 {
+    //TODO: consider std qsort
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < mtbdd_levels_size()) {
@@ -179,6 +180,7 @@ VOID_TASK_IMPL_2(mtbdd_count_sort_levels, int*, levels, size_t, threshold)
             levels[i] = i;
         }
     }
+
     sort_level_counts(levels, level_counts);
 }
 
