@@ -33,9 +33,7 @@
 #define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, s,  ##__VA_ARGS__); }
 #define LOG_INFO(s, ...)    { if (ENABLE_INFO_LOGS)  fprintf(stdout, s,  ##__VA_ARGS__); }
 
-
-static int reorder_is_initialized = 0;
-static clock_t t_start = 0;
+static int reorder_initialized = 0;
 
 typedef struct sifting_config
 {
@@ -47,11 +45,10 @@ typedef struct sifting_config
     size_t total_num_swap;                  // number of swaps completed
     size_t max_var;                         // maximum number of vars swapped per sifting
     size_t total_num_var;                   // maximum number of vars sifted
-    unsigned long time_limit_ms;               // time limit in milliseconds
+    unsigned long time_limit_ms;            // time limit in milliseconds
 } reorder_config_t;
 
-/// reordering configuration default values
-// TODO: determine optimal config defaults
+/// reordering configurations
 static reorder_config_t configs = {
         .termination_cb = NULL,
         .t_start_sifting = 0,
@@ -68,10 +65,10 @@ static int should_terminate_reordering(const reorder_config_t *reorder_config);
 
 void sylvan_init_reorder()
 {
-    sylvan_init_mtbdd();
+    if (reorder_initialized) return;
+    reorder_initialized = 1;
 
-    if (reorder_is_initialized) return;
-    reorder_is_initialized = 1;
+    sylvan_init_mtbdd();
 
     sylvan_register_quit(&sylvan_quit_reorder);
     mtbdd_levels_gc_add_mark_managed_refs();
@@ -80,8 +77,7 @@ void sylvan_init_reorder()
 void sylvan_quit_reorder()
 {
     sylvan_levels_destroy();
-    reorder_is_initialized = 0;
-    t_start = 0;
+    reorder_initialized = 0;
 }
 
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback)
@@ -114,7 +110,7 @@ void sylvan_set_reorder_timelimit(size_t time_limit)
     configs.time_limit_ms = time_limit;
 }
 
-TASK_IMPL_5(sylvan_varswap_res_t, sift_down,
+TASK_IMPL_5(varswap_res_t, sift_down,
             size_t*, pos,
             size_t, high,
             size_t*, curSize,
@@ -122,8 +118,8 @@ TASK_IMPL_5(sylvan_varswap_res_t, sift_down,
             size_t*, bestPos)
 {
     for (; *pos < high; *pos = *pos+1) {
-        sylvan_varswap_res_t res = sylvan_varswap(*pos);
-        if (!is_varswap_res_success(res)) return res;
+        varswap_res_t res = sylvan_varswap(*pos);
+        if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
         size_t after = llmsset_count_marked(nodes);
         LOG_DEBUG("sift(UP): from %zu to %zu\n", *curSize, after);
@@ -141,7 +137,7 @@ TASK_IMPL_5(sylvan_varswap_res_t, sift_down,
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_5(sylvan_varswap_res_t, sift_up,
+TASK_IMPL_5(varswap_res_t, sift_up,
             size_t*, pos,
             size_t, low,
             size_t*, curSize,
@@ -149,8 +145,8 @@ TASK_IMPL_5(sylvan_varswap_res_t, sift_up,
             size_t*, bestPos)
 {
     for (; *pos > low; *pos = *pos - 1) {
-        sylvan_varswap_res_t res = sylvan_varswap(*pos-1);
-        if (!is_varswap_res_success(res)) return res;
+        varswap_res_t res = sylvan_varswap(*pos-1);
+        if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
         size_t after = llmsset_count_marked(nodes);
         LOG_DEBUG("sift(DN): from %zu to %zu\n", *curSize, after);
@@ -168,16 +164,16 @@ TASK_IMPL_5(sylvan_varswap_res_t, sift_up,
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(sylvan_varswap_res_t, sift_to_pos, size_t, pos, size_t, targetPos)
+TASK_IMPL_2(varswap_res_t, sift_to_pos, size_t, pos, size_t, targetPos)
 {
     for (; pos < targetPos; pos++) {
-        sylvan_varswap_res_t res = sylvan_varswap(pos);
-        if (!is_varswap_res_success(res)) return res;
+        varswap_res_t res = sylvan_varswap(pos);
+        if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
     for (; pos > targetPos; pos--) {
-        sylvan_varswap_res_t res = sylvan_varswap(pos-1);
-        if (!is_varswap_res_success(res)) return res;
+        varswap_res_t res = sylvan_varswap(pos-1);
+        if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
     return SYLVAN_VARSWAP_SUCCESS;
@@ -206,7 +202,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
     size_t cur_size = llmsset_count_marked(nodes);
 
     // loop over all levels
-    for (unsigned int i = 0; i < mtbdd_levels_size(); i++) {
+    for (size_t i = 0; i < mtbdd_levels_size(); i++) {
         int lvl = levels[i];
         if (lvl == -1) break; // done
         size_t pos = mtbdd_level_to_var(lvl);
@@ -215,7 +211,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
         size_t best_pos = pos;
 
         LOG_DEBUG("sifting level %d at position %zu\n", lvl, pos);
-        sylvan_varswap_res_t res;
+        varswap_res_t res;
 
         // search for the optimum variable position
         if (lvl > (long long int) (mtbdd_levels_size() / 2)) {
@@ -231,7 +227,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
 
         configs.total_num_var++;
 
-        if (!is_varswap_res_success(res)) break;
+        if (sylvan_varswap_issuccess(res) == SYLVAN_FAIL) break;
         if (should_terminate_reordering(&configs)) break;
 
         LOG_DEBUG("level %d has best position %zu with size %zu\n", lvl, best_pos, best_size);
@@ -264,5 +260,3 @@ static int should_terminate_reordering(const reorder_config_t *reorder_config)
     }
     return SYLVAN_FAIL;
 }
-
-

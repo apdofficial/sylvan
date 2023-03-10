@@ -40,13 +40,13 @@ UTEST_TASK_0(test_simple_varswap, levels)
     ASSERT_EQ(mtbdd_levels_size(), (size_t)num_of_levels);
 
     // test var swap function used by sifting
-    mtbdd_levels_varswap(v0);
+    mtbdd_varswap(v0);
 
     // assert swapped functionality of level to node
     ASSERT_EQ(mtbdd_ithlevel(0), n1);
     ASSERT_EQ(mtbdd_ithlevel(1), n0);
 
-    mtbdd_levels_varswap(v0);
+    mtbdd_varswap(v0);
 
     // check that the variable was correctly swapped back
     // assert swapped functionality of level to node
@@ -300,7 +300,7 @@ int main(int argc, const char *const argv[])
 
     // Init Sylvan
     // Give 2 GB memory
-    sylvan_set_limits(2LL*1LL<<30, 1, 5);
+    sylvan_set_limits(2LL*1LL<<30, 1, 10);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

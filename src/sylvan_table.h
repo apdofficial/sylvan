@@ -161,7 +161,6 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
 
 /**
  * Rehash a single bucket.
- * Returns 0 if successful, or 1 if not.
  */
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 

@@ -103,7 +103,7 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
  * </ul>
  * \param var variable to be swapped with var+1
  */
-void mtbdd_levels_varswap(uint32_t var);
+void mtbdd_varswap(uint32_t var);
 
 
 /**

@@ -219,7 +219,7 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
         uint64_t frst = *fptr;
         if (cas(fptr, frst, d_idx)) {
             *dptr = (hash & MASK_HASH) | frst;
-            return 1;
+            return SYLVAN_SUCCESS;
         }
     }
 }
@@ -283,7 +283,7 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
 
         if (idx == didx) { // we are head
             *fptr = d; // next part of the chain
-            return 1;
+            return SYLVAN_SUCCESS;
         }
 
         for (;;) {
@@ -291,7 +291,7 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
 
             // item was not actually in the hash table (node that was not hashed)
             // if you use clear one on the same thing twice it goues wrong
-            if (idx == 0) return 0; // wasn't in???
+            if (idx == 0) return SYLVAN_FAIL; // wasn't in???
 
             uint64_t *ptr = ((uint64_t*)dbs->data) + 3*idx;
             uint64_t v = *ptr;
@@ -300,7 +300,7 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
 
             if ((v & MASK_INDEX) == didx) { // found our predecessor
                 if (!cas(ptr, v, (v & MASK_HASH) | d)) break; // restart
-                return 1;
+                return SYLVAN_SUCCESS;
             } else {
                 idx = v & MASK_INDEX; // next
             }

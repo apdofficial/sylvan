@@ -92,7 +92,7 @@ void mtbdd_levels_gc_add_mark_managed_refs(void)
     sylvan_gc_add_mark(TASK(mtbdd_gc_mark_managed_refs));
 }
 
-void mtbdd_levels_varswap(uint32_t var)
+void mtbdd_varswap(uint32_t var)
 {
     level_to_var[var_to_level[var]] = var + 1;
     level_to_var[var_to_level[var + 1]] = var;

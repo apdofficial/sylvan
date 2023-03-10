@@ -28,7 +28,7 @@ UTEST_TASK_0(test_sifting, basic_sift_up)
 
     size_t pos = mtbdd_getvar(n0);
 
-    sylvan_varswap_res_t res = sift_down(&pos, 3, &cursize, &bestsize, &bestPos);
+    varswap_res_t res = sift_down(&pos, 3, &cursize, &bestsize, &bestPos);
     ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n0), 3u);
@@ -54,7 +54,7 @@ UTEST_TASK_0(test_sifting, basic_sift_down)
 
     size_t pos = mtbdd_getvar(n5);
 
-    sylvan_varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
+    varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
     ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
@@ -80,7 +80,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
 
     size_t pos = mtbdd_getvar(n5);
 
-    sylvan_varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestlvl);
+    varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestlvl);
     ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
 
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
@@ -132,7 +132,7 @@ int main(int argc, const char *const argv[])
 
     // Init Sylvan
     // Give 2 GB memory
-    sylvan_set_limits(2LL*1LL<<30, 1, 5);
+    sylvan_set_limits(2LL*1LL<<30, 1, 10);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
