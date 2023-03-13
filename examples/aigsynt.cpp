@@ -34,10 +34,11 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 1; // autodetect
+static int workers = 0; // autodetect
 static int verbose = 0;
 static char* aag_filename = NULL; // filename of DOT file
-static int reorder = 0;
+static int static_reorder = 0;
+static int dynamic_reorder = 0;
 
 static int sloan_w1 = 1;
 static int sloan_w2 = 8;
@@ -47,7 +48,8 @@ static struct argp_option options[] =
 {
     {"workers", 'w', "<workers>", 0, "Number of workers (default=0: autodetect)", 0},
     {"verbose", 'v', 0, 0, "Set verbose", 0},
-    {"reorder", 'r', 0, 0, "Reorder with Sloan", 0},
+    {"static reorder", 's', 0, 0, "Reorder with Sloan", 0},
+    {"dynamic reorder", 'd', 0, 0, "Dynamic reordering with Sylvan", 0},
     {0, 0, 0, 0, 0, 0}
 };
 
@@ -58,8 +60,11 @@ parse_opt(int key, char *arg, struct argp_state *state)
     case 'w':
         workers = atoi(arg);
         break;
-    case 'r':
-        reorder = 1;
+    case 's':
+        static_reorder = 1;
+        break;
+    case 'd':
+        dynamic_reorder = 1;
         break;
     case 'v':
         verbose = 1;
@@ -252,7 +257,7 @@ VOID_TASK_0(parse)
     if (O != 1) Abort("expecting 1 output\n");
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
-    mtbdd_levels_new(M + 1);
+    mtbdd_levels_new(M+1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
 
@@ -303,7 +308,7 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-    if (reorder) {
+    if (static_reorder) {
         int *matrix = new int[M*M];
         for (unsigned m=0; m<M*M; m++) matrix[m] = 0;
         for (unsigned m=0; m<M; m++) matrix[m*M+m] = 1;
@@ -363,19 +368,20 @@ VOID_TASK_0(parse)
             }
         }
 
-        boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
+        // boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
         std::vector<Vertex> inv_perm(boost::num_vertices(g));
 
         boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g), boost::get(boost::vertex_priority, g), sloan_w1, sloan_w2);
 
         level_to_var = new int[M+1];
+        mtbdd_levels_new(M+1);
         for (unsigned int i=0; i<=M; i++) level_to_var[i] = -1;
         
         int r = 0;
-        for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
-            int j = index_map[*i];
-            printf("%d %d\n", r++, j);
-        }
+        // for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
+            // int j = index_map[*i];
+            // printf("%d %d\n", r++, j);
+        // }
     
         r = 0;
         for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
@@ -439,15 +445,13 @@ VOID_TASK_0(parse)
         for (unsigned int i=0; i<=M; i++) level_to_var[i] = i-1;
     }
 
-/*
+    /*
     // add edges for the bipartite graph
     for (int i = 0; i < dm_nrows(m); i++) {
             for (int j = 0; j < dm_ncols(m); j++) {
                     if (dm_is_set(m, i, j)) add_edge(i, dm_nrows(m) + j, g);
             }
     }*/
-
-
     /*
     for (uint64_t a=0; a<A; a++) {
         MTBDD lhs = sylvan_asdfithvar(read_uint()/2);
@@ -498,10 +502,9 @@ VOID_TASK_0(parse)
     printf("\n");
 #endif
 
-    INFO("There are %zu controllable and %zu uncontrollable inputs.\n",
-        sylvan_set_count(Xc), sylvan_set_count(Xu));
+    INFO("There are %zu controllable and %zu uncontrollable inputs.\n", sylvan_set_count(Xc), sylvan_set_count(Xu));
 
-    // sylvan_stats_report(stdout);
+    sylvan_stats_report(stdout);
 
     INFO("Making the gate BDDs...\n");
 
@@ -520,9 +523,10 @@ VOID_TASK_0(parse)
 #endif
 
     sylvan_stats_report(stdout);
-
     sylvan_gc();
-    sylvan_reorder(0, 0);
+    if(dynamic_reorder){
+        sylvan_reorder(0, 0);
+    }
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -613,11 +617,11 @@ VOID_TASK_0(parse)
 
     int iteration = 0;
 
+    
     while (Unsafe != OldUnsafe) {
         OldUnsafe = Unsafe;
         iteration++;
         if (verbose) {
-            //INFO("Iteration %d.\n", iteration);
             INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
         }
         // INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
@@ -629,16 +633,14 @@ VOID_TASK_0(parse)
         Step = sylvan_exists(Step, Xu);
         // INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
 
-        /*
-        MTBDD supp = sylvan_support(Step);
-        while (supp != sylvan_set_empty()) {
-            printf("%d ", sylvan_set_first(supp));
-            supp = sylvan_set_next(supp);
-        }
-        printf("\n");
-        sylvan_print(Step);
-        printf("\n");
-        */
+        // MTBDD supp = sylvan_support(Step);
+        // while (supp != sylvan_set_empty()) {
+        //     printf("%d ", sylvan_set_first(supp));
+        //     supp = sylvan_set_next(supp);
+        // }
+        // printf("\n");
+        // sylvan_print(Step);
+        // printf("\n");
 
         // check if initial state in Step (all 0)
         MTBDD Check = Step;
@@ -679,7 +681,6 @@ VOID_TASK_0(gc_end)
     size_t used, total;
     sylvan_table_usage(&used, &total);
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
-    INFO("Running the sifting algorithm.\n");
 }
 
 int
@@ -696,10 +697,12 @@ main(int argc, char **argv)
 
     // Init Sylvan
     // Give 4 GB memory
-    sylvan_set_limits(4LL*1LL<<30, 1, 10);
+    sylvan_set_limits(4LL*1LL<<30, 1, 2);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
+    sylvan_set_reorder_threshold(128);
+
 
     // Set hooks for logging garbage collection
     if (verbose) {

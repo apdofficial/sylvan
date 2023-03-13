@@ -44,7 +44,7 @@ typedef struct sifting_config
     size_t max_swap;                        // maximum number of swaps per sifting
     size_t total_num_swap;                  // number of swaps completed
     size_t max_var;                         // maximum number of vars swapped per sifting
-    size_t total_num_var;                   // maximum number of vars sifted
+    size_t total_num_var;                   // number of vars sifted
     unsigned long time_limit_ms;            // time limit in milliseconds
 } reorder_config_t;
 
@@ -117,7 +117,7 @@ TASK_IMPL_5(varswap_res_t, sift_down,
             size_t*, bestSize,
             size_t*, bestPos)
 {
-    for (; *pos < high; *pos = *pos+1) {
+    for (; *pos < high; *pos = *pos + 1) {
         varswap_res_t res = sylvan_varswap(*pos);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
@@ -164,15 +164,15 @@ TASK_IMPL_5(varswap_res_t, sift_up,
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_res_t, sift_to_pos, size_t, pos, size_t, targetPos)
+TASK_IMPL_2(varswap_res_t, sift_to_pos, size_t*, pos, size_t, targetPos)
 {
-    for (; pos < targetPos; pos++) {
-        varswap_res_t res = sylvan_varswap(pos);
+    for (; *pos < targetPos; *pos = *pos + 1) {
+        varswap_res_t res = sylvan_varswap(*pos);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
-    for (; pos > targetPos; pos--) {
-        varswap_res_t res = sylvan_varswap(pos-1);
+    for (; *pos > targetPos; *pos = *pos - 1) {
+        varswap_res_t res = sylvan_varswap(*pos-1);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
@@ -223,7 +223,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
         }
 
         // optimum variable position restoration
-        sift_to_pos(pos, best_pos);
+        sift_to_pos(&pos, best_pos);
 
         configs.total_num_var++;
 
