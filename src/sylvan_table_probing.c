@@ -25,7 +25,7 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-#define LIMITED_PROBE_SEQUENCE 1
+#define LIMITED_PROBE_SEQUENCE 0
 
 #ifndef cas
 #define cas(ptr, old, new) (__sync_bool_compare_and_swap((ptr),(old),(new)))

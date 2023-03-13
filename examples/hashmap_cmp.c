@@ -6,7 +6,9 @@
 
 #include "sylvan_int.h"
 
-void sylvan_setup(uint64_t memoryCap){
+
+void sylvan_setup(uint64_t memoryCap)
+{
     sylvan_set_limits(memoryCap, 1, 2);
     sylvan_init_package();
     sylvan_init_mtbdd();
@@ -18,28 +20,10 @@ int compare_float(const void * a, const void * b)
   return ( *(float*)a - *(float*)b );
 }
 
-void calculate_medians(size_t samples_per_round, size_t rounds, float medians[samples_per_round], float data[rounds][samples_per_round]){
-    for (size_t sample = 0; sample < samples_per_round; sample++){
-        // collect all rounds for a given sample
-        float flatten[samples_per_round];
-        
-        for (size_t round = 0; round < rounds; round++){
-            if(data[round][sample] == 0.0f) continue; // skip empty rows
-            flatten[round] = data[round][sample];
-        }
-        // sort the array
-        qsort(flatten, rounds, sizeof(float), compare_float);
-
-        // pick sample from the middle of the distribution
-        medians[sample] = flatten[rounds/2];
-    }
-}
-
-
 TASK_0(int, run)
 {
     size_t rounds = 10;
-    size_t samples_per_round = 500; // expected max
+    size_t samples_per_round = 50; // expected max
 
     float runtimes[rounds][samples_per_round];
     float usages[rounds][samples_per_round];
@@ -55,7 +39,7 @@ TASK_0(int, run)
         for (size_t j = 0; j < 50000000; ++j) {       
 
             clock_t start = clock();
-            for (size_t k = 0; k < 10000; ++k) {
+            for (size_t k = 0; k < 100000; ++k) {
                 MTBDD v = mtbdd_ithvar(j);
                 if (v == mtbdd_invalid) {
                     printf("table is full\n");
@@ -68,11 +52,12 @@ TASK_0(int, run)
             float used = llmsset_count_marked(nodes);
             float all = llmsset_get_size(nodes);
             float usage = (used/all)*100;
-            if (usage >= 99.5) break;
+            if (usage >= 97.7) break;
             
-            // printf("r %zu | s %zu | table usage %.2f%% | runtime: %.2fns\n", round, sample, usage, runtime);
+            printf("r %zu | s %zu | table usage %.2f%% | runtime: %.2fns\n", round, sample, usage, runtime);
 
             if (round == 0) continue; // warm up round
+            if (sample > samples_per_round) break;
 
             usages[round-1][sample] = usage;
             runtimes[round-1][sample] = runtime;
@@ -84,25 +69,47 @@ TASK_0(int, run)
 
     // write the raw data into a csv
     FILE *file;
-    file = fopen("./hashmap_chaining_raw.csv", "w+");
+    file = fopen("./hashmap_probing_raw.csv", "w+");
     fprintf(file, "round, usages, runtimes_ms\n");
     for (size_t round = 0; round < rounds; round++){
         for (size_t sample = 0; sample < samples_per_round; sample++) {
-            if(usages[round][sample] == 0.0f) break;
-            fprintf(file, "%zu, %.5f, %.5f\n", round, usages[round][sample], runtimes[round][sample]);
+            if (usages[round][sample] == 0.0f) break;
+            fprintf(file, "%zu, %.2f, %.2f\n", round, usages[round][sample], runtimes[round][sample]);
         }
     }
     fclose(file);
 
-    calculate_medians(samples_per_round, rounds, runtime_medians, usages);
-    calculate_medians(samples_per_round, rounds, usage_medians, runtimes);
+    for (size_t sample = 0; sample < samples_per_round; sample++){
+        // collect all rounds for a given sample
+        float flatten[samples_per_round];
+        for (size_t round = 0; round < rounds; round++){
+            if(runtimes[round][sample] == 0.0f) break;
+            flatten[round] = runtimes[round][sample];
+        }
+        // sort the array
+        qsort(flatten, rounds, sizeof(float), compare_float);
+        // pick sample from the middle of the distribution
+        runtime_medians[sample] = flatten[rounds/2];
+    }
+
+    for (size_t sample = 0; sample < samples_per_round; sample++){
+        // collect all rounds for a given sample
+        float flatten[samples_per_round];
+        for (size_t round = 0; round < rounds; round++){
+            if(usages[round][sample] == 0.0f) continue; // skip empty rows
+            flatten[round] = usages[round][sample];
+        }
+        // sort the array
+        qsort(flatten, rounds, sizeof(float), compare_float);
+        // pick sample from the middle of the distribution
+        usage_medians[sample] = flatten[rounds/2];
+    }
 
     // write the medians into a csv
-    file = fopen("./hashmap_chaining_medians.csv", "w+");
+    file = fopen("./hashmap_probing_medians.csv", "w+");
     fprintf(file, "usages, runtimes_ms\n");
     for (size_t sample = 0; sample < samples_per_round; sample++) {
-         if(usage_medians[sample] == 0.0f) break;
-        fprintf(file, "%.5f, %.5f\n", usage_medians[sample], runtime_medians[sample]);
+        fprintf(file, "%.2f, %.2f\n", usage_medians[sample], runtime_medians[sample]);
     }
     fclose(file);
 
@@ -111,12 +118,8 @@ TASK_0(int, run)
 
 int main(int argc, char **argv)
 {
-    // Init Lace
-    lace_start(4, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
-
+    lace_start(4, 1000000); 
     int res = RUN(run);
-
     lace_stop();
-
     return res;
 }
