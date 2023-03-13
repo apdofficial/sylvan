@@ -6,7 +6,6 @@
 
 #include "sylvan_int.h"
 
-
 void sylvan_setup(uint64_t memoryCap)
 {
     sylvan_set_limits(memoryCap, 1, 2);
@@ -54,7 +53,7 @@ TASK_0(int, run)
             float usage = (used/all)*100;
             if (usage >= 97.7) break;
             
-            printf("r %zu | s %zu | table usage %.2f%% | runtime: %.2fns\n", round, sample, usage, runtime);
+            // printf("r %zu | s %zu | table usage %.2f%% | runtime: %.2fns\n", round, sample, usage, runtime);
 
             if (round == 0) continue; // warm up round
             if (sample > samples_per_round) break;
@@ -69,16 +68,17 @@ TASK_0(int, run)
 
     // write the raw data into a csv
     FILE *file;
-    file = fopen("./hashmap_probing_raw.csv", "w+");
-    fprintf(file, "round, usages, runtimes_ms\n");
+    file = fopen("./hashmap_chaining_raw.csv", "w+");
+    fprintf(file, "round,usages,runtimes\n");
     for (size_t round = 0; round < rounds; round++){
         for (size_t sample = 0; sample < samples_per_round; sample++) {
             if (usages[round][sample] == 0.0f) break;
-            fprintf(file, "%zu, %.2f, %.2f\n", round, usages[round][sample], runtimes[round][sample]);
+            fprintf(file, "%zu,%.2f,%.2f\n", round, usages[round][sample], runtimes[round][sample]);
         }
     }
     fclose(file);
 
+    // calcualte median for each sample
     for (size_t sample = 0; sample < samples_per_round; sample++){
         // collect all rounds for a given sample
         float flatten[samples_per_round];
@@ -92,6 +92,7 @@ TASK_0(int, run)
         runtime_medians[sample] = flatten[rounds/2];
     }
 
+    // calcualte median for each sample
     for (size_t sample = 0; sample < samples_per_round; sample++){
         // collect all rounds for a given sample
         float flatten[samples_per_round];
@@ -106,10 +107,10 @@ TASK_0(int, run)
     }
 
     // write the medians into a csv
-    file = fopen("./hashmap_probing_medians.csv", "w+");
-    fprintf(file, "usages, runtimes_ms\n");
+    file = fopen("./hashmap_chaining_medians.csv", "w+");
+    fprintf(file, "usages,runtimes\n");
     for (size_t sample = 0; sample < samples_per_round; sample++) {
-        fprintf(file, "%.2f, %.2f\n", usage_medians[sample], runtime_medians[sample]);
+        fprintf(file, "%.2f,%.2f\n", usage_medians[sample], runtime_medians[sample]);
     }
     fclose(file);
 
