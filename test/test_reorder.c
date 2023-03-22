@@ -85,7 +85,8 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
 
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
 
-    sift_to_pos(mtbdd_getvar(n5), 5);
+    pos = mtbdd_getvar(n5);
+    sift_to_pos(&pos, 5u);
 
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
 }
@@ -112,9 +113,14 @@ UTEST_TASK_0(test_sifting, sifting) {
     MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
     mtbdd_protect(&f);
 #endif
+    size_t size_before = llmsset_count_marked(nodes);
 
     sylvan_set_reorder_threshold(0);
     sylvan_reorder(0, 0);
+
+    size_t size_after = llmsset_count_marked(nodes);
+
+    ASSERT_LT(size_after, size_before);
 
     ASSERT_EQ(mtbdd_getvar(n0), 0U);
     ASSERT_EQ(mtbdd_getvar(n1), 1U);
@@ -128,7 +134,7 @@ UTEST_TASK_0(test_sifting, sifting) {
 int main(int argc, const char *const argv[])
 {
     // Init Lace
-    lace_start(2, 1000000); // 2 workers, use a 1,000,000 size task queue
+    lace_start(4, 1000000); // 2 workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 2 GB memory

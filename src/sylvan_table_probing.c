@@ -25,8 +25,6 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-#define LIMITED_PROBE_SEQUENCE 0
-
 #ifndef cas
 #define cas(ptr, old, new) (__sync_bool_compare_and_swap((ptr),(old),(new)))
 #endif
@@ -192,10 +190,9 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
         // find next idx on probe sequence
         idx = (idx & CL_MASK) | ((idx+1) & CL_MASK_R);
         if (idx == last) {
-#if LIMITED_PROBE_SEQUENCE
-            if (++i == dbs->threshold) return 0; // failed to find empty spot in probe sequence
-#else
 
+#if SYLVAN_USE_LIMITED_PROBE_SEQUENCE
+            if (++i == dbs->threshold) return 0; // failed to find empty spot in probe sequence
 #endif
             // go to next cache line in probe sequence
             hash_rehash += step;
@@ -287,64 +284,6 @@ void*
 llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 {
     return dbs->data + index * 16;
-}
-
-/**
- * Remove a single hash from the table
- * (do not run parallel with lookup!!!)
- * (for dynamic variable reordering)
- * (lock-free, but not wait-free)
- */
-int
-llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
-{
-    printf("probing: llmsset_clear_one\n");
-    volatile uint64_t *dptr = ((uint64_t*)dbs->data) + 3*didx;
-
-    uint64_t d = *dptr;
-    if (d & MASK_INDEX) {
-        while (!cas(dptr, d, (uint64_t)-1)) {
-            d = *dptr;
-        }
-        d &= MASK_INDEX; // <d> now contains the next bucket in the chain
-    } else {
-        d = 0; // nothing after us, so we don't need to make a -1
-    }
-
-    const uint64_t hash = is_custom_bucket(dbs, didx) ?
-        dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
-        sylvan_tabhash16(dptr[1], dptr[2], 14695981039346656037LLU);
-
-#if LLMSSET_MASK
-    volatile uint64_t *fptr = &dbs->table[hash & dbs->mask];
-#else
-    volatile uint64_t *fptr = &dbs->table[hash % dbs->table_size];
-#endif
-
-    for (;;) {
-        uint64_t idx = *fptr;
-
-        if (idx == didx) { // we are head
-            *fptr = d;
-            return 1;
-        }
-
-        for (;;) {
-            if (idx == 0) return 0; // wasn't in???
-
-            uint64_t *ptr = ((uint64_t*)dbs->data) + 3*idx;
-            uint64_t v = *ptr;
-
-            if (v == (uint64_t)-1) break; // found delete-in-progress, restart
-
-            if ((v & MASK_INDEX) == didx) { // found our predecessor
-                if (!cas(ptr, v, (v & MASK_HASH) | d)) break; // restart
-                return 1;
-            } else {
-                idx = v & MASK_INDEX; // next
-            }
-        }
-    }
 }
 
 llmsset_t
