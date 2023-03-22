@@ -2,7 +2,6 @@ add_library(sylvan STATIC)
 add_library(sylvan::sylvan ALIAS sylvan)
 
 option(SYLVAN_USE_CHAINING "Unique table uses chaining instead of linear probing" ON)
-
 if(SYLVAN_USE_CHAINING)
     target_sources(sylvan PRIVATE sylvan_table_chaining.c)
 else()

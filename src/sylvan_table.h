@@ -164,10 +164,12 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
  */
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
+#if SYLVAN_USE_CHAINING
 /**
  * Remove a single BDD from the table
  */
 int llmsset_clear_one(const llmsset_t dbs, uint64_t index);
+#endif
 
 /**
  * Retrieve number of marked buckets.
