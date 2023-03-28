@@ -154,6 +154,7 @@ TASK_IMPL_1(varswap_res_t, sylvan_varswap, uint32_t, var)
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(var, 0, nodes->table_size, &result);
 #else
+    // clear the entire table
     sylvan_varswap_p0();
 #endif
 
@@ -171,7 +172,7 @@ TASK_IMPL_1(varswap_res_t, sylvan_varswap, uint32_t, var)
             // first clear hashes of nodes with <var> and <var+1>
             sylvan_varswap_p0(var, 0, nodes->table_size, &result);
 #else
-            // first clear hashes of nodes with <var> and <var+1>
+            // clear the entire table
             sylvan_varswap_p0();
 #endif
 

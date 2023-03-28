@@ -12,9 +12,9 @@ def step(low: float, up: float, leng: int):
 
 
 if __name__ == "__main__":
-    dataset_chaining = pd.read_csv("./hashmap_cmp/chaining/hashmap_chaining_medians.csv")
-    dataset_probing = pd.read_csv("./hashmap_cmp/probing/limited/hashmap_probing_medians.csv")
-    dataset_probing_unlimited = pd.read_csv("./hashmap_cmp/probing/unlimited/hashmap_probing_medians.csv")
+    dataset_chaining = pd.read_csv("hashmap_cmp/chaining/seq_hashmap_chaining_medians.csv")
+    dataset_probing = pd.read_csv("hashmap_cmp/probing/limited/seq_hashmap_probing_medians.csv")
+    dataset_probing_unlimited = pd.read_csv("hashmap_cmp/probing/unlimited/seq_hashmap_probing_medians.csv")
 
     pyplot.figure(figsize=(10, 10))
 
