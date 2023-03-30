@@ -34,7 +34,7 @@
 #define SYLVAN_USE_CHAINING 1
 #endif
 
-/* Use linear probing with <threshold> number of attempts or unlimited amount of attempts */
+/* Use linear probing with <threshold> number of attempts or unlimited number of attempts */
 #ifndef SYLVAN_USE_LIMITED_PROBE_SEQUENCE
 #define SYLVAN_USE_LIMITED_PROBE_SEQUENCE 1
 #endif

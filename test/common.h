@@ -6,20 +6,6 @@
 
 __thread uint64_t seed = 1;
 
-void print_level_arrays(int iter){
-    printf("iter=%d  \n", iter);
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i)
-        printf("l%zu=v%d, ", i, mtbdd_level_to_var(i));
-    printf("\n");
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i){
-        MTBDD node = mtbdd_ithlevel(i);
-        uint32_t var = sylvan_var(node);
-        printf("l%zu[n%llu, v%u], ", i, node,  var);
-    }
-
-    printf("\n");
-}
-
 uint64_t
 xorshift_rand(void)
 {
