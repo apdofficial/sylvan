@@ -24,6 +24,9 @@ add_example(nqueens nqueens.c)
 
 add_example(simple simple.cpp)
 
+add_example(aigsynt aigsynt.cpp)
+target_compile_options(aigsynt PRIVATE -Wno-unused-parameter)
+
 # Check if we have Meddly
 find_library(MEDDLY_FOUND meddly)
 if(MEDDLY_FOUND)
@@ -38,6 +41,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     # add argp library for OSX
     find_package(Argp REQUIRED)
     include_directories(${ARGP_INCLUDE_PATH})
+    target_link_libraries(aigsynt PRIVATE ${ARGP_LIBRARIES})
     target_link_libraries(bddmc PRIVATE ${ARGP_LIBRARIES})
     target_link_libraries(lddmc PRIVATE ${ARGP_LIBRARIES})
     target_link_libraries(ldd2bdd PRIVATE ${ARGP_LIBRARIES})

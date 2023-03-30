@@ -141,13 +141,13 @@ All notable changes to Sylvan will be documented in this file.
 
 ## [1.1.2] - 2017-01-11
 ### Fixed
-- The pkg-config file is slightly improved.
+- The pkg-configs file is slightly improved.
 - A critical bug in `sylvan_collect` has been fixed.
 
 
 ## [1.1.1] - 2017-01-10
 ### Fixed
-- The pkg-config file now includes hwloc as a requirement
+- The pkg-configs file now includes hwloc as a requirement
 
 
 ## [1.1.0] - 2017-01-09
@@ -160,7 +160,7 @@ All notable changes to Sylvan will be documented in this file.
 - LDD methods `relprod` and `relprev` now support action labels (meta 5).
 - Examples program `ldd2bdd` now converts LDD transition systems to BDDs transition systems.
 - Methods `cache_get6` and `cache_put6` for operation cache entries that require two buckets.
-- File `sylvan.pc` for pkg-config.
+- File `sylvan.pc` for pkg-configs.
 
 ### Changed
 - The API to register a custom MTBDD leaf now requires multiple calls, which is better design for future extensions.

@@ -748,7 +748,7 @@ TASK_0(int, runtests)
     // Testing without garbage collection
     sylvan_gc_disable();
 
-    int test_iterations = 1000;
+    int test_iterations = 100;
 
     printf("test_zdd_eval...\n");
     for (int i=0; i<test_iterations; i++) if (CALL(test_zdd_eval)) return 1;

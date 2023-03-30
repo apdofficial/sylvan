@@ -41,7 +41,7 @@ struct sylvan_skiplist
 #endif
 
 #ifndef compiler_barrier
-#define compiler_barrier() { asm volatile("" ::: "memory"); }
+#define compiler_barrier() { asm volatile("dmb ish" ::: "memory"); }
 #endif
 
 sylvan_skiplist_t
