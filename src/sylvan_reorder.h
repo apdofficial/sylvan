@@ -23,16 +23,14 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/**
-   \brief Type of termination handler.
-*/
-typedef int (*reorder_termination_cb)();
-
+__attribute__((unused))
 void sylvan_init_reorder(void);
 
+__attribute__((unused))
 void sylvan_quit_reorder(void);
 
-__attribute__((unused)) __attribute__((unused))
+typedef int (*reorder_termination_cb)();
+__attribute__((unused))
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
 
@@ -106,7 +104,7 @@ TASK_DECL_5(varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*
  */
 #define sift_up(var, low, curSize, bestSize, bestPos) RUN(sift_up, var, low, curSize, bestSize, bestPos)
 
-TASK_DECL_2(varswap_res_t, sift_to_pos, size_t*, size_t);
+TASK_DECL_2(varswap_res_t, sift_to_pos, size_t, size_t);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift

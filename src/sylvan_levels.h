@@ -50,12 +50,20 @@ VOID_TASK_DECL_2(mtbdd_count_sort_levels, int*, size_t);
  * @details The BDDs representing managed levels are always kept during garbage collection. Not currently thread-safe.
  * \param amount number of levels to create
  */
+ __attribute__((unused))
 void mtbdd_levels_new(size_t amount);
 
 /**
  * \brief  Reset all levels.
  */
+__attribute__((unused))
 void mtbdd_levels_reset(void);
+
+__attribute__((unused))
+int mtbdd_getorderlock(uint32_t level);
+
+__attribute__((unused))
+void mtbdd_setorderlock(uint32_t level, int is_locked);
 
 /**
  * \brief  Get the BDD node representing "if level then true else false"
