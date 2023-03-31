@@ -26,7 +26,7 @@
 #define BLOCKSIZE 128
 
 #define ENABLE_ERROR_LOGS   1 // critical errors that cause sifting to fail
-#define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
+#define ENABLE_INFO_LOGS    0 // useful information w.r.t. dynamic reordering
 #define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
 
 #define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, s,  ##__VA_ARGS__); }
@@ -130,7 +130,7 @@ TASK_IMPL_5(varswap_res_t, sift_down,
             *bestPos = *pos;
         }
         if ((float) (*curSize) >= configs.max_growth * (float) (*bestSize)) {
-            *pos = *pos+1;
+            *pos = (*pos)+1;
             break;
         }
     }
@@ -144,8 +144,8 @@ TASK_IMPL_5(varswap_res_t, sift_up,
             size_t*, bestSize,
             size_t*, bestPos)
 {
-    for (; *pos > low; *pos = *pos - 1) {
-        varswap_res_t res = sylvan_varswap(*pos-1);
+    for (; *pos > low; *pos = (*pos) - 1) {
+        varswap_res_t res = sylvan_varswap((*pos)-1);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
         size_t after = llmsset_count_marked(nodes);
@@ -157,22 +157,22 @@ TASK_IMPL_5(varswap_res_t, sift_up,
             *bestPos = *pos;
         }
         if ((float) (*curSize) >= configs.max_growth * (float) (*bestSize)) {
-            *pos = *pos-1;
+            *pos = (*pos)-1;
             break;
         }
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_res_t, sift_to_pos, size_t*, pos, size_t, targetPos)
+TASK_IMPL_2(varswap_res_t, sift_to_pos, size_t, pos, size_t, targetPos)
 {
-    for (; *pos < targetPos; *pos = *pos + 1) {
-        varswap_res_t res = sylvan_varswap(*pos);
+    for (; pos < targetPos; pos++) {
+        varswap_res_t res = sylvan_varswap(pos);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
-    for (; *pos > targetPos; *pos = *pos - 1) {
-        varswap_res_t res = sylvan_varswap(*pos-1);
+    for (; pos > targetPos; pos--) {
+        varswap_res_t res = sylvan_varswap(pos--);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
     }
@@ -193,7 +193,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
     size_t before_size = llmsset_count_marked(nodes);
 
     // if high == 0, then we sift all variables
-    if (high == 0) high = mtbdd_levels_size() - 1;
+    if (high == 0) high = mtbdd_levels_size() - 2;
     LOG_INFO("sifting start: between %d and %d\n", low, high);
 
     int levels[mtbdd_levels_size()];
@@ -201,10 +201,12 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
 
     size_t cur_size = llmsset_count_marked(nodes);
 
-    // loop over all levels
+    // loop over all levels and perform sifting on each variable
     for (size_t i = 0; i < mtbdd_levels_size(); i++) {
         int lvl = levels[i];
         if (lvl == -1) break; // done
+        if (mtbdd_getorderlock(lvl)) continue; // skip, level is locked
+
         size_t pos = mtbdd_level_to_var(lvl);
 
         size_t best_size = cur_size;
@@ -223,7 +225,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, uint32_t, low, uint32_t, high)
         }
 
         // optimum variable position restoration
-        sift_to_pos(&pos, best_pos);
+        sift_to_pos(pos, best_pos);
 
         configs.total_num_var++;
 

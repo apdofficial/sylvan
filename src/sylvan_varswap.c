@@ -245,6 +245,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         }
     }
 }
+
 #endif
 
 /**
@@ -293,7 +294,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             // if <var+1>, then replace with <var> and rehash
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
-                LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
+                LOG_ERROR("sylvan_varswap_p1: llmsset_rehash_bucket(%zu) failed!\n", first);
                 *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
@@ -302,12 +303,12 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
         }
 
         // nvar == <var>
-        if (mtbddnode_getmark(node)) {
+        if (mtbddnode_getp2mark(node)) {
             // marked node, remove mark and rehash (we are apparently recovering)
-            mtbddnode_setmark(node, 0);
+            mtbddnode_setp2mark(node, 0);
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
-                LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_clear_one(%zu) failed!\n", first);
+                LOG_ERROR("sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
                 *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
             }
             continue;
@@ -331,7 +332,7 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
                     }
                 } else {
                     // mark for phase 2
-                    mtbddnode_setmark(node, 1);
+                    mtbddnode_setp2mark(node, 1);
                     marked++;
                 }
             }
@@ -351,12 +352,12 @@ TASK_IMPL_4(uint64_t, sylvan_varswap_p1,
             }
             if (p2) {
                 // mark for phase 2
-                mtbddnode_setmark(node, 1);
+                mtbddnode_setp2mark(node, 1);
                 marked++;
             } else {
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, first) != 1) {
-                    LOG_ERROR("sylvan_varswap_p1: llmsset_clear_one(%zu) failed!\n", first);
+                    LOG_ERROR("sylvan_varswap_p1: llmsset_rehash_bucket(%zu) failed!\n", first);
                     *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                 }
             }
@@ -405,7 +406,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
-        if (!mtbddnode_getmark(node)) continue; // an unmarked node
+        if (!mtbddnode_getp2mark(node)) continue; // an unmarked node
 
         if (mtbddnode_ismapnode(node)) {
             // it is a map node, swap places with next in chain

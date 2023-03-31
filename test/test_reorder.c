@@ -86,12 +86,13 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
 
     pos = mtbdd_getvar(n5);
-    sift_to_pos(&pos, 5u);
+    sift_to_pos(pos, 5u);
 
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
 }
 
 UTEST_TASK_0(test_sifting, sifting) {
+    // manually trigger sylvan garbage collection
     sylvan_gc();
 
     mtbdd_levels_reset();
@@ -113,23 +114,40 @@ UTEST_TASK_0(test_sifting, sifting) {
     MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
     mtbdd_protect(&f);
 #endif
-    size_t size_before = llmsset_count_marked(nodes);
-
     sylvan_set_reorder_threshold(0);
+
+    size_t size_before = llmsset_count_marked(nodes);
     sylvan_reorder(0, 0);
-
     size_t size_after = llmsset_count_marked(nodes);
-
     ASSERT_LT(size_after, size_before);
+
+    // restore the order
+    sift_to_pos(0, mtbdd_level_to_var(0));
+    sift_to_pos(1, mtbdd_level_to_var(1));
+    sift_to_pos(2, mtbdd_level_to_var(2));
+    sift_to_pos(3, mtbdd_level_to_var(3));
+    sift_to_pos(4, mtbdd_level_to_var(4));
+    sift_to_pos(5, mtbdd_level_to_var(5));
 
     ASSERT_EQ(mtbdd_getvar(n0), 0U);
     ASSERT_EQ(mtbdd_getvar(n1), 1U);
-    ASSERT_EQ(mtbdd_getvar(n3), 2U);
-    ASSERT_EQ(mtbdd_getvar(n2), 3U);
+    ASSERT_EQ(mtbdd_getvar(n2), 2U);
+    ASSERT_EQ(mtbdd_getvar(n3), 3U);
     ASSERT_EQ(mtbdd_getvar(n4), 4U);
     ASSERT_EQ(mtbdd_getvar(n5), 5U);
-}
 
+    size_t size_restored = llmsset_count_marked(nodes);
+    ASSERT_NE(size_after, size_restored);
+
+    mtbdd_setorderlock(2, 1);
+    mtbdd_setorderlock(3, 1);
+
+    size_before = llmsset_count_marked(nodes);
+    sylvan_reorder(0, 0);
+    size_after = llmsset_count_marked(nodes);
+
+    ASSERT_EQ(size_after, size_before);
+}
 
 int main(int argc, const char *const argv[])
 {

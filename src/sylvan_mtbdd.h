@@ -62,6 +62,9 @@ typedef MTBDD MTBDDMAP;
  * False is also used in Integer/Real/Fraction MTBDDs for partially defined functions.
  */
 static const MTBDD mtbdd_complement = 0x8000000000000000LL;
+//static const MTBDD mtbdd_notleaf    = 0x4000000000000000LL;
+static const MTBDD mtbdd_p2mark     = 0x2000000000000000LL;
+//static const MTBDD mtbdd_mapnode    = 0x1000000000000000LL;
 static const MTBDD mtbdd_false      = 0;
 static const MTBDD mtbdd_true       = 0x8000000000000000LL;
 static const MTBDD mtbdd_invalid    = 0xffffffffffffffffLL;
