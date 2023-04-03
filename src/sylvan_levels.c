@@ -13,7 +13,7 @@ static size_t levels_count = 0;        // number of created levels
 static size_t levels_size = 0;         // size of the 3 arrays
 
 
-void mtbdd_levels_new(size_t amount)
+void mtbdd_newlevels(size_t amount)
 {
     if (levels_count + amount >= levels_size) {
 #if 0
@@ -38,7 +38,7 @@ void mtbdd_levels_new(size_t amount)
         orderlocks[levels_count] = 0;
     }
     if(!(levels && orderlocks && var_to_level && level_to_var)) {
-        fprintf(stderr, "mtbdd_levels_new failed to allocate new memory!");
+        fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
     }
 }
 
@@ -122,6 +122,26 @@ void mtbdd_varswap(uint32_t var)
     var_to_level[var + 1] = save;
 }
 
+void mtbdd_varswap_adj(uint32_t x, uint32_t y)
+{
+    level_to_var[var_to_level[x]] = y;
+    level_to_var[var_to_level[y]] = x;
+    uint32_t save = var_to_level[x];
+    var_to_level[x] = var_to_level[y];
+    var_to_level[y] = save;
+}
+
+size_t mtbdd_nextlow(uint32_t var)
+{
+    uint32_t level = mtbdd_var_to_level(var);
+    return level == 0 ? var : mtbdd_level_to_var(level - 1);
+}
+
+size_t mtbdd_nexthigh(uint32_t var)
+{
+    uint32_t level = mtbdd_var_to_level(var);
+    return level == mtbdd_levels_size() - 1 ? var : mtbdd_level_to_var(level + 1);
+}
 
 void sylvan_levels_destroy(void)
 {
@@ -146,7 +166,6 @@ void sylvan_levels_destroy(void)
  */
 static inline void sort_level_counts(int* levels, const size_t* level_counts)
 {
-    //TODO: consider std qsort
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < mtbdd_levels_size()) {

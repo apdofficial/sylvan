@@ -62,6 +62,8 @@ namespace sylvan {
 #include <sylvan_levels.h>
 #include <sylvan_varswap.h>
 #include <sylvan_reorder.h>
+#include <sylvan_varswap_adj.h>
+#include <sylvan_reorder_adj.h>
 #include <sylvan_zdd.h>
 
 #ifdef __cplusplus

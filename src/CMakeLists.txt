@@ -2,53 +2,57 @@ add_library(sylvan STATIC)
 add_library(sylvan::sylvan ALIAS sylvan)
 
 option(SYLVAN_USE_CHAINING "Unique table uses chaining instead of linear probing" ON)
-if(SYLVAN_USE_CHAINING)
+if (SYLVAN_USE_CHAINING)
     target_sources(sylvan PRIVATE sylvan_table_chaining.c)
-else()
+else ()
     target_sources(sylvan PRIVATE sylvan_table_probing.c)
-endif()
+endif ()
 
 target_sources(sylvan
-  PRIVATE
-    sha2.c
-    sylvan_bdd.c
-    sylvan_cache.c
-    sylvan_common.c
-    sylvan_hash.c
-    sylvan_ldd.c
-    sylvan_mt.c
-    sylvan_mtbdd.c
-    sylvan_obj.cpp
-    sylvan_refs.c
-    sylvan_sl.c
-    sylvan_stats.c
-    sylvan_zdd.c
-    sylvan_varswap.c
-    sylvan_levels.c
-    sylvan_reorder.c
-  PUBLIC
-    sylvan.h
-    sylvan_bdd.h
-    sylvan_cache.h
-    sylvan_config.h
-    sylvan_common.h
-    sylvan_hash.h
-    sylvan_int.h
-    sylvan_ldd.h
-    sylvan_ldd_int.h
-    sylvan_mt.h
-    sylvan_mtbdd.h
-    sylvan_mtbdd_int.h
-    sylvan_obj.hpp
-    sylvan_stats.h
-    sylvan_tls.h
-    sylvan_zdd.h
-    sylvan_zdd_int.h
-    sylvan_varswap.h
-    sylvan_levels.h
-    sylvan_reorder.h
-    sylvan_table.h
-)
+        PRIVATE
+        sha2.c
+        sylvan_bdd.c
+        sylvan_cache.c
+        sylvan_common.c
+        sylvan_hash.c
+        sylvan_ldd.c
+        sylvan_mt.c
+        sylvan_mtbdd.c
+        sylvan_obj.cpp
+        sylvan_refs.c
+        sylvan_sl.c
+        sylvan_stats.c
+        sylvan_zdd.c
+        sylvan_varswap.c
+        sylvan_levels.c
+        sylvan_reorder.c
+        sylvan_varswap_adj.c
+        sylvan_reorder_adj.c
+        PUBLIC
+        sylvan.h
+        sylvan_bdd.h
+        sylvan_cache.h
+        sylvan_config.h
+        sylvan_common.h
+        sylvan_hash.h
+        sylvan_int.h
+        sylvan_ldd.h
+        sylvan_ldd_int.h
+        sylvan_mt.h
+        sylvan_mtbdd.h
+        sylvan_mtbdd_int.h
+        sylvan_obj.hpp
+        sylvan_stats.h
+        sylvan_tls.h
+        sylvan_zdd.h
+        sylvan_zdd_int.h
+        sylvan_varswap.h
+        sylvan_levels.h
+        sylvan_reorder.h
+        sylvan_table.h
+        sylvan_varswap_adj.h
+        sylvan_reorder_adj.h
+        )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
 target_compile_features(sylvan PUBLIC c_std_11 cxx_std_11)
@@ -57,16 +61,16 @@ target_include_directories(sylvan PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(sylvan PUBLIC m pthread lace)
 
 option(SYLVAN_GMP "Include custom MTBDD type GMP")
-if(SYLVAN_GMP)
+if (SYLVAN_GMP)
     # We only want to include the custom MTBDD type GMP if we actually have the GMP library
     find_package(GMP REQUIRED)
     target_sources(sylvan PRIVATE sylvan_gmp.c PUBLIC sylvan_gmp.h)
     target_include_directories(sylvan PRIVATE ${GMP_INCLUDE_DIR})
     target_link_libraries(sylvan PUBLIC ${GMP_LIBRARIES})
-endif()
+endif ()
 
 # Do we want to collect BDD statistics?
 option(SYLVAN_STATS "Let Sylvan collect statistics at runtime" OFF)
-if(SYLVAN_STATS)
+if (SYLVAN_STATS)
     set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_STATS")
-endif()
+endif ()

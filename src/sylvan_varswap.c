@@ -5,7 +5,7 @@
 
 #define ENABLE_ERROR_LOGS   1 // critical errors that cause varswap to fail
 #define ENABLE_INFO_LOGS    1 // useful information w.r.t. dynamic reordering
-#define ENABLE_DEBUG_LOGS   0 // useful only for development purposes
+#define ENABLE_DEBUG_LOGS   1 // useful only for development purposes
 
 #define LOG_ERROR(s, ...)   { if (ENABLE_ERROR_LOGS) fprintf(stderr, s,  ##__VA_ARGS__); }
 #define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG_LOGS) fprintf(stdout, s,  ##__VA_ARGS__); }
@@ -142,7 +142,6 @@ MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high)
     return index;
 }
 
-
 TASK_IMPL_1(varswap_res_t, sylvan_varswap, uint32_t, var)
 {
     varswap_res_t result = SYLVAN_VARSWAP_SUCCESS;
@@ -200,6 +199,11 @@ TASK_IMPL_1(varswap_res_t, sylvan_varswap, uint32_t, var)
 
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+
+    LOG_DEBUG("sylvan_varswap(%u): ", var);
+    for (size_t i = 0; i < mtbdd_levels_size(); ++i)
+        printf("%u ", mtbdd_getvar(mtbdd_ithlevel(i)));
+    printf("\n");
 
     return result;
 }

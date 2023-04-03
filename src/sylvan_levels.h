@@ -51,7 +51,7 @@ VOID_TASK_DECL_2(mtbdd_count_sort_levels, int*, size_t);
  * \param amount number of levels to create
  */
  __attribute__((unused))
-void mtbdd_levels_new(size_t amount);
+void mtbdd_newlevels(size_t amount);
 
 /**
  * \brief  Reset all levels.
@@ -113,6 +113,13 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
  */
 void mtbdd_varswap(uint32_t var);
 
+void mtbdd_varswap_adj(uint32_t x, uint32_t y);
+
+__attribute__((unused))
+size_t mtbdd_nextlow(uint32_t var);
+
+__attribute__((unused))
+size_t mtbdd_nexthigh(uint32_t var);
 
 /**
  * \brief Clean up the resourced allocated for managing levels

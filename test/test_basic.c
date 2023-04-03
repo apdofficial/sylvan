@@ -374,7 +374,7 @@ test_varswap()
 
     /* initialize 10 levels */
     mtbdd_levels_reset();
-    mtbdd_levels_new(10);
+    mtbdd_newlevels(10);
 
     /* test ithvar, switch 6 and 7 */
     one = mtbdd_ithlevel(6);

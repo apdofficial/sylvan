@@ -22,7 +22,7 @@ UTEST_TASK_0(test_simple_varswap, levels)
     sylvan_gc();
 
     mtbdd_levels_reset();
-    mtbdd_levels_new(num_of_levels);
+    mtbdd_newlevels(num_of_levels);
 
     /// start with the happy flow
     BDD n0 = mtbdd_ithlevel(0);
@@ -82,7 +82,7 @@ UTEST_TASK_0(test_simple_varswap, var_single_swap)
 
     // initialize 10 levels of variables
     mtbdd_levels_reset();
-    mtbdd_levels_new(5);
+    mtbdd_newlevels(5);
 
     BDD n3 = mtbdd_ithlevel(3);
     BDD n4 = mtbdd_ithlevel(4);
@@ -120,7 +120,7 @@ UTEST_TASK_0(test_simple_varswap, var_multiple_swaps)
 
     // initialize 10 levels of variables
     mtbdd_levels_reset();
-    mtbdd_levels_new(3);
+    mtbdd_newlevels(3);
 
     BDD n0 = mtbdd_ithlevel(0);
     BDD n1 = mtbdd_ithlevel(1);
@@ -172,7 +172,7 @@ UTEST_TASK_0(test_simple_varswap, var_single_swap_hash)
 
     // initialize 10 levels of variables
     mtbdd_levels_reset();
-    mtbdd_levels_new(10);
+    mtbdd_newlevels(10);
 
     BDD n5 = mtbdd_ithlevel(5);
     BDD n6 = mtbdd_ithlevel(6);
@@ -207,7 +207,7 @@ UTEST_TASK_0(test_simple_varswap, var_swap_random)
 
     // initialize 10 levels of variables
     mtbdd_levels_reset();
-    mtbdd_levels_new(10);
+    mtbdd_newlevels(10);
 
     for (int i = 0; i < 10; ++i) {
         /// test random, swap of level 6 with level 7
@@ -265,7 +265,7 @@ UTEST_TASK_0(test_simple_varswap, bddmap)
 
     // initialize 10 levels of variables
     mtbdd_levels_reset();
-    mtbdd_levels_new(10);
+    mtbdd_newlevels(10);
 
     /* test bddmap [6 -> 6] becomes [7 -> 7] */
     BDDMAP map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(6));

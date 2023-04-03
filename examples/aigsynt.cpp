@@ -257,7 +257,7 @@ VOID_TASK_0(parse)
     if (O != 1) Abort("expecting 1 output\n");
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
-    mtbdd_levels_new(M+1);
+    mtbdd_newlevels(M + 1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
 
@@ -374,7 +374,7 @@ VOID_TASK_0(parse)
         boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g), boost::get(boost::vertex_priority, g), sloan_w1, sloan_w2);
 
         level_to_var = new int[M+1];
-        mtbdd_levels_new(M+1);
+        mtbdd_newlevels(M + 1);
         for (unsigned int i=0; i<=M; i++) level_to_var[i] = -1;
         
         int r = 0;
@@ -525,7 +525,7 @@ VOID_TASK_0(parse)
     sylvan_stats_report(stdout);
     sylvan_gc();
     if(dynamic_reorder){
-        sylvan_reorder(0, 0);
+        sylvan_reorder_adj(0, 0);
     }
 
 #if 0
