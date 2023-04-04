@@ -238,7 +238,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            if (llmsset_clear_one(nodes, first) == SYLVAN_FAIL) {
+            if (!llmsset_clear_one(nodes, first)) {
                 LOG_ERROR("sylvan_varswap_p0: llmsset_clear_one(%u) failed!\n", nvar);
             }
         }

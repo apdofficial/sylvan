@@ -262,22 +262,22 @@ static int should_terminate_reordering(const reorder_config_t *reorder_config)
 {
     if (reorder_config->termination_cb != NULL && reorder_config->termination_cb()) {
         LOG_INFO("sifting exit: termination_cb\n");
-        return SYLVAN_SUCCESS;
+        return 1;
     }
     if (reorder_config->total_num_swap > reorder_config->max_swap) {
         LOG_INFO("sifting exit: reached %u from the total_num_swap %u\n", reorder_config->total_num_swap,
                  reorder_config->max_swap);
-        return SYLVAN_SUCCESS;
+        return 1;
     }
     if (reorder_config->total_num_var > reorder_config->max_var) {
         LOG_INFO("sifting exit: reached %u from the total_num_var %u\n", reorder_config->total_num_var,
                  reorder_config->max_var);
-        return SYLVAN_SUCCESS;
+        return 1;
     }
     size_t t_elapsed = clock_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms) {
         LOG_INFO("sifting exit: reached %lums from the time_limit %.2llums\n", t_elapsed, reorder_config->time_limit_ms);
-        return SYLVAN_SUCCESS;
+        return 1;
     }
-    return SYLVAN_FAIL;
+    return 0;
 }
