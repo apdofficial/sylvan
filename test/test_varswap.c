@@ -21,7 +21,7 @@ UTEST_TASK_0(test_simple_varswap, levels)
     // manually trigger sylvan garbage collection
     sylvan_gc();
 
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(num_of_levels);
 
     /// start with the happy flow
@@ -37,7 +37,7 @@ UTEST_TASK_0(test_simple_varswap, levels)
     ASSERT_EQ(mtbdd_node_to_level(n0), 0u);
     ASSERT_EQ(mtbdd_node_to_level(n1), 1u);
     // assert correct size of levels
-    ASSERT_EQ(mtbdd_levels_size(), (size_t)num_of_levels);
+    ASSERT_EQ(mtbdd_levelscount(), (size_t)num_of_levels);
 
     // test var swap function used by sifting
     mtbdd_varswap(v0);
@@ -53,21 +53,21 @@ UTEST_TASK_0(test_simple_varswap, levels)
     ASSERT_EQ(mtbdd_ithlevel(0), n0);
     ASSERT_EQ(mtbdd_ithlevel(1), n1);
 
-    size_t level_counts[mtbdd_levels_size()];
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i) level_counts[i] = 0;
-    mtbdd_count_levels(level_counts);
+    size_t level_counts[mtbdd_levelscount()];
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i) level_counts[i] = 0;
+    mtbdd_countlevels(level_counts);
 
-    for (size_t i = 1; i < mtbdd_levels_size(); ++i) ASSERT_EQ(level_counts[i], 1u);
+    for (size_t i = 1; i < mtbdd_levelscount(); ++i) ASSERT_EQ(level_counts[i], 1u);
 
     /// now test the sad flow
     ASSERT_EQ(mtbdd_ithlevel(-1), mtbdd_invalid);
     ASSERT_EQ(mtbdd_ithlevel(num_of_levels), mtbdd_invalid);
     ASSERT_EQ(mtbdd_ithlevel(num_of_levels + 1), mtbdd_invalid);
-    ASSERT_EQ(mtbdd_level_to_var(mtbdd_levels_size()), mtbdd_levels_size());
+    ASSERT_EQ(mtbdd_level_to_var(mtbdd_levelscount()), mtbdd_levelscount());
 
     /// test exit procedure
-    mtbdd_levels_reset();
-    ASSERT_EQ(mtbdd_levels_size(), 0u);
+    mtbdd_resetlevels();
+    ASSERT_EQ(mtbdd_levelscount(), 0u);
 
     sylvan_levels_destroy();
 }
@@ -81,7 +81,7 @@ UTEST_TASK_0(test_simple_varswap, var_single_swap)
     sylvan_gc();
 
     // initialize 10 levels of variables
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(5);
 
     BDD n3 = mtbdd_ithlevel(3);
@@ -119,7 +119,7 @@ UTEST_TASK_0(test_simple_varswap, var_multiple_swaps)
     sylvan_gc();
 
     // initialize 10 levels of variables
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(3);
 
     BDD n0 = mtbdd_ithlevel(0);
@@ -171,7 +171,7 @@ UTEST_TASK_0(test_simple_varswap, var_single_swap_hash)
     sylvan_gc();
 
     // initialize 10 levels of variables
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(10);
 
     BDD n5 = mtbdd_ithlevel(5);
@@ -206,7 +206,7 @@ UTEST_TASK_0(test_simple_varswap, var_swap_random)
     sylvan_gc();
 
     // initialize 10 levels of variables
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(10);
 
     for (int i = 0; i < 10; ++i) {
@@ -264,7 +264,7 @@ UTEST_TASK_0(test_simple_varswap, bddmap)
     sylvan_gc();
 
     // initialize 10 levels of variables
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(10);
 
     /* test bddmap [6 -> 6] becomes [7 -> 7] */

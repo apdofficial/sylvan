@@ -10,46 +10,13 @@
 
 UTEST_STATE();
 
-UTEST_TASK_0(test_sifting, basic_sift_up_down)
-{
-    // manually trigger sylvan garbage collection
-    sylvan_gc();
-
-    mtbdd_levels_reset();
-    mtbdd_newlevels(3);
-
-    size_t cursize = llmsset_count_marked(nodes);
-    size_t bestsize = cursize;
-    size_t bestPos = 0;
-
-    int initial_order[3] = {0, 1, 2};
-    for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
-        ASSERT_EQ(mtbdd_getvar(mtbdd_ithlevel(i)), i);
-    }
-
-    print_vars();
-    size_t pos = 2;
-//    varswap_res_t res = sift_down(&pos, 2, &cursize, &bestsize, &bestPos);
-    varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
-    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
-    print_vars();
-
-    int final_order[3] = {1, 2, 0};
-    for (unsigned int i = 0; i < sizeof(final_order) / sizeof(final_order[0]); ++i){
-        ASSERT_EQ(mtbdd_getvar(mtbdd_ithlevel(i)), i);
-    }
-
-    sylvan_levels_destroy();
-}
-
-
 UTEST_TASK_0(test_sifting, basic_sift_up)
 {
     // manually trigger sylvan garbage collection
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(3);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(3);
 
     BDD n0 = mtbdd_ithlevel(0);
 
@@ -74,8 +41,8 @@ UTEST_TASK_0(test_sifting, basic_sift_down)
     // manually trigger sylvan garbage collection
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(6);
 
     BDD n5 = mtbdd_ithlevel(5);
 
@@ -100,8 +67,8 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
     // manually trigger sylvan garbage collection
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(6);
 
     BDD n5 = mtbdd_ithlevel(5);
 
@@ -119,7 +86,7 @@ UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
     ASSERT_EQ(mtbdd_getvar(n5), 0u);
 
     pos = mtbdd_getvar(n5);
-    sift_to_pos(pos, 5u);
+    sift_to_target(pos, 5u);
 
     ASSERT_EQ(mtbdd_getvar(n5), 5u);
     sylvan_levels_destroy();
@@ -129,8 +96,8 @@ UTEST_TASK_0(test_sifting, sifting) {
     // manually trigger sylvan garbage collection
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(6);
 
     BDD n0 = mtbdd_ithlevel(0);
     BDD n1 = mtbdd_ithlevel(1);
@@ -156,12 +123,12 @@ UTEST_TASK_0(test_sifting, sifting) {
     ASSERT_LT(size_after, size_before);
 
     // restore the order
-    sift_to_pos(0, mtbdd_level_to_var(0));
-    sift_to_pos(1, mtbdd_level_to_var(1));
-    sift_to_pos(2, mtbdd_level_to_var(2));
-    sift_to_pos(3, mtbdd_level_to_var(3));
-    sift_to_pos(4, mtbdd_level_to_var(4));
-    sift_to_pos(5, mtbdd_level_to_var(5));
+    sift_to_target(0, mtbdd_level_to_var(0));
+    sift_to_target(1, mtbdd_level_to_var(1));
+    sift_to_target(2, mtbdd_level_to_var(2));
+    sift_to_target(3, mtbdd_level_to_var(3));
+    sift_to_target(4, mtbdd_level_to_var(4));
+    sift_to_target(5, mtbdd_level_to_var(5));
 
     ASSERT_EQ(mtbdd_getvar(n0), 0U);
     ASSERT_EQ(mtbdd_getvar(n1), 1U);

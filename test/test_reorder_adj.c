@@ -10,17 +10,43 @@
 #include "sylvan_levels.h"
 #include "common.h"
 
+const static size_t initial_order[4] = {0, 1, 2, 3 };
+
+TASK_DECL_1(MTBDD, create_example_bdd, size_t);
+#define create_example_bdd(is_optimal) CALL(create_example_bdd, is_optimal)
+
+TASK_1(MTBDD, construct_bdd, size_t, is_optimal)
+{
+//    BDDs from the paper:
+//    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
+//    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
+    MTBDD v0 = mtbdd_newlevel();
+    MTBDD v1 = mtbdd_newlevel();
+    MTBDD v2 = mtbdd_newlevel();
+    MTBDD v3 = mtbdd_newlevel();
+    MTBDD v4 = mtbdd_newlevel();
+    MTBDD v5 = mtbdd_newlevel();
+
+    MTBDD bdd;
+    if (is_optimal) {
+        // optimal order
+        // ideally 8 nodes including 2 terminal nodes
+        bdd = sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
+    } else {
+        // not optimal order
+        // ideally 16 nodes including 2 terminal nodes
+        bdd = sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
+    }
+
+    mtbdd_protect(&bdd);
+    return bdd;
+}
 
 TASK_0(int, test_varswap_down)
 {
     sylvan_gc();
-    mtbdd_levels_reset();
+    mtbdd_levels_destroy();
     mtbdd_newlevels(4);
-
-    size_t initial_order[4] = {0, 1, 2, 3 };
-    for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
-        test_assert(mtbdd_level_to_var(i) == initial_order[i]);
-    }
 
     size_t var = 0;
     test_assert(sylvan_varswap_adj(var, mtbdd_nexthigh(var)) == SYLVAN_VARSWAP_SUCCESS);
@@ -39,10 +65,9 @@ TASK_0(int, test_varswap_down)
 TASK_0(int, test_varswap_up)
 {
     sylvan_gc();
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(4);
 
-    size_t initial_order[4] = {0, 1, 2, 3 };
     for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
         test_assert(mtbdd_level_to_var(i) == initial_order[i]);
     }
@@ -64,10 +89,9 @@ TASK_0(int, test_varswap_up)
 TASK_0(int, test_sift_down)
 {
     sylvan_gc();
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(4);
 
-    size_t initial_order[4] = {0, 1, 2, 3 };
     for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
         test_assert(mtbdd_level_to_var(i) == initial_order[i]);
     }
@@ -92,10 +116,9 @@ TASK_0(int, test_sift_down)
 TASK_0(int, test_sift_up)
 {
     sylvan_gc();
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(4);
 
-    size_t initial_order[4] = {0, 1, 2, 3 };
     for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
         test_assert(mtbdd_level_to_var(i) == initial_order[i]);
     }
@@ -120,10 +143,9 @@ TASK_0(int, test_sift_up)
 TASK_0(int, test_sift_to_lvl)
 {
     sylvan_gc();
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(4);
 
-    size_t initial_order[4] = {0, 1, 2, 3 };
     for (unsigned int i = 0; i < sizeof(initial_order) / sizeof(initial_order[0]); ++i){
         test_assert(mtbdd_level_to_var(i) == initial_order[i]);
     }
@@ -140,29 +162,12 @@ TASK_0(int, test_sift_to_lvl)
     return 0;
 }
 
-TASK_0(int, test_reorder)
+TASK_0(int, test_reorder_adj)
 {
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_newlevels(6);
-
-    BDD n0 = mtbdd_ithlevel(0);
-    BDD n1 = mtbdd_ithlevel(1);
-    BDD n2 = mtbdd_ithlevel(2);
-    BDD n3 = mtbdd_ithlevel(3);
-    BDD n4 = mtbdd_ithlevel(4);
-    BDD n5 = mtbdd_ithlevel(5);
-
-#if 1
-    // not optimal order
-    MTBDD f = sylvan_or(sylvan_and(n0, n3), sylvan_or(sylvan_and(n1, n4), sylvan_and(n2, n5)));
-    mtbdd_protect(&f);
-#else
-    // optimal order
-    MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
-    mtbdd_protect(&f);
-#endif
+    size_t is_optimally_ordered = 0;
+    MTBDD bdd = create_example_bdd(is_optimally_ordered);
 
     size_t size_before = llmsset_count_marked(nodes);
     sylvan_reorder_adj(0, 0);
@@ -170,8 +175,28 @@ TASK_0(int, test_reorder)
 
     test_assert(size_after < size_before);
 
+    mtbdd_unprotect(&bdd);
     return 0;
 }
+
+TASK_0(int, test_reorder)
+{
+    sylvan_gc();
+
+    size_t is_optimally_ordered = 0;
+    MTBDD bdd = create_example_bdd(is_optimally_ordered);
+
+    size_t size_before = llmsset_count_marked(nodes);
+    sylvan_reorder(0, 0);
+    size_t size_after = llmsset_count_marked(nodes);
+
+    test_assert(size_after < size_before);
+
+    mtbdd_unprotect(&bdd);
+    return 0;
+}
+
+
 
 TASK_0(int, runtests)
 {
@@ -188,6 +213,8 @@ TASK_0(int, runtests)
     for (int j=0;j<num_test_runs;j++) if (RUN(test_sift_to_lvl)) return 1;
     printf("Testing test_reorder.\n");
     for (int j=0;j<num_test_runs;j++) if (RUN(test_reorder)) return 1;
+    printf("Testing test_reorder_adj.\n");
+    for (int j=0;j<num_test_runs;j++) if (RUN(test_reorder_adj)) return 1;
     return 0;
 }
 

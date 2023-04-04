@@ -41,7 +41,7 @@ __attribute__((unused))
  *         The default value is 32.
  * @param threshold The threshold for the number of nodes per level.
 */
-void sylvan_set_reorder_threshold(size_t threshold);
+void sylvan_set_reorder_threshold(uint32_t threshold);
 
 __attribute__((unused)) 
 /**
@@ -58,7 +58,7 @@ __attribute__((unused))
  * @details The default value is 10000.
  * @param max_swap The maximum number of swaps per sifting.
 */
-void sylvan_set_reorder_maxswap(size_t max_swap);
+void sylvan_set_reorder_maxswap(uint32_t max_swap);
 
 __attribute__((unused)) 
 /**
@@ -66,7 +66,7 @@ __attribute__((unused))
  * @details The default value is 2000.
  * @param max_var The maximum number of vars swapped per sifting.
 */
-void sylvan_set_reorder_maxvar(size_t max_var);
+void sylvan_set_reorder_maxvar(uint32_t max_var);
 
 __attribute__((unused))
 /**
@@ -74,9 +74,9 @@ __attribute__((unused))
  * @details The default value is 50000 milliseconds.
  * @param time_limit The time limit for the reordering.
 */
-void sylvan_set_reorder_timelimit(size_t time_limit);
+void sylvan_set_reorder_timelimit(uint64_t time_limit);
 
-TASK_DECL_5(varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_5(varswap_res_t, sift_down, BDDVAR*, BDDVAR, uint64_t*, uint64_t*, BDDVAR*);
 /**
  * \brief Sift given variable up from its current level to the target level.
  *
@@ -88,9 +88,9 @@ TASK_DECL_5(varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sift_down(var, high, curSize, bestSize, bestPos) RUN(sift_down, var, high, curSize, bestSize, bestPos)
+#define sift_down(var, high, cur_size, best_size, best_pos) CALL(sift_down, var, high, cur_size, best_size, best_pos)
 
-TASK_DECL_5(varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_5(varswap_res_t, sift_up, BDDVAR*, BDDVAR, uint64_t*, uint64_t*, BDDVAR*);
 /**
  * \brief Sift given variable down from its current level to the target level.
  *
@@ -102,17 +102,17 @@ TASK_DECL_5(varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*
  *
  * \sideeffect order of variables is changed
  */
-#define sift_up(var, low, curSize, bestSize, bestPos) RUN(sift_up, var, low, curSize, bestSize, bestPos)
+#define sift_up(var, low, cur_size, best_size, best_pos) CALL(sift_up, var, low, cur_size, best_size, best_pos)
 
-TASK_DECL_2(varswap_res_t, sift_to_pos, size_t, size_t);
+TASK_DECL_2(varswap_res_t, sift_to_target, BDDVAR, BDDVAR);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
  * \param targetPos - target position (w.r.t. dynamic variable reordering)
  */
-#define sift_to_pos(var, targetPos) RUN(sift_to_pos, var, targetPos)
+#define sift_to_target(var, target_var) CALL(sift_to_target, var, target_var)
 
-VOID_TASK_DECL_2(sylvan_reorder, uint32_t, uint32_t);
+VOID_TASK_DECL_2(sylvan_reorder, BDDVAR, BDDVAR);
 /**
   \brief Implementation of Rudell's sifting algorithm.
 

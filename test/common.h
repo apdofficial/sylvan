@@ -7,7 +7,7 @@
 __thread uint64_t seed = 1;
 
 void print_vars(){
-    for (size_t i = 0; i < mtbdd_levels_size(); ++i){
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i){
         printf("%u ", mtbdd_level_to_var(i));
     }
     printf("\n");

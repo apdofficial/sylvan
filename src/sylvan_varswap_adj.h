@@ -6,7 +6,7 @@
 #define SYLVAN_SYLVAN_VARSWAP_ADJ_H
 
 
-TASK_DECL_2(varswap_res_t, sylvan_varswap_adj, uint32_t, uint32_t);
+TASK_DECL_2(varswap_res_t, sylvan_varswap_adj, BDDVAR, BDDVAR);
 /**
   @brief Swaps two adjacent variables.
 

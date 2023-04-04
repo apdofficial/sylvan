@@ -373,7 +373,7 @@ test_varswap()
     sylvan_gc();
 
     /* initialize 10 levels */
-    mtbdd_levels_reset();
+    mtbdd_resetlevels();
     mtbdd_newlevels(10);
 
     /* test ithvar, switch 6 and 7 */

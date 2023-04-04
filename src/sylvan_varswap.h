@@ -46,7 +46,7 @@ static inline int sylvan_varswap_issuccess(varswap_res_t result)
     return result == SYLVAN_VARSWAP_SUCCESS || result == SYLVAN_VARSWAP_ROLLBACK;
 }
 
-TASK_DECL_1(varswap_res_t, sylvan_varswap, uint32_t);
+TASK_DECL_1(varswap_res_t, sylvan_varswap, BDDVAR);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *

@@ -12,16 +12,41 @@
 extern "C" {
 #endif /* __cplusplus */
 
-TASK_DECL_5(varswap_res_t, sift_down_adj, size_t, size_t, size_t*, size_t*, size_t*);
-#define sift_down_adj(var, high_lvl, cur_size, best_size, best_lvl) RUN(sift_down_adj, var, high_lvl, cur_size, best_size, best_lvl)
+__attribute__((unused))
+void sylvan_init_reorder_adj(void);
 
-TASK_DECL_5(varswap_res_t, sift_up_adj, size_t, size_t, size_t*, size_t*, size_t*);
-#define sift_up_adj(var, low_lvl, cur_size, best_size, best_lvl) RUN(sift_up_adj, var, low_lvl, cur_size, best_size, best_lvl)
+__attribute__((unused))
+void sylvan_quit_reorder_adj(void);
 
-TASK_DECL_2(varswap_res_t, sift_to_lvl, size_t, size_t);
-#define sift_to_lvl(var, lvl) RUN(sift_to_lvl, var, lvl)
+typedef int (*reorder_termination_cb)();
+__attribute__((unused))
+void sylvan_set_reorder_terminationcb_adj(reorder_termination_cb callback);
 
-VOID_TASK_DECL_2(sylvan_reorder_adj, uint32_t, uint32_t);
+__attribute__((unused))
+void sylvan_set_reorder_threshold_adj(size_t threshold);
+
+__attribute__((unused))
+void sylvan_set_reorder_maxgrowth_adj(float max_growth);
+
+__attribute__((unused))
+void sylvan_set_reorder_maxswap_adj(size_t max_swap);
+
+__attribute__((unused))
+void sylvan_set_reorder_maxvar_adj(size_t max_var);
+
+__attribute__((unused))
+void sylvan_set_reorder_timelimit_adj(size_t time_limit);
+
+TASK_DECL_5(varswap_res_t, sift_down_adj, BDDVAR, LEVEL, uint64_t*, uint64_t*, LEVEL*);
+#define sift_down_adj(var, high_lvl, cur_size, best_size, best_lvl) CALL(sift_down_adj, var, high_lvl, cur_size, best_size, best_lvl)
+
+TASK_DECL_5(varswap_res_t, sift_up_adj, BDDVAR, LEVEL, uint64_t*, uint64_t*, LEVEL*);
+#define sift_up_adj(var, low_lvl, cur_size, best_size, best_lvl) CALL(sift_up_adj, var, low_lvl, cur_size, best_size, best_lvl)
+
+TASK_DECL_2(varswap_res_t, sift_to_lvl, BDDVAR, LEVEL);
+#define sift_to_lvl(var, lvl) CALL(sift_to_lvl, var, lvl)
+
+VOID_TASK_DECL_2(sylvan_reorder_adj, LEVEL, LEVEL);
 #define sylvan_reorder_adj(low_lvl, high_lvl)  CALL(sylvan_reorder_adj, low_lvl, high_lvl)
 
 #ifdef __cplusplus
