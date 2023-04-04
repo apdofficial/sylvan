@@ -525,8 +525,8 @@ VOID_TASK_0(parse)
 
     sylvan_stats_report(stdout);
     if (dynamic_reorder) {
-//        sylvan_reorder_adj(0, 0);
-        sylvan_reorder(0, 0);
+        sylvan_reorder_adj(0, 0);
+//        sylvan_reorder(0, 0);
     }
 
 #if 0

@@ -44,7 +44,7 @@ TASK_DECL_5(varswap_res_t, sift_up_adj, BDDVAR, LEVEL, uint64_t*, uint64_t*, LEV
 #define sift_up_adj(var, low_lvl, cur_size, best_size, best_lvl) CALL(sift_up_adj, var, low_lvl, cur_size, best_size, best_lvl)
 
 TASK_DECL_2(varswap_res_t, sift_to_lvl, BDDVAR, LEVEL);
-#define sift_to_lvl(var, lvl) CALL(sift_to_lvl, var, lvl)
+#define sift_to_lvl(var, target_lvl) CALL(sift_to_lvl, var, target_lvl)
 
 VOID_TASK_DECL_2(sylvan_reorder_adj, LEVEL, LEVEL);
 #define sylvan_reorder_adj(low_lvl, high_lvl)  CALL(sylvan_reorder_adj, low_lvl, high_lvl)

@@ -196,6 +196,7 @@ VOID_TASK_IMPL_2(sylvan_reorder, BDDVAR, low, BDDVAR, high)
 {
     // TODO: implement variable interaction check (look at (Ebendt et al. in RT [12]) and CUDD)
     // TODO: implement variable order lock (its order will never be changed)
+    sylvan_gc();
 
     if (mtbdd_levelscount() < 1) return;
 
@@ -206,11 +207,16 @@ VOID_TASK_IMPL_2(sylvan_reorder, BDDVAR, low, BDDVAR, high)
     uint64_t before_size = llmsset_count_marked(nodes);
 
     // if high == 0, then we sift all variables
-    if (high == 0) high = mtbdd_levelscount() - 2;
+    if (high == 0) high = mtbdd_levelscount() - 2; // do not swap the last node, thus -2 instead of -1
     LOG_INFO("sifting start: between %d and %d\n", low, high);
 
     int levels[mtbdd_levelscount()];
     mtbdd_count_sort_levels(levels, configs.level_count_threshold);
+
+    for (size_t i = 0; i < sizeof(levels) / sizeof(levels[0]); ++i) {
+        LOG_DEBUG("%d ", levels[i]);
+    }
+    LOG_DEBUG("\n");
 
     uint64_t cur_size = llmsset_count_marked(nodes);
 

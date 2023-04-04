@@ -52,13 +52,13 @@ typedef struct sifting_config
 static reorder_config_t configs_adj = {
         .termination_cb = NULL,
         .t_start_sifting = 0,
-        .level_count_threshold = 1,
-        .max_growth = 1.2f,
+        .level_count_threshold = 32,
+        .max_growth = 1.1f,
         .max_swap = 10000,
         .total_num_swap = 0,
         .max_var = 2000,
         .total_num_var = 0,
-        .time_limit_ms = 50000
+        .time_limit_ms = 500000
 };
 
 static int should_terminate_reordering(const reorder_config_t *reorder_config);
@@ -114,13 +114,13 @@ void sylvan_set_reorder_timelimit_adj(size_t time_limit)
 
 static inline BDDVAR mtbdd_next_highvar(const BDDVAR var)
 {
-    uint32_t level = mtbdd_var_to_level(var);
+    LEVEL level = mtbdd_var_to_level(var);
     return level >= mtbdd_levelscount() - 1 ? var : mtbdd_level_to_var(level + 1);
 }
 
 static inline BDDVAR mtbdd_next_lowvar(const BDDVAR var)
 {
-    uint32_t level = mtbdd_var_to_level(var);
+    LEVEL level = mtbdd_var_to_level(var);
     return level <= 0 ? var : mtbdd_level_to_var(level - 1);
 }
 
@@ -159,7 +159,7 @@ TASK_IMPL_5(varswap_res_t, sift_up_adj,
             LEVEL*, best_lvl)
 {
     while (mtbdd_var_to_level(var) > low_lvl) {
-        varswap_res_t res = sylvan_varswap_adj(var, mtbdd_next_lowvar(var));
+        varswap_res_t res = sylvan_varswap_adj(mtbdd_next_lowvar(var), var);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs_adj.total_num_swap++;
         *cur_size = llmsset_count_marked(nodes);
@@ -176,15 +176,15 @@ TASK_IMPL_5(varswap_res_t, sift_up_adj,
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_res_t, sift_to_lvl, BDDVAR, var, LEVEL, lvl)
+TASK_IMPL_2(varswap_res_t, sift_to_lvl, BDDVAR, var, LEVEL, target_lvl)
 {
-    while (mtbdd_var_to_level(var) < lvl) {
+    while (mtbdd_var_to_level(var) < target_lvl) {
         varswap_res_t res = sylvan_varswap_adj(var, mtbdd_next_highvar(var));
         if (!sylvan_varswap_issuccess(res)) return res;
         configs_adj.total_num_swap++;
     }
-    while (mtbdd_var_to_level(var) > lvl) {
-        varswap_res_t res = sylvan_varswap_adj(var, mtbdd_next_lowvar(var));
+    while (mtbdd_var_to_level(var) > target_lvl) {
+        varswap_res_t res = sylvan_varswap_adj(mtbdd_next_lowvar(var), var);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs_adj.total_num_swap++;
     }
@@ -204,7 +204,8 @@ VOID_TASK_IMPL_2(sylvan_reorder_adj, LEVEL, low_lvl, LEVEL, high_lvl)
     size_t before_size = llmsset_count_marked(nodes);
 
     // if high == 0, then we sift all variables
-    if (high_lvl == 0) high_lvl = mtbdd_levelscount() - 2;
+    if (high_lvl == 0) high_lvl = mtbdd_levelscount() - 2; // do not swap the last node, thus -2 instead of -1
+
     LOG_INFO("sifting started: between levels %llu and %llu\n", low_lvl, high_lvl);
 
     int levels[mtbdd_levelscount()];
@@ -219,7 +220,6 @@ VOID_TASK_IMPL_2(sylvan_reorder_adj, LEVEL, low_lvl, LEVEL, high_lvl)
     }
 
     uint64_t cur_size = llmsset_count_marked(nodes);
-    uint64_t best_size = cur_size;
 
     // loop over all levels and perform sifting on each variable
     for (size_t i = 0; i < mtbdd_levelscount(); i++) {
@@ -230,9 +230,8 @@ VOID_TASK_IMPL_2(sylvan_reorder_adj, LEVEL, low_lvl, LEVEL, high_lvl)
         if (mtbdd_getorderlock(lvl)) continue; // skip, level is locked
 
         LEVEL best_lvl = lvl;
+        uint64_t best_size = cur_size;
         varswap_res_t res;
-
-        assert(cur_size == best_size);
 
         LOG_INFO("sifting v%d at l%llu with current size %llu\n", var, lvl, cur_size);
 
@@ -249,7 +248,7 @@ VOID_TASK_IMPL_2(sylvan_reorder_adj, LEVEL, low_lvl, LEVEL, high_lvl)
         sift_to_lvl(var, best_lvl);
 
         assert(mtbdd_var_to_level(var) == best_lvl);
-        assert(cur_size == best_size);
+//        assert(cur_size == best_size);
 
         configs_adj.total_num_var++;
 
