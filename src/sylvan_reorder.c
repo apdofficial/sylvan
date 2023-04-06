@@ -179,6 +179,8 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
 
 TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 {
+//    lace_barrier();
+
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
 
     configs.t_start_sifting = clock();
@@ -241,7 +243,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
         if (should_terminate_reordering(&configs)) break;
 #if STATS
         if (state.best_size < state.size)
-            printf("Reuced the number of nodes from %zu to %zu\n", state.size, state.best_size);
+            printf("Reduced the number of nodes from %zu to %zu\n", state.size, state.best_size);
 #endif
     }
 

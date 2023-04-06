@@ -77,7 +77,7 @@ typedef MTBDD BDD;
 typedef MTBDDMAP BDDMAP;
 typedef MTBDD BDDSET;
 typedef uint32_t BDDVAR;
-typedef BDDVAR BDDLEVEL;
+typedef uint64_t BDDLEVEL;
 typedef BDDVAR BDDLABEL;
 static const MTBDD sylvan_complement = 0x8000000000000000LL;
 static const MTBDD sylvan_false      = 0;

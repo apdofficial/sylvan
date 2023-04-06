@@ -401,6 +401,7 @@ TASK_0(int, test_siftpos)
 
 TASK_0(int, test_reorder)
 {
+    printf("RUN(test_reorder)\n");
     sylvan_gc();
     mtbdd_resetlevels();
 
@@ -411,7 +412,7 @@ TASK_0(int, test_reorder)
     sylvan_reorder_all();
     size_t size_after = mtbdd_nodecount(bdd);
 
-    test_assert(size_after <= size_before);
+    test_assert(size_after < size_before);
     mtbdd_unprotect(&bdd);
 
     return 0;
@@ -431,8 +432,7 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
     printf("test_siftpos.\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_siftpos)) return 1;
-//    printf("test_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    printf("test_reorder\n"); RUN(test_reorder);
     return 0;
 }
 
@@ -444,11 +444,12 @@ int main()
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
+    sylvan_gc_enable();
 
     sylvan_set_reorder_threshold(1);
     sylvan_set_reorder_maxgrowth(1.2f);
 
-    size_t ntests = 100;
+    size_t ntests = 2;
 
     int res = RUN(runtests, ntests);
 

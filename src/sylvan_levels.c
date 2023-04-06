@@ -65,7 +65,7 @@ size_t mtbdd_levelscount(void)
     return levels_count;
 }
 
-MTBDD mtbdd_ithlevel(uint32_t level)
+MTBDD mtbdd_ithlevel(BDDLEVEL level)
 {
     if (level < levels_count) return levels[level_to_var[level]];
     else return mtbdd_invalid;

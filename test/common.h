@@ -17,7 +17,7 @@ void print_level_to_var(){
 void print_var_to_level(){
     printf("var_to_level: ");
     for (size_t i = 0; i < mtbdd_levelscount(); ++i){
-        printf("%u ", mtbdd_var_to_level(i));
+        printf("%llu ", mtbdd_var_to_level(i));
     }
     printf("\n");
 }
