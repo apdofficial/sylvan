@@ -10,7 +10,7 @@ extern "C" {
  */
 #define BLOCKSIZE 128
 
-typedef enum varswap_res {
+typedef enum varswap {
     /// the operation was aborted and rolled back
     SYLVAN_VARSWAP_ROLLBACK = 1,
     /// success

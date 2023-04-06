@@ -33,18 +33,14 @@ typedef struct sifting_state
     BDDLABEL high;
 } sifting_state_t;
 
-__attribute__((unused))
 void sylvan_init_reorder(void);
 
-__attribute__((unused))
 void sylvan_quit_reorder(void);
 
 typedef int (*reorder_termination_cb)();
 
-__attribute__((unused))
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
-__attribute__((unused))
 /**
  * @brief Set threshold for the number of nodes per level to consider during the reordering.
  * @details If the number of nodes per level is less than the threshold, the level is skipped during the reordering.
@@ -53,7 +49,6 @@ __attribute__((unused))
 */
 void sylvan_set_reorder_threshold(uint32_t threshold);
 
-__attribute__((unused))
 /**
  * @brief Set the maximum growth coefficient.
  * @details The maximum growth coefficient is used to calculate the maximum growth of the number of nodes during the reordering.
@@ -62,7 +57,6 @@ __attribute__((unused))
 */
 void sylvan_set_reorder_maxgrowth(float max_growth);
 
-__attribute__((unused))
 /**
  * @brief Set the maximum number of swaps per sifting.
  * @details The default value is 10000.
@@ -70,7 +64,6 @@ __attribute__((unused))
 */
 void sylvan_set_reorder_maxswap(uint32_t max_swap);
 
-__attribute__((unused))
 /**
  * @brief Set the maximum number of vars swapped per sifting.
  * @details The default value is 2000.
@@ -78,7 +71,6 @@ __attribute__((unused))
 */
 void sylvan_set_reorder_maxvar(uint32_t max_var);
 
-__attribute__((unused))
 /**
  * @brief Set the time limit for the reordering.
  * @details The default value is 50000 milliseconds.

@@ -59,9 +59,9 @@ void mtbdd_resetlevels(void);
  */
 MTBDD mtbdd_ithlevel(BDDLEVEL level);
 
-BDDLEVEL mtbdd_label_to_level(BDDLABEL var);
+BDDLEVEL mtbdd_var_to_level(BDDVAR var);
 
-BDDLABEL mtbdd_level_to_label(BDDLEVEL level);
+BDDVAR mtbdd_level_to_var(BDDLEVEL level);
 
 /**
  * \brief  Get the number of created levels
@@ -89,7 +89,7 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
  * </ul>
  * \param var variable to be swapped with var+1
  */
-void mtbdd_varswap(BDDLABEL var);
+void mtbdd_varswap(BDDVAR var);
 
 void mtbdd_mark_threshold(int* level, const size_t* level_counts, uint32_t threshold);
 

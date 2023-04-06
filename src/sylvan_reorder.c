@@ -25,13 +25,7 @@
  */
 #define BLOCKSIZE 128
 
-#define ENABLE_ERROR   1 // critical errors that cause sifting to fail
-#define ENABLE_INFO    1 // useful information w.r.t. dynamic reordering
-#define ENABLE_DEBUG   1 // useful only for development purposes
-
-#define LOG_ERROR(s, ...)   { if (ENABLE_ERROR) fprintf(stderr, s,  ##__VA_ARGS__); }
-#define LOG_DEBUG(s, ...)   { if (ENABLE_DEBUG) fprintf(stdout, s,  ##__VA_ARGS__); }
-#define LOG_INFO(s, ...)    { if (ENABLE_INFO)  fprintf(stdout, s,  ##__VA_ARGS__); }
+#define STATS 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 
@@ -193,13 +187,15 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 
     // if high == 0, then we sift all variables
     if (high == 0) high = mtbdd_levelscount() - 1;
-    LOG_INFO("sifting start: between %d and %d\n", low, high);
+
+#if STATS
+    printf("Sifting between variable labels %d and %d\n", low, high);
+    size_t before_size = llmsset_count_marked(nodes);
+#endif
 
     // now count all variable levels (parallel...)
     size_t level_counts[mtbdd_levelscount()];
-    for (size_t i = 0; i < mtbdd_levelscount(); i++) {
-        level_counts[i] = 0;
-    }
+    for (size_t i = 0; i < mtbdd_levelscount(); i++) level_counts[i] = 0;
     sylvan_count_nodes(level_counts);
 
     // mark and sort
@@ -217,7 +213,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
         if (levels[i] < 0) break; // marked level, done
         uint64_t lvl = levels[i];
 
-        state.pos = mtbdd_level_to_label(lvl);
+        state.pos = mtbdd_level_to_var(lvl);
         if (state.pos < low || state.pos > high) continue; // skip, not in range
 
         state.best_pos = state.pos;
@@ -243,7 +239,16 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 
         configs.total_num_var++;
         if (should_terminate_reordering(&configs)) break;
+#if STATS
+        if (state.best_size < state.size)
+            printf("Reuced the number of nodes from %zu to %zu\n", state.size, state.best_size);
+#endif
     }
+
+#if STATS
+    size_t after_size = llmsset_count_marked(nodes);
+    printf("Reordering reduced the number of nodes from %zu to %zu\n", before_size, after_size);
+#endif
 
     return res;
 }
@@ -251,23 +256,31 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 static int should_terminate_reordering(const reorder_config_t *reorder_config)
 {
     if (reorder_config->termination_cb != NULL && reorder_config->termination_cb()) {
-        LOG_INFO("sifting exit: termination_cb\n");
+#if STATS
+        printf("sifting exit: termination_cb\n");
+#endif
         return 1;
     }
     if (reorder_config->total_num_swap > reorder_config->max_swap) {
-        LOG_INFO("sifting exit: reached %u from the total_num_swap %u\n", reorder_config->total_num_swap,
-                 reorder_config->max_swap);
+#if STATS
+        printf("sifting exit: reached %u from the total_num_swap %u\n", reorder_config->total_num_swap,
+             reorder_config->max_swap);
+#endif
         return 1;
     }
     if (reorder_config->total_num_var > reorder_config->max_var) {
-        LOG_INFO("sifting exit: reached %u from the total_num_var %u\n", reorder_config->total_num_var,
-                 reorder_config->max_var);
+#if STATS
+        printf("sifting exit: reached %u from the total_num_var %u\n", reorder_config->total_num_var,
+             reorder_config->max_var);
+#endif
         return 1;
     }
     size_t t_elapsed = clock_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms) {
-        LOG_INFO("sifting exit: reached %lums from the time_limit %.2llums\n", t_elapsed,
-                 reorder_config->time_limit_ms);
+#if STATS
+        printf("sifting exit: reached %lums from the time_limit %.2llums\n", t_elapsed,
+             reorder_config->time_limit_ms);
+#endif
         return 1;
     }
     return 0;
