@@ -373,8 +373,8 @@ test_varswap()
     sylvan_gc();
 
     /* initialize 10 levels */
-    mtbdd_levels_reset();
-    mtbdd_levels_new(10);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(10);
 
     /* test ithvar, switch 6 and 7 */
     one = mtbdd_ithlevel(6);
@@ -420,6 +420,12 @@ test_varswap()
 
     sylvan_getsha(one, hash1);
     sylvan_getsha(two, hash2);
+
+    // 6, 7, 8
+    //
+    // 7, 6, 8 s(6)
+    // 7, 8, 6 s(7)
+    // 8, 7, 6 s(6)
 
     test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
     test_assert(sylvan_varswap(7) == SYLVAN_VARSWAP_SUCCESS);

@@ -10,7 +10,7 @@ extern "C" {
  */
 #define BLOCKSIZE 128
 
-typedef enum varswap_res {
+typedef enum varswap {
     /// the operation was aborted and rolled back
     SYLVAN_VARSWAP_ROLLBACK = 1,
     /// success
@@ -27,7 +27,9 @@ typedef enum varswap_res {
     SYLVAN_VARSWAP_P2_CREATE_FAIL = -5,
     /// cannot rehash and cannot create node in phase 2
     SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
-} varswap_res_t;
+    /// the operation was aborted and rolled back
+    SYLVAN_VARSWAP_ERROR = -7,
+} varswap_t;
 
 /**
  * @brief Provide description for given result.
@@ -39,14 +41,16 @@ typedef enum varswap_res {
  * @param buf buffer into which the description will be copied
  * @param buf_len
  */
-void sylvan_varswap_resdescription(varswap_res_t result, char *buf, size_t buf_len);
+void sylvan_varswap_resdescription(varswap_t result, char *buf, size_t buf_len);
 
-static inline int sylvan_varswap_issuccess(varswap_res_t result)
+static inline int sylvan_varswap_issuccess(varswap_t result)
 {
     return result == SYLVAN_VARSWAP_SUCCESS || result == SYLVAN_VARSWAP_ROLLBACK;
 }
 
-TASK_DECL_1(varswap_res_t, sylvan_varswap, uint32_t);
+void sylvan_print_varswap_res(varswap_t result);
+
+TASK_DECL_1(varswap_t, sylvan_varswap, BDDLABEL);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *
@@ -82,7 +86,7 @@ TASK_DECL_1(varswap_res_t, sylvan_varswap, uint32_t);
   * @return varswap_res_t
   *
   */
-#define sylvan_varswap(var) CALL(sylvan_varswap, var)
+#define sylvan_varswap(pos) CALL(sylvan_varswap, pos)
 
 #ifdef __cplusplus
 }

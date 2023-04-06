@@ -22,7 +22,7 @@ extern "C" {
  */
 #define COUNT_NODES_BLOCK_SIZE 4096
 
-VOID_TASK_DECL_3(mtbdd_count_levels, size_t*, size_t, size_t);
+VOID_TASK_DECL_3(sylvan_count_nodes, size_t*, size_t, size_t);
 /**
  * @brief Count the number of nodes per real variable level in parallel.
  * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
@@ -30,40 +30,26 @@ VOID_TASK_DECL_3(mtbdd_count_levels, size_t*, size_t, size_t);
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define mtbdd_count_levels(level_counts) RUN(mtbdd_count_levels, level_counts, 0, nodes->table_size)
+#define sylvan_count_nodes(level_counts) RUN(sylvan_count_nodes, level_counts, 0, nodes->table_size)
 
-VOID_TASK_DECL_2(mtbdd_count_sort_levels, int*, size_t);
 /**
- * @brief Count and sort all variable levels (parallel...)
- *
- * \details Order all the variables using gnome sort according to the number of entries in each level.
- *
- * \param level_counts - array of size mtbdd_levels_size()
- * \param threshold - only count levels which have at least threshold number of variables.
- * If level is skipped assign it -1.
- *
+ * @brief Create the next level and return the BDD representing the variable (ithlevel)
+ * @details The BDDs representing managed levels are always kept during garbage collection.
+ * NOTE: not currently thread-safe.
  */
-#define mtbdd_count_sort_levels(levels, threshold) RUN(mtbdd_count_sort_levels, levels, threshold)
+MTBDD mtbdd_newlevel(void);
 
 /**
  * @brief Create the next <amount> levels
  * @details The BDDs representing managed levels are always kept during garbage collection. Not currently thread-safe.
  * \param amount number of levels to create
  */
- __attribute__((unused))
-void mtbdd_levels_new(size_t amount);
+int mtbdd_newlevels(size_t amount);
 
 /**
  * \brief  Reset all levels.
  */
-__attribute__((unused))
-void mtbdd_levels_reset(void);
-
-__attribute__((unused))
-int mtbdd_getorderlock(uint32_t level);
-
-__attribute__((unused))
-void mtbdd_setorderlock(uint32_t level, int is_locked);
+void mtbdd_resetlevels(void);
 
 /**
  * \brief  Get the BDD node representing "if level then true else false"
@@ -71,30 +57,22 @@ void mtbdd_setorderlock(uint32_t level, int is_locked);
  * however, after a swap they can point to a different variable
  * \param level for which the BDD needs to be returned
  */
-MTBDD mtbdd_ithlevel(uint32_t level);
+MTBDD mtbdd_ithlevel(BDDLEVEL level);
 
-/**
- * \brief  Get the current level of the given internal variable <var>
- * \param var for which the level needs to be returned
- */
-uint32_t mtbdd_var_to_level(uint32_t var);
+BDDLEVEL mtbdd_var_to_level(BDDVAR var);
 
-/**
- * @brief Get the current internal variable of the given level
- * \param level for which the variable needs be returned
- */
-uint32_t mtbdd_level_to_var(uint32_t level);
+BDDVAR mtbdd_level_to_var(BDDLEVEL level);
 
 /**
  * \brief  Get the number of created levels
  */
-size_t mtbdd_levels_size(void);
+size_t mtbdd_levelscount(void);
 
 /**
  * \brief  Return the level of the given internal node.
  * \param node for which the level needs to be returned
  */
-uint32_t mtbdd_node_to_level(MTBDD node);
+BDDLEVEL mtbdd_node_to_level(MTBDD node);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.
@@ -111,14 +89,11 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
  * </ul>
  * \param var variable to be swapped with var+1
  */
-void mtbdd_varswap(uint32_t var);
+void mtbdd_varswap(BDDVAR var);
 
+void mtbdd_mark_threshold(int* level, const size_t* level_counts, uint32_t threshold);
 
-/**
- * \brief Clean up the resourced allocated for managing levels
- */
-void sylvan_levels_destroy(void);
-
+void gnome_sort(int *levels, const size_t *level_counts);
 
 #ifdef __cplusplus
 }
