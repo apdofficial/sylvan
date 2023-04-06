@@ -66,7 +66,9 @@ typedef struct llmsset
     llmsset_equals_cb equals_cb;    // custom equals function
     llmsset_create_cb create_cb;    // custom create function
     llmsset_destroy_cb destroy_cb;  // custom destroy function
+#if SYLVAN_USE_LIMITED_PROBE_SEQUENCE
     int16_t           threshold;    // number of iterations for insertion until returning error, only used with probing
+#endif
 } *llmsset_t;
 
 /**

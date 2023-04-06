@@ -6,6 +6,22 @@
 
 __thread uint64_t seed = 1;
 
+void print_level_to_var(){
+    printf("level_to_var: ");
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i){
+        printf("%u ", mtbdd_level_to_var(i));
+    }
+    printf("\n");
+}
+
+void print_var_to_level(){
+    printf("var_to_level: ");
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i){
+        printf("%llu ", mtbdd_var_to_level(i));
+    }
+    printf("\n");
+}
+
 uint64_t
 xorshift_rand(void)
 {
