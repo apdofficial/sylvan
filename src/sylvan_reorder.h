@@ -136,6 +136,17 @@ TASK_DECL_2(varswap_t, sylvan_reorder, BDDLABEL, BDDLABEL);
 
 #define sylvan_reorder_all()  sylvan_reorder(0, 0)
 
+TASK_DECL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*);
+/**
+  @brief Reorder the variables in the BDDs according to the given permutation.
+
+  @details The permutation is an array of BDD labels, where the i-th element is the label
+  of the variable that should be moved to position i. The size
+  of the array should be equal or greater to the number of variables
+  currently in use.
+ */
+#define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
