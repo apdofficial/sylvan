@@ -136,25 +136,15 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
     return ((float) (state->size) >= configs.max_growth * (float) (state->best_size));
 }
 
-static inline void move_pos_dn(sifting_state_t *state)
-{
-    ++state->pos;
-}
-
-static inline void move_pos_up(sifting_state_t *state)
-{
-    --state->pos;
-}
-
 TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 {
-    for (; state->pos < state->high; move_pos_dn(state)) {
+    for (; state->pos < state->high; ++state->pos) {
         varswap_t res = sylvan_varswap(state->pos);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
         update_best_pos(state);
         if (is_max_growth_reached(state)) {
-            move_pos_dn(state);
+            ++state->pos;
             break;
         }
     }
@@ -164,13 +154,13 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 
 TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 {
-    for (; state->pos > state->low; move_pos_up(state)) {
+    for (; state->pos > state->low; --state->pos) {
         varswap_t res = sylvan_varswap(state->pos - 1);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
         update_best_pos(state);
         if (is_max_growth_reached(state)) {
-            move_pos_up(state);
+            --state->pos;
             break;
         }
     }
@@ -199,8 +189,8 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     int identity = 1;
 
     // check if permutation is identity
-    for (size_t i = 0; i < mtbdd_levelscount(); i++) {
-        if (permutation[i] != mtbdd_level_to_var(i)) {
+    for (size_t level = 0; level < mtbdd_levelscount(); level++) {
+        if (permutation[level] != mtbdd_level_to_var(level)) {
             identity = 0;
             break;
         }
