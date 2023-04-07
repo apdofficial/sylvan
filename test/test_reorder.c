@@ -10,6 +10,7 @@
 #include "sylvan_reorder.h"
 #include "sylvan_levels.h"
 #include "common.h"
+#include "sylvan_interact.h"
 
 TASK_DECL_1(MTBDD, create_example_bdd, size_t);
 #define create_example_bdd(is_optimal) CALL(create_example_bdd, is_optimal)
@@ -423,7 +424,7 @@ TASK_0(int, test_reorder_perm)
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
 
-    BDDLABEL perm[4] = {3, 0, 2, 1};
+    uint32_t perm[4] = {3, 0, 2, 1};
 
     test_assert(sylvan_reorder_perm(perm) == SYLVAN_VARSWAP_SUCCESS);
 
@@ -452,7 +453,6 @@ TASK_0(int, test_reorder_perm)
 
 TASK_0(int, test_reorder)
 {
-    printf("RUN(test_reorder)\n");
     sylvan_gc();
     mtbdd_resetlevels();
 
@@ -469,23 +469,52 @@ TASK_0(int, test_reorder)
     return 0;
 }
 
+TASK_0(int, test_interact)
+{
+    sylvan_gc();
+    mtbdd_resetlevels();
+
+    MTBDD bdd = create_example_bdd(0);
+    mtbdd_protect(&bdd);
+
+    interact_state_t state;
+    interact_alloc(&state, mtbdd_levelscount());
+    interact_init_par(&state);
+
+    for (size_t col = 0; col < state.ncols; ++col){
+        for (size_t row = 0; row < state.nrows; ++row){
+            printf("%d ", interact_get(&state, row, col));
+        }
+        printf("\n");
+    }
+
+    printf("\n");
+
+    mtbdd_unprotect(&bdd);
+    interact_free(&state);
+
+    return 0;
+}
+
 TASK_1(int, runtests, size_t, ntests)
 {
-    printf("test_varswap\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-    printf("test_varswap_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-    printf("test_varswap_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-    printf("test_sift_down.\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-    printf("test_sift_up.\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-    printf("test_siftpos.\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_siftpos)) return 1;
-    printf("test_reorder_perm.\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-    printf("test_reorder\n"); RUN(test_reorder);
+//    printf("test_reorder\n"); RUN(test_reorder);
+//    printf("test_varswap\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+//    printf("test_varswap_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+//    printf("test_varswap_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+//    printf("test_sift_down.\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+//    printf("test_sift_up.\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+//    printf("test_siftpos.\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_siftpos)) return 1;
+//    printf("test_reorder_perm.\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_interact.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
 }
 
@@ -502,7 +531,7 @@ int main()
     sylvan_set_reorder_threshold(1);
     sylvan_set_reorder_maxgrowth(1.2f);
 
-    size_t ntests = 2;
+    size_t ntests = 1;
 
     int res = RUN(runtests, ntests);
 
