@@ -71,9 +71,9 @@ if(SYLVAN_LIMIT_PROBE_SEQUENCE)
 endif()
 
 # Do we want to use chaining implementation or linear probing implementation?
-option(SYLVAN_CHAINING "Unique table uses chaining instead of linear probing" OFF)
-if(SYLVAN_CHAINING)
-    set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_CHAINING")
+option(SYLVAN_USE_CHAINING "Unique table uses chaining instead of linear probing" OFF)
+if(SYLVAN_USE_CHAINING)
+    set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_USE_CHAINING")
     target_sources(sylvan PRIVATE sylvan_table_chaining.c)
 else ()
     target_sources(sylvan PRIVATE sylvan_table.c)

@@ -75,7 +75,7 @@ typedef struct llmsset
 static inline void*
 llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 {
-#if SYLVAN_CHAINING
+#if SYLVAN_USE_CHAINING
     return dbs->data + index * 24 + 8;
 #else
     return dbs->data + index * 16;
@@ -128,14 +128,14 @@ llmsset_set_size(llmsset_t dbs, size_t size)
     /* check bounds (don't be rediculous) */
     if (size > 128 && size <= dbs->max_size) {
         dbs->table_size = size;
-#if LLMSSET_MASK && SYLVAN_CHAINING
+#if LLMSSET_MASK && SYLVAN_USE_CHAINING
         /* Warning: if size is not a power of two, you will get interesting behavior */
         dbs->mask = dbs->table_size/2 - 1;
-#elif LLMSSET_MASK && !SYLVAN_CHAINING
+#elif LLMSSET_MASK && !SYLVAN_USE_CHAINING
         /* Warning: if size is not a power of two, you will get interesting behavior */
         dbs->mask = dbs->table_size - 1;
 #endif
-#if !SYLVAN_CHAINING
+#if !SYLVAN_USE_CHAINING
         /* Set threshold: number of cache lines to probe before giving up on node insertion */
         dbs->threshold = 192 - 2 * __builtin_clzll(dbs->table_size);
 #endif
@@ -195,7 +195,7 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
  */
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
-#if SYLVAN_CHAINING
+#if SYLVAN_USE_CHAINING
 /**
  * Remove a single BDD from the table
  */
