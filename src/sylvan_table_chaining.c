@@ -224,28 +224,6 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     }
 }
 
-inline void
-llmsset_set_size(llmsset_t dbs, size_t size)
-{
-    /* check bounds (don't be rediculous) */
-    if (size > 128 && size <= dbs->max_size) {
-        dbs->table_size = size;
-#if LLMSSET_MASK
-        /* Warning: if size is not a power of two, you will get interesting behavior */
-        dbs->mask = dbs->table_size/2 - 1;
-#endif
-    }
-}
-
-/**
- * Retrieve a pointer to the data associated with the 42-bit value.
- */
-void*
-llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
-{
-    return dbs->data + index * 24 + 8;
-}
-
 /**
  * Remove a single hash from the table
  * (do not run parallel with lookup!!!)

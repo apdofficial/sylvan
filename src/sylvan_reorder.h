@@ -76,7 +76,7 @@ void sylvan_set_reorder_maxvar(uint32_t max_var);
  * @details The default value is 50000 milliseconds.
  * @param time_limit The time limit for the reordering.
 */
-void sylvan_set_reorder_timelimit(uint64_t time_limit);
+void sylvan_set_reorder_timelimit(double time_limit);
 
 TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
 /**
@@ -136,7 +136,7 @@ TASK_DECL_2(varswap_t, sylvan_reorder, BDDLABEL, BDDLABEL);
 
 #define sylvan_reorder_all()  sylvan_reorder(0, 0)
 
-TASK_DECL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*);
+TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
 /**
   @brief Reorder the variables in the BDDs according to the given permutation.
 

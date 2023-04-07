@@ -31,18 +31,16 @@ static int reorder_initialized = 0;
 
 typedef struct sifting_config
 {
-    reorder_termination_cb termination_cb;    // termination callback
-    clock_t t_start_sifting;                  // start time of the sifting
-    uint32_t threshold;           // threshold for number of nodes per level
-    float max_growth;                         // coefficient used to calculate maximum growth
-    uint32_t max_swap;                        // maximum number of swaps per sifting
-    uint32_t total_num_swap;                  // number of swaps completed
-    uint32_t max_var;                         // maximum number of vars swapped per sifting
-    uint32_t total_num_var;                   // number of vars sifted
-    uint64_t time_limit_ms;                   // time limit in milliseconds
+    reorder_termination_cb termination_cb;      // termination callback
+    double t_start_sifting;                     // start time of the sifting
+    uint32_t threshold;                         // threshold for number of nodes per level
+    float max_growth;                           // coefficient used to calculate maximum growth
+    uint32_t max_swap;                          // maximum number of swaps per sifting
+    uint32_t total_num_swap;                    // number of swaps completed
+    uint32_t max_var;                           // maximum number of vars swapped per sifting
+    uint32_t total_num_var;                     // number of vars sifted
+    double time_limit_ms;                       // time limit in milliseconds
 } reorder_config_t;
-
-// TODO: update clock_t t_start_sifting to cpu time instead of cpu clock (atm not compatible with multithreading)
 
 /// reordering configurations
 static reorder_config_t configs = {
@@ -54,8 +52,25 @@ static reorder_config_t configs = {
         .total_num_swap = 0,
         .max_var = 2000,
         .total_num_var = 0,
-        .time_limit_ms = 10 * 60000 // 10 minute
+        .time_limit_ms = 1 * 60000 // 1 minute
 };
+
+static double wctime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (tv.tv_sec + 1E-6 * tv.tv_usec);
+}
+
+static inline double wctime_sec_elapsed(double t_start)
+{
+    return wctime() - t_start;
+}
+
+static inline double wctime_ms_elapsed(double start)
+{
+    return wctime_sec_elapsed(start) * 1000;
+}
 
 static int should_terminate_reordering(const reorder_config_t *reorder_config);
 
@@ -102,12 +117,12 @@ void sylvan_set_reorder_maxvar(uint32_t max_var)
     configs.max_var = max_var;
 }
 
-void sylvan_set_reorder_timelimit(uint64_t time_limit)
+void sylvan_set_reorder_timelimit(double time_limit)
 {
     configs.time_limit_ms = time_limit;
 }
 
-static inline void update_best_pos(sifting_state_t* state)
+static inline void update_best_pos(sifting_state_t *state)
 {
     state->size = llmsset_count_marked(nodes);
     if (state->size < state->best_size) {
@@ -116,17 +131,17 @@ static inline void update_best_pos(sifting_state_t* state)
     }
 }
 
-static inline int is_max_growth_reached(const sifting_state_t* state)
+static inline int is_max_growth_reached(const sifting_state_t *state)
 {
     return ((float) (state->size) >= configs.max_growth * (float) (state->best_size));
 }
 
-static inline void move_pos_dn(sifting_state_t* state)
+static inline void move_pos_dn(sifting_state_t *state)
 {
     ++state->pos;
 }
 
-static inline void move_pos_up(sifting_state_t* state)
+static inline void move_pos_up(sifting_state_t *state)
 {
     --state->pos;
 }
@@ -178,7 +193,7 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
 }
 
 
-TASK_IMPL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*, permutation)
+TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
     varswap_t res = SYLVAN_VARSWAP_SUCCESS;
     int identity = 1;
@@ -192,7 +207,7 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*, permutation)
     }
     if (identity) return res;
 
-    for (size_t level = 0; level < mtbdd_levelscount(); ++level){
+    for (size_t level = 0; level < mtbdd_levelscount(); ++level) {
         BDDLABEL var = permutation[level];
         BDDLABEL pos = mtbdd_var_to_level(var);
         res = sylvan_siftpos(pos, level);
@@ -206,7 +221,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 {
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
 
-    configs.t_start_sifting = clock();
+    configs.t_start_sifting = wctime();
     configs.total_num_swap = 0;
     configs.total_num_var = 0;
 
@@ -288,23 +303,26 @@ static int should_terminate_reordering(const reorder_config_t *reorder_config)
     }
     if (reorder_config->total_num_swap > reorder_config->max_swap) {
 #if STATS
-        printf("sifting exit: reached %u from the total_num_swap %u\n", reorder_config->total_num_swap,
-             reorder_config->max_swap);
+        printf("sifting exit: reached %u from the total_num_swap %u\n",
+               reorder_config->total_num_swap,
+               reorder_config->max_swap);
 #endif
         return 1;
     }
     if (reorder_config->total_num_var > reorder_config->max_var) {
 #if STATS
-        printf("sifting exit: reached %u from the total_num_var %u\n", reorder_config->total_num_var,
-             reorder_config->max_var);
+        printf("sifting exit: reached %u from the total_num_var %u\n",
+               reorder_config->total_num_var,
+               reorder_config->max_var);
 #endif
         return 1;
     }
-    size_t t_elapsed = clock_ms_elapsed(reorder_config->t_start_sifting);
+    double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms) {
 #if STATS
-        printf("sifting exit: reached %lums from the time_limit %.2llums\n", t_elapsed,
-             reorder_config->time_limit_ms);
+        printf("sifting exit: reached %fms from the time_limit %.2fms\n",
+               t_elapsed,
+               reorder_config->time_limit_ms);
 #endif
         return 1;
     }

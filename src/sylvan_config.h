@@ -29,12 +29,12 @@
 #define SYLVAN_AGGRESSIVE_RESIZE 1
 #endif
 
-/* Use chaining or Linear probing for the hash map. */
-#ifndef SYLVAN_USE_CHAINING
-#define SYLVAN_USE_CHAINING 1
+/* Either use chaining or linear implementation as a hash collision strategy */
+#ifndef SYLVAN_CHAINING
+#define SYLVAN_CHAINING 0
 #endif
 
-/* Use linear probing with <threshold> number of attempts or unlimited number of attempts */
-#ifndef SYLVAN_USE_LIMITED_PROBE_SEQUENCE
-#define SYLVAN_USE_LIMITED_PROBE_SEQUENCE 1
+/* Either use chaining or linear implementation as a hash collision strategy */
+#ifndef SYLVAN_LIMIT_PROBE_SEQUENCE
+#define SYLVAN_LIMIT_PROBE_SEQUENCE 0
 #endif

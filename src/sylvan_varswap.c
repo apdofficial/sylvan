@@ -5,7 +5,7 @@
 
 #define STATS 0 // useful information w.r.t. dynamic reordering
 
-#if SYLVAN_USE_CHAINING
+#if SYLVAN_CHAINING
 VOID_TASK_DECL_4(sylvan_varswap_p0, BDDLABEL, uint64_t, uint64_t, volatile varswap_t*);
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
@@ -150,7 +150,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
     // ensure that the cache is cleared
     sylvan_clear_cache();
 
-#if SYLVAN_USE_CHAINING
+#if SYLVAN_CHAINING
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
 #else
@@ -169,7 +169,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
 #if STATS
             printf("Recovery time!\n");
 #endif
-#if SYLVAN_USE_CHAINING
+#if SYLVAN_CHAINING
             // first clear hashes of nodes with <var> and <var+1>
             sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
 #else
@@ -205,7 +205,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
     return result;
 }
 
-#if SYLVAN_USE_CHAINING
+#if SYLVAN_CHAINING
 /**
  * Implementation of the zero phase of variable swapping.
  * For all <var+1> nodes, make <var> and rehash.

@@ -1,13 +1,6 @@
 add_library(sylvan STATIC)
 add_library(sylvan::sylvan ALIAS sylvan)
 
-option(SYLVAN_USE_CHAINING "Unique table uses chaining instead of linear probing" ON)
-if (SYLVAN_USE_CHAINING)
-    target_sources(sylvan PRIVATE sylvan_table_chaining.c)
-else ()
-    target_sources(sylvan PRIVATE sylvan_table_probing.c)
-endif ()
-
 target_sources(sylvan
         PRIVATE
         sha2.c
@@ -69,4 +62,19 @@ endif ()
 option(SYLVAN_STATS "Let Sylvan collect statistics at runtime" OFF)
 if (SYLVAN_STATS)
     set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_STATS")
+endif ()
+
+# Do we want to limit the probe sequence?
+option(SYLVAN_LIMIT_PROBE_SEQUENCE "Let Sylvan limit number of iterations for insertion until returning error" OFF)
+if(SYLVAN_LIMIT_PROBE_SEQUENCE)
+    set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_LIMIT_PROBE_SEQUENCE")
+endif()
+
+# Do we want to use chaining implementation or linear probing implementation?
+option(SYLVAN_CHAINING "Unique table uses chaining instead of linear probing" OFF)
+if(SYLVAN_CHAINING)
+    set_target_properties(sylvan PROPERTIES COMPILE_DEFINITIONS "SYLVAN_CHAINING")
+    target_sources(sylvan PRIVATE sylvan_table_chaining.c)
+else ()
+    target_sources(sylvan PRIVATE sylvan_table.c)
 endif ()
