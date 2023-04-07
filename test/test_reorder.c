@@ -16,7 +16,7 @@ TASK_DECL_1(MTBDD, create_example_bdd, size_t);
 
 TASK_IMPL_1(MTBDD, create_example_bdd, size_t, is_optimal)
 {
-//    BDDs from the paper:
+//    BDD is from the paper:
 //    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
 //    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
     MTBDD v0 = mtbdd_newlevel();
@@ -29,11 +29,11 @@ TASK_IMPL_1(MTBDD, create_example_bdd, size_t, is_optimal)
     MTBDD bdd;
     if (is_optimal) {
         // optimal order 0, 1, 2, 3, 4, 5
-        // ideally 8 nodes including 2 terminal nodes
+        // minimum 8 nodes including 2 terminal nodes
         bdd = sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
     } else {
         // not optimal order 0, 3, 1, 4, 2, 5
-        // ideally 16 nodes including 2 terminal nodes
+        // minimum 16 nodes including 2 terminal nodes
         bdd = sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
     }
     return bdd;
@@ -399,6 +399,57 @@ TASK_0(int, test_siftpos)
     return 0;
 }
 
+TASK_0(int, test_reorder_perm)
+{
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
+
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* reorder the variables according to the variable permutation*/
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    BDDLABEL perm[4] = {3, 0, 2, 1};
+
+    test_assert(sylvan_reorder_perm(perm) == SYLVAN_VARSWAP_SUCCESS);
+
+    test_assert(mtbdd_level_to_var(0) == perm[0]);
+    test_assert(mtbdd_level_to_var(1) == perm[1]);
+    test_assert(mtbdd_level_to_var(2) == perm[2]);
+    test_assert(mtbdd_level_to_var(3) == perm[3]);
+
+    test_assert(mtbdd_var_to_level(perm[0]) == 0);
+    test_assert(mtbdd_var_to_level(perm[1]) == 1);
+    test_assert(mtbdd_var_to_level(perm[2]) == 2);
+    test_assert(mtbdd_var_to_level(perm[3]) == 3);
+
+    test_assert(zero == mtbdd_ithvar(1));
+    test_assert(one == mtbdd_ithvar(3));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(0));
+
+    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(one) == 3);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 0);
+
+    return 0;
+}
+
 TASK_0(int, test_reorder)
 {
     printf("RUN(test_reorder)\n");
@@ -432,6 +483,8 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
     printf("test_siftpos.\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_siftpos)) return 1;
+    printf("test_reorder_perm.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
     printf("test_reorder\n"); RUN(test_reorder);
     return 0;
 }
