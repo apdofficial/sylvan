@@ -233,6 +233,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     state.low = low;
     state.high = high;
     state.size = llmsset_count_marked(nodes);
+    state.best_size = state.size;
 
     for (size_t i = 0; i < mtbdd_levelscount(); i++) {
         if (levels[i] < 0) break; // marked level, done
@@ -242,7 +243,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
         if (state.pos < low || state.pos > high) continue; // skip, not in range
 
         state.best_pos = state.pos;
-        state.best_size = state.size;
 
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
