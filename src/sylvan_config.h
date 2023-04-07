@@ -24,17 +24,12 @@
 #define SYLVAN_STATS 0
 #endif
 
+/* Enable/disable using mmap to allocate large amounts of memory */
+#ifndef SYLVAN_USE_MMAP
+#define SYLVAN_USE_MMAP 0
+#endif
+
 /* Aggressive or conservative resizing strategy */
 #ifndef SYLVAN_AGGRESSIVE_RESIZE
 #define SYLVAN_AGGRESSIVE_RESIZE 1
-#endif
-
-/* Use chaining or Linear probing for the hash map. */
-#ifndef SYLVAN_USE_CHAINING
-#define SYLVAN_USE_CHAINING 1
-#endif
-
-/* Use linear probing with <threshold> number of attempts or unlimited number of attempts */
-#ifndef SYLVAN_USE_LIMITED_PROBE_SEQUENCE
-#define SYLVAN_USE_LIMITED_PROBE_SEQUENCE 1
 #endif

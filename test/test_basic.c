@@ -12,10 +12,32 @@
 #include "sylvan.h"
 #include "test_assert.h"
 #include "sylvan_int.h"
-#include "sylvan_varswap.h"
-#include "sylvan_levels.h"
-#include "common.h"
 
+__thread uint64_t seed = 1;
+
+uint64_t
+xorshift_rand(void)
+{
+    uint64_t x = seed;
+    if (seed == 0) seed = rand();
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    seed = x;
+    return x * 2685821657736338717LL;
+}
+
+double
+uniform_deviate(uint64_t seed)
+{
+    return seed * (1.0 / ((double)(UINT64_MAX) + 1.0));
+}
+
+int
+rng(int low, int high)
+{
+    return low + uniform_deviate(xorshift_rand()) * (high-low);
+}
 
 static int
 test_cache()
@@ -80,6 +102,39 @@ test_cache()
     return 0;
 }
 
+static inline BDD
+make_random(int i, int j)
+{
+    if (i == j) return rng(0, 2) ? sylvan_true : sylvan_false;
+
+    BDD yes = make_random(i+1, j);
+    BDD no = make_random(i+1, j);
+    BDD result = sylvan_invalid;
+
+    switch(rng(0, 4)) {
+    case 0:
+        result = no;
+        sylvan_deref(yes);
+        break;
+    case 1:
+        result = yes;
+        sylvan_deref(no);
+        break;
+    case 2:
+        result = sylvan_ref(sylvan_makenode(i, yes, no));
+        sylvan_deref(no);
+        sylvan_deref(yes);
+        break;
+    case 3:
+    default:
+        result = sylvan_ref(sylvan_makenode(i, no, yes));
+        sylvan_deref(no);
+        sylvan_deref(yes);
+        break;
+    }
+
+    return result;
+}
 
 static MDD
 make_random_ldd_set(int depth, int maxvalue, int elements)
@@ -359,107 +414,6 @@ test_compose()
 }
 
 int
-test_varswap()
-{
-    LACE_VARS;
-    BDD one, two;
-    BDDMAP map;
-
-    char hash1[65];
-    char hash2[65];
-    char hash3[65];
-    char hash4[65];
-
-    sylvan_gc();
-
-    /* initialize 10 levels */
-    mtbdd_resetlevels();
-    mtbdd_newlevels(10);
-
-    /* test ithvar, switch 6 and 7 */
-    one = mtbdd_ithlevel(6);
-    two = mtbdd_ithlevel(7);
-    test_assert(one == mtbdd_ithvar(6));
-    test_assert(two == mtbdd_ithvar(7));
-    test_assert(mtbdd_getvar(one) == 6);
-    test_assert(mtbdd_getvar(two) == 7);
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(mtbdd_getvar(one) == 7);
-    test_assert(mtbdd_getvar(two) == 6);
-    test_assert(one == mtbdd_ithvar(7));
-    test_assert(two == mtbdd_ithvar(6));
-
-    /* test random, switch 6 and 7 */
-    one = make_random(3, 16);
-    map = sylvan_map_empty();
-    map = sylvan_map_add(map, 6, mtbdd_ithvar(7));
-    map = sylvan_map_add(map, 7, mtbdd_ithvar(6));
-    two = sylvan_compose(one, map);
-
-    test_assert(sylvan_compose(two, map) == one);
-
-    sylvan_getsha(one, hash1);
-    sylvan_getsha(two, hash2);
-
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-
-    sylvan_getsha(one, hash3);
-    sylvan_getsha(two, hash4);
-
-    test_assert(strcmp(hash1, hash4) == 0);
-    test_assert(strcmp(hash2, hash3) == 0);
-
-    /* test random, switch 6 and 8 */
-    one = make_random(3, 16);
-    map = sylvan_map_empty();
-    map = sylvan_map_add(map, 6, mtbdd_ithvar(8));
-    map = sylvan_map_add(map, 8, mtbdd_ithvar(6));
-    two = sylvan_compose(one, map);
-
-    test_assert(sylvan_compose(two, map) == one);
-
-    sylvan_getsha(one, hash1);
-    sylvan_getsha(two, hash2);
-
-    // 6, 7, 8
-    //
-    // 7, 6, 8 s(6)
-    // 7, 8, 6 s(7)
-    // 8, 7, 6 s(6)
-
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(7) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-
-    sylvan_getsha(one, hash3);
-    sylvan_getsha(two, hash4);
-
-    /* test bddmap [6 -> 6] becomes [7 -> 7] */
-    map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(6));
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_map_key(map) == 7);
-    test_assert(sylvan_map_value(map) == mtbdd_ithvar(7));
-
-    /* test bddmap [6 -> 7] becomes [7 -> 6] */
-    map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_map_key(map) == 7);
-    test_assert(sylvan_map_value(map) == mtbdd_ithvar(6));
-
-    /* test bddmap [6 -> 7, 7 -> 8] becomes [6 -> 8, 7 -> 6] */
-    map = sylvan_map_add(sylvan_map_empty(), 6, mtbdd_ithvar(7));
-    map = sylvan_map_add(map, 7, mtbdd_ithvar(8));
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_map_key(map) == 6);
-    test_assert(sylvan_map_value(map) == mtbdd_ithvar(8));
-    map = sylvan_map_next(map);
-    test_assert(sylvan_map_key(map) == 7);
-    test_assert(sylvan_map_value(map) == mtbdd_ithvar(6));
-
-    return 0;
-}
-
-int
 test_ldd()
 {
     // very basic testing of makenode
@@ -572,8 +526,7 @@ TASK_0(int, runtests)
     for (int j=0;j<10;j++) if (test_compose()) return 1;
     printf("Testing operators.\n");
     for (int j=0;j<10;j++) if (test_operators()) return 1;
-    printf("Testing varswap.\n");
-    for (int j=0;j<10;j++) if (test_varswap()) return 1;
+
     printf("Testing ldd.\n");
     if (test_ldd()) return 1;
 
@@ -582,8 +535,8 @@ TASK_0(int, runtests)
 
 int main()
 {
-    // Init Lace
-    lace_start(2, 1000000); // 2 workers, use a 1,000,000 size task queue
+    // Standard Lace initialization with 1 worker
+    lace_start(1, 0);
 
     // Simple Sylvan initialization, also initialize BDD, MTBDD and LDD support
     sylvan_set_sizes(1LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
@@ -591,7 +544,6 @@ int main()
     sylvan_init_bdd();
     sylvan_init_mtbdd();
     sylvan_init_ldd();
-    sylvan_init_reorder();
 
     printf("Sylvan initialization complete.\n");
 

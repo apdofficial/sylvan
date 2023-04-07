@@ -59,9 +59,6 @@ namespace sylvan {
 #include <sylvan_mtbdd.h>
 #include <sylvan_bdd.h>
 #include <sylvan_ldd.h>
-#include <sylvan_levels.h>
-#include <sylvan_varswap.h>
-#include <sylvan_reorder.h>
 #include <sylvan_zdd.h>
 
 #ifdef __cplusplus

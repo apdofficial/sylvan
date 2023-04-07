@@ -2845,8 +2845,8 @@ static void
 mtbdd_unmark_rec(MTBDD mtbdd)
 {
     mtbddnode_t n = MTBDD_GETNODE(mtbdd);
-    if (!mtbddnode_getp2mark(n)) return;
-    mtbddnode_setp2mark(n, 0);
+    if (!mtbddnode_getmark(n)) return;
+    mtbddnode_setmark(n, 0);
     if (mtbddnode_isleaf(n)) return;
     mtbdd_unmark_rec(mtbddnode_getlow(n));
     mtbdd_unmark_rec(mtbddnode_gethigh(n));
@@ -2862,8 +2862,8 @@ mtbdd_leafcount_mark(MTBDD mtbdd)
     if (mtbdd == mtbdd_true) return 0; // do not count true/false leaf
     if (mtbdd == mtbdd_false) return 0; // do not count true/false leaf
     mtbddnode_t n = MTBDD_GETNODE(mtbdd);
-    if (mtbddnode_getp2mark(n)) return 0;
-    mtbddnode_setp2mark(n, 1);
+    if (mtbddnode_getmark(n)) return 0;
+    mtbddnode_setmark(n, 1);
     if (mtbddnode_isleaf(n)) return 1; // count leaf as 1
     return mtbdd_leafcount_mark(mtbddnode_getlow(n)) + mtbdd_leafcount_mark(mtbddnode_gethigh(n));
 }
@@ -2885,8 +2885,8 @@ static size_t
 mtbdd_nodecount_mark(MTBDD mtbdd)
 {
     mtbddnode_t n = MTBDD_GETNODE(mtbdd);
-    if (mtbddnode_getp2mark(n)) return 0;
-    mtbddnode_setp2mark(n, 1);
+    if (mtbddnode_getmark(n)) return 0;
+    mtbddnode_setmark(n, 1);
     if (mtbddnode_isleaf(n)) return 1; // count leaf as 1
     return 1 + mtbdd_nodecount_mark(mtbddnode_getlow(n)) + mtbdd_nodecount_mark(mtbddnode_gethigh(n));
 }
@@ -3018,8 +3018,8 @@ static void
 mtbdd_fprintdot_rec(FILE *out, MTBDD mtbdd)
 {
     mtbddnode_t n = MTBDD_GETNODE(mtbdd); // also works for mtbdd_false
-    if (mtbddnode_getp2mark(n)) return;
-    mtbddnode_setp2mark(n, 1);
+    if (mtbddnode_getmark(n)) return;
+    mtbddnode_setmark(n, 1);
 
     if (mtbdd == mtbdd_true || mtbdd == mtbdd_false) {
         fprintf(out, "0 [shape=box, style=filled, label=\"F\"];\n");
@@ -3067,8 +3067,8 @@ static void
 mtbdd_fprintdot_nc_rec(FILE *out, MTBDD mtbdd)
 {
     mtbddnode_t n = MTBDD_GETNODE(mtbdd); // also works for mtbdd_false
-    if (mtbddnode_getp2mark(n)) return;
-    mtbddnode_setp2mark(n, 1);
+    if (mtbddnode_getmark(n)) return;
+    mtbddnode_setmark(n, 1);
 
     if (mtbdd == mtbdd_true) {
         fprintf(out, "%" PRIu64 " [shape=box, style=filled, label=\"T\"];\n", mtbdd);
@@ -3119,8 +3119,8 @@ mtbdd_sha2_rec(MTBDD dd, SHA256_CTX *ctx)
     }
 
     mtbddnode_t node = MTBDD_GETNODE(dd);
-    if (mtbddnode_getp2mark(node) == 0) {
-        mtbddnode_setp2mark(node, 1);
+    if (mtbddnode_getmark(node) == 0) {
+        mtbddnode_setmark(node, 1);
         if (mtbddnode_isleaf(node)) {
             uint32_t type = mtbddnode_gettype(node);
             SHA256_Update(ctx, (void*)&type, sizeof(uint32_t));

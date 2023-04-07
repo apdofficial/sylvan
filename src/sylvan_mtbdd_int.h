@@ -120,23 +120,17 @@ mtbddnode_getvariable(mtbddnode_t n)
     return (uint32_t)(n->b >> 40);
 }
 
-static inline void __attribute__((unused))
-mtbddnode_setvariable(mtbddnode_t n, uint32_t newvar)
-{
-    n->b = ((uint64_t)newvar)<<40 | (n->b & 0x000000ffffffffff);
-}
-
 static inline int __attribute__((unused))
-mtbddnode_getp2mark(mtbddnode_t n)
+mtbddnode_getmark(mtbddnode_t n)
 {
-    return n->a & mtbdd_p2mark ? 1 : 0;
+    return n->a & 0x2000000000000000 ? 1 : 0;
 }
 
 static inline void __attribute__((unused))
-mtbddnode_setp2mark(mtbddnode_t n, int is_marked)
+mtbddnode_setmark(mtbddnode_t n, int mark)
 {
-    if (is_marked) n->a |= mtbdd_p2mark;
-    else n->a &= ~mtbdd_p2mark;
+    if (mark) n->a |= 0x2000000000000000;
+    else n->a &= 0xdfffffffffffffff;
 }
 
 static inline void __attribute__((unused))
