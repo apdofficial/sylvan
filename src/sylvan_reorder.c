@@ -177,10 +177,33 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
+
+TASK_IMPL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*, permutation)
+{
+    varswap_t res = SYLVAN_VARSWAP_SUCCESS;
+    int identity = 1;
+
+    // check if permutation is identity
+    for (size_t i = 0; i < mtbdd_levelscount(); i++) {
+        if (permutation[i] != mtbdd_level_to_var(i)) {
+            identity = 0;
+            break;
+        }
+    }
+    if (identity) return res;
+
+    for (size_t level = 0; level < mtbdd_levelscount(); ++level){
+        BDDLABEL var = permutation[level];
+        BDDLABEL pos = mtbdd_var_to_level(var);
+        res = sylvan_siftpos(pos, level);
+        if (!sylvan_varswap_issuccess(res)) break;
+    }
+
+    return res;
+}
+
 TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 {
-//    lace_barrier();
-
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
 
     configs.t_start_sifting = clock();
@@ -210,6 +233,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     state.low = low;
     state.high = high;
     state.size = llmsset_count_marked(nodes);
+    state.best_size = state.size;
 
     for (size_t i = 0; i < mtbdd_levelscount(); i++) {
         if (levels[i] < 0) break; // marked level, done
@@ -219,7 +243,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
         if (state.pos < low || state.pos > high) continue; // skip, not in range
 
         state.best_pos = state.pos;
-        state.best_size = state.size;
 
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
