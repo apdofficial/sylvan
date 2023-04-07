@@ -1,165 +1,513 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sylvan.h"
+#include "test_assert.h"
 #include "sylvan_int.h"
-#include "utest_lace.h"
+#include "sylvan_varswap.h"
+#include "sylvan_reorder.h"
 #include "sylvan_levels.h"
 #include "common.h"
 
-UTEST_STATE();
+TASK_DECL_1(MTBDD, create_example_bdd, size_t);
+#define create_example_bdd(is_optimal) CALL(create_example_bdd, is_optimal)
 
-UTEST_TASK_0(test_sifting, basic_sift_up)
+TASK_IMPL_1(MTBDD, create_example_bdd, size_t, is_optimal)
 {
-    // manually trigger sylvan garbage collection
-    sylvan_gc();
+//    BDD is from the paper:
+//    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
+//    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
+    MTBDD v0 = mtbdd_newlevel();
+    MTBDD v1 = mtbdd_newlevel();
+    MTBDD v2 = mtbdd_newlevel();
+    MTBDD v3 = mtbdd_newlevel();
+    MTBDD v4 = mtbdd_newlevel();
+    MTBDD v5 = mtbdd_newlevel();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(3);
-
-    BDD n0 = mtbdd_ithlevel(0);
-
-    size_t cursize = llmsset_count_marked(nodes);
-    size_t bestsize = cursize;
-    size_t bestPos = 0;
-
-    ASSERT_EQ(mtbdd_getvar(n0), 0u);
-
-    size_t pos = mtbdd_getvar(n0);
-
-    varswap_res_t res = sift_down(&pos, 3, &cursize, &bestsize, &bestPos);
-    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
-
-    ASSERT_EQ(mtbdd_getvar(n0), 3u);
-
-    sylvan_levels_destroy();
+    MTBDD bdd;
+    if (is_optimal) {
+        // optimal order 0, 1, 2, 3, 4, 5
+        // minimum 8 nodes including 2 terminal nodes
+        bdd = sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
+    } else {
+        // not optimal order 0, 3, 1, 4, 2, 5
+        // minimum 16 nodes including 2 terminal nodes
+        bdd = sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
+    }
+    return bdd;
 }
 
-UTEST_TASK_0(test_sifting, basic_sift_down)
+TASK_0(int, test_varswap)
 {
-    // manually trigger sylvan garbage collection
+    BDD one, two;
+    BDDMAP map;
+
+    char hash1[65];
+    char hash2[65];
+    char hash3[65];
+    char hash4[65];
+
     sylvan_gc();
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
+    mtbdd_resetlevels();
+    mtbdd_newlevels(10);
 
-    BDD n5 = mtbdd_ithlevel(5);
+    /* test ithvar, switch 6 and 7 */
+    one = mtbdd_ithlevel(6);
+    two = mtbdd_ithlevel(7);
 
-    size_t cursize = llmsset_count_marked(nodes);
-    size_t bestsize = cursize;
-    size_t bestPos = 0;
+    test_assert(mtbdd_level_to_var(6) == 6);
+    test_assert(mtbdd_level_to_var(7) == 7);
+    test_assert(mtbdd_var_to_level(6) == 6);
+    test_assert(mtbdd_var_to_level(7) == 7);
+    test_assert(one == mtbdd_ithvar(6));
+    test_assert(two == mtbdd_ithvar(7));
+    test_assert(mtbdd_getvar(one) == 6);
+    test_assert(mtbdd_getvar(two) == 7);
 
-    ASSERT_EQ(mtbdd_getvar(n5), 5u);
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
 
-    size_t pos = mtbdd_getvar(n5);
+    test_assert(mtbdd_level_to_var(7) == 6);
+    test_assert(mtbdd_level_to_var(6) == 7);
+    test_assert(mtbdd_var_to_level(7) == 6);
+    test_assert(mtbdd_var_to_level(6) == 7);
+    test_assert(mtbdd_getvar(one) == 7);
+    test_assert(mtbdd_getvar(two) == 6);
+    test_assert(one == mtbdd_ithvar(7));
+    test_assert(two == mtbdd_ithvar(6));
 
-    varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestPos);
-    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
+    /* test random, switch 6 and 7 */
+    one = make_random(3, 16);
+    map = sylvan_map_empty();
+    map = sylvan_map_add(map, 6, mtbdd_ithvar(7));
+    map = sylvan_map_add(map, 7, mtbdd_ithvar(6));
+    two = sylvan_compose(one, map);
 
-    ASSERT_EQ(mtbdd_getvar(n5), 0u);
+    test_assert(sylvan_compose(two, map) == one);
 
-    sylvan_levels_destroy();
+    sylvan_getsha(one, hash1);
+    sylvan_getsha(two, hash2);
+
+    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
+
+    sylvan_getsha(one, hash3);
+    sylvan_getsha(two, hash4);
+
+    test_assert(strcmp(hash1, hash4) == 0);
+    test_assert(strcmp(hash2, hash3) == 0);
+
+    return 0;
 }
 
-UTEST_TASK_0(test_sifting, basic_sift_to_best_level)
+TASK_0(int, test_varswap_down)
 {
-    // manually trigger sylvan garbage collection
     sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
 
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
 
-    BDD n5 = mtbdd_ithlevel(5);
+    /* swap down manually var 0 to level 3 */
+    test_assert(mtbdd_level_to_var(0) == 0);
+    test_assert(mtbdd_level_to_var(1) == 1);
+    test_assert(mtbdd_level_to_var(2) == 2);
+    test_assert(mtbdd_level_to_var(3) == 3);
 
-    size_t cursize = llmsset_count_marked(nodes);
-    size_t bestsize = cursize;
-    size_t bestlvl = mtbdd_var_to_level(0);
+    test_assert(mtbdd_var_to_level(0) == 0);
+    test_assert(mtbdd_var_to_level(1) == 1);
+    test_assert(mtbdd_var_to_level(2) == 2);
+    test_assert(mtbdd_var_to_level(3) == 3);
 
-    ASSERT_EQ(mtbdd_getvar(n5), 5u);
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
 
-    size_t pos = mtbdd_getvar(n5);
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
 
-    varswap_res_t res = sift_up(&pos, 0, &cursize, &bestsize, &bestlvl);
-    ASSERT_EQ(res, SYLVAN_VARSWAP_SUCCESS);
+    // 0, 1, 2, 3
+    test_assert(sylvan_varswap(0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(1) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(2) == SYLVAN_VARSWAP_SUCCESS);
+    // 1, 2, 3, 0
 
-    ASSERT_EQ(mtbdd_getvar(n5), 0u);
+    test_assert(mtbdd_level_to_var(0) == 1);
+    test_assert(mtbdd_level_to_var(1) == 2);
+    test_assert(mtbdd_level_to_var(2) == 3);
+    test_assert(mtbdd_level_to_var(3) == 0);
 
-    pos = mtbdd_getvar(n5);
-    sift_to_pos(pos, 5u);
+    test_assert(mtbdd_var_to_level(1) == 0);
+    test_assert(mtbdd_var_to_level(2) == 1);
+    test_assert(mtbdd_var_to_level(3) == 2);
+    test_assert(mtbdd_var_to_level(0) == 3);
 
-    ASSERT_EQ(mtbdd_getvar(n5), 5u);
+    test_assert(zero == mtbdd_ithvar(3));
+    test_assert(one == mtbdd_ithvar(0));
+    test_assert(two == mtbdd_ithvar(1));
+    test_assert(three == mtbdd_ithvar(2));
+
+    test_assert(mtbdd_getvar(zero) == 3);
+    test_assert(mtbdd_getvar(one) == 0);
+    test_assert(mtbdd_getvar(two) == 1);
+    test_assert(mtbdd_getvar(three) == 2);
+
+    return 0;
 }
 
-UTEST_TASK_0(test_sifting, sifting) {
-    // manually trigger sylvan garbage collection
-    sylvan_gc();
-
-    mtbdd_levels_reset();
-    mtbdd_levels_new(6);
-
-    BDD n0 = mtbdd_ithlevel(0);
-    BDD n1 = mtbdd_ithlevel(1);
-    BDD n2 = mtbdd_ithlevel(2);
-    BDD n3 = mtbdd_ithlevel(3);
-    BDD n4 = mtbdd_ithlevel(4);
-    BDD n5 = mtbdd_ithlevel(5);
-
-#if 1
-    // not optimal order
-    MTBDD f = sylvan_or(sylvan_and(n0, n3), sylvan_or(sylvan_and(n1, n4), sylvan_and(n2, n5)));
-    mtbdd_protect(&f);
-#else
-    // optimal order
-    MTBDD f = sylvan_or(sylvan_and(n0, n1), sylvan_or(sylvan_and(n2, n3), sylvan_and(n4, n5)));
-    mtbdd_protect(&f);
-#endif
-    sylvan_set_reorder_threshold(0);
-
-    size_t size_before = llmsset_count_marked(nodes);
-    sylvan_reorder(0, 0);
-    size_t size_after = llmsset_count_marked(nodes);
-    ASSERT_LT(size_after, size_before);
-
-    // restore the order
-    sift_to_pos(0, mtbdd_level_to_var(0));
-    sift_to_pos(1, mtbdd_level_to_var(1));
-    sift_to_pos(2, mtbdd_level_to_var(2));
-    sift_to_pos(3, mtbdd_level_to_var(3));
-    sift_to_pos(4, mtbdd_level_to_var(4));
-    sift_to_pos(5, mtbdd_level_to_var(5));
-
-    ASSERT_EQ(mtbdd_getvar(n0), 0U);
-    ASSERT_EQ(mtbdd_getvar(n1), 1U);
-    ASSERT_EQ(mtbdd_getvar(n2), 2U);
-    ASSERT_EQ(mtbdd_getvar(n3), 3U);
-    ASSERT_EQ(mtbdd_getvar(n4), 4U);
-    ASSERT_EQ(mtbdd_getvar(n5), 5U);
-
-    size_t size_restored = llmsset_count_marked(nodes);
-    ASSERT_NE(size_after, size_restored);
-
-    mtbdd_setorderlock(2, 1);
-    mtbdd_setorderlock(3, 1);
-
-    size_before = llmsset_count_marked(nodes);
-    sylvan_reorder(0, 0);
-    size_after = llmsset_count_marked(nodes);
-
-    ASSERT_EQ(size_after, size_before);
-}
-
-int main(int argc, const char *const argv[])
+TASK_0(int, test_varswap_up)
 {
-    // Init Lace
-    lace_start(4, 1000000); // 2 workers, use a 1,000,000 size task queue
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
 
-    // Init Sylvan
-    // Give 2 GB memory
-    sylvan_set_limits(2LL*1LL<<30, 1, 10);
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* swap up manually var 3 to level 0 */
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    // 0, 1, 2, 3
+    test_assert(sylvan_varswap(2) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(1) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_varswap(0) == SYLVAN_VARSWAP_SUCCESS);
+    // 3, 0, 1, 2
+
+    test_assert(mtbdd_level_to_var(0) == 3);
+    test_assert(mtbdd_level_to_var(1) == 0);
+    test_assert(mtbdd_level_to_var(2) == 1);
+    test_assert(mtbdd_level_to_var(3) == 2);
+
+    test_assert(mtbdd_var_to_level(3) == 0);
+    test_assert(mtbdd_var_to_level(0) == 1);
+    test_assert(mtbdd_var_to_level(1) == 2);
+    test_assert(mtbdd_var_to_level(2) == 3);
+
+    test_assert(zero == mtbdd_ithvar(1));
+    test_assert(one == mtbdd_ithvar(2));
+    test_assert(two == mtbdd_ithvar(3));
+    test_assert(three == mtbdd_ithvar(0));
+
+    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(one) == 2);
+    test_assert(mtbdd_getvar(two) == 3);
+    test_assert(mtbdd_getvar(three) == 0);
+
+    return 0;
+}
+
+TASK_0(int, test_sift_down)
+{
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
+
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* swap down manually var 0 to level 3 */
+    test_assert(mtbdd_level_to_var(0) == 0);
+    test_assert(mtbdd_level_to_var(1) == 1);
+    test_assert(mtbdd_level_to_var(2) == 2);
+    test_assert(mtbdd_level_to_var(3) == 3);
+
+    test_assert(mtbdd_var_to_level(0) == 0);
+    test_assert(mtbdd_var_to_level(1) == 1);
+    test_assert(mtbdd_var_to_level(2) == 2);
+    test_assert(mtbdd_var_to_level(3) == 3);
+
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    sifting_state_t state;
+    state.size = llmsset_count_marked(nodes);
+    state.best_size = state.size;
+    state.pos = 0;
+    state.best_pos = 0;
+    state.low = 0;
+    state.high = 3;
+
+    // 0, 1, 2, 3
+    test_assert(sylvan_siftdown(&state) == SYLVAN_VARSWAP_SUCCESS);
+    // 1, 2, 3, 0
+
+    test_assert(mtbdd_level_to_var(0) == 1);
+    test_assert(mtbdd_level_to_var(1) == 2);
+    test_assert(mtbdd_level_to_var(2) == 3);
+    test_assert(mtbdd_level_to_var(3) == 0);
+
+    test_assert(mtbdd_var_to_level(1) == 0);
+    test_assert(mtbdd_var_to_level(2) == 1);
+    test_assert(mtbdd_var_to_level(3) == 2);
+    test_assert(mtbdd_var_to_level(0) == 3);
+
+    test_assert(zero == mtbdd_ithvar(3));
+    test_assert(one == mtbdd_ithvar(0));
+    test_assert(two == mtbdd_ithvar(1));
+    test_assert(three == mtbdd_ithvar(2));
+
+    test_assert(mtbdd_getvar(zero) == 3);
+    test_assert(mtbdd_getvar(one) == 0);
+    test_assert(mtbdd_getvar(two) == 1);
+    test_assert(mtbdd_getvar(three) == 2);
+
+    return 0;
+}
+
+TASK_0(int, test_sift_up)
+{
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
+
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* swap up manually var 3 to level 0 */
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    sifting_state_t state;
+    state.size = llmsset_count_marked(nodes);
+    state.best_size = state.size;
+    state.pos = 3;
+    state.best_pos = 0;
+    state.low = 0;
+    state.high = 3;
+
+    // 0, 1, 2, 3
+    test_assert(sylvan_siftup(&state) == SYLVAN_VARSWAP_SUCCESS);
+    // 3, 0, 1, 2
+
+    test_assert(mtbdd_level_to_var(0) == 3);
+    test_assert(mtbdd_level_to_var(1) == 0);
+    test_assert(mtbdd_level_to_var(2) == 1);
+    test_assert(mtbdd_level_to_var(3) == 2);
+
+    test_assert(mtbdd_var_to_level(3) == 0);
+    test_assert(mtbdd_var_to_level(0) == 1);
+    test_assert(mtbdd_var_to_level(1) == 2);
+    test_assert(mtbdd_var_to_level(2) == 3);
+
+    test_assert(zero == mtbdd_ithvar(1));
+    test_assert(one == mtbdd_ithvar(2));
+    test_assert(two == mtbdd_ithvar(3));
+    test_assert(three == mtbdd_ithvar(0));
+
+    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(one) == 2);
+    test_assert(mtbdd_getvar(two) == 3);
+    test_assert(mtbdd_getvar(three) == 0);
+    return 0;
+}
+
+TASK_0(int, test_siftpos)
+{
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
+
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* swap up manually var 3 to level 0 */
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    // 0, 1, 2, 3
+    test_assert(sylvan_siftpos(3, 0) == SYLVAN_VARSWAP_SUCCESS);
+    // 3, 0, 1, 2
+
+    test_assert(mtbdd_level_to_var(0) == 3);
+    test_assert(mtbdd_level_to_var(1) == 0);
+    test_assert(mtbdd_level_to_var(2) == 1);
+    test_assert(mtbdd_level_to_var(3) == 2);
+
+    test_assert(mtbdd_var_to_level(3) == 0);
+    test_assert(mtbdd_var_to_level(0) == 1);
+    test_assert(mtbdd_var_to_level(1) == 2);
+    test_assert(mtbdd_var_to_level(2) == 3);
+
+    test_assert(zero == mtbdd_ithvar(1));
+    test_assert(one == mtbdd_ithvar(2));
+    test_assert(two == mtbdd_ithvar(3));
+    test_assert(three == mtbdd_ithvar(0));
+
+    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(one) == 2);
+    test_assert(mtbdd_getvar(two) == 3);
+    test_assert(mtbdd_getvar(three) == 0);
+
+    // 3, 0, 1, 2
+    test_assert(sylvan_siftpos(0, 3) == SYLVAN_VARSWAP_SUCCESS);
+    // 0, 1, 2, 3
+
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    return 0;
+}
+
+TASK_0(int, test_reorder_perm)
+{
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+    sylvan_gc();
+    mtbdd_resetlevels();
+    mtbdd_newlevels(4);
+
+    MTBDD zero = mtbdd_ithlevel(0);
+    MTBDD one = mtbdd_ithlevel(1);
+    MTBDD two = mtbdd_ithlevel(2);
+    MTBDD three = mtbdd_ithlevel(3);
+
+    /* reorder the variables according to the variable permutation*/
+    test_assert(zero == mtbdd_ithvar(0));
+    test_assert(one == mtbdd_ithvar(1));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(3));
+
+    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(one) == 1);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
+
+    BDDLABEL perm[4] = {3, 0, 2, 1};
+
+    test_assert(sylvan_reorder_perm(perm) == SYLVAN_VARSWAP_SUCCESS);
+
+    test_assert(mtbdd_level_to_var(0) == perm[0]);
+    test_assert(mtbdd_level_to_var(1) == perm[1]);
+    test_assert(mtbdd_level_to_var(2) == perm[2]);
+    test_assert(mtbdd_level_to_var(3) == perm[3]);
+
+    test_assert(mtbdd_var_to_level(perm[0]) == 0);
+    test_assert(mtbdd_var_to_level(perm[1]) == 1);
+    test_assert(mtbdd_var_to_level(perm[2]) == 2);
+    test_assert(mtbdd_var_to_level(perm[3]) == 3);
+
+    test_assert(zero == mtbdd_ithvar(1));
+    test_assert(one == mtbdd_ithvar(3));
+    test_assert(two == mtbdd_ithvar(2));
+    test_assert(three == mtbdd_ithvar(0));
+
+    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(one) == 3);
+    test_assert(mtbdd_getvar(two) == 2);
+    test_assert(mtbdd_getvar(three) == 0);
+
+    return 0;
+}
+
+TASK_0(int, test_reorder)
+{
+    printf("RUN(test_reorder)\n");
+    sylvan_gc();
+    mtbdd_resetlevels();
+
+    MTBDD bdd = create_example_bdd(0);
+    mtbdd_protect(&bdd);
+
+    size_t size_before = mtbdd_nodecount(bdd);
+    sylvan_reorder_all();
+    size_t size_after = mtbdd_nodecount(bdd);
+
+    test_assert(size_after < size_before);
+    mtbdd_unprotect(&bdd);
+
+    return 0;
+}
+
+TASK_1(int, runtests, size_t, ntests)
+{
+    printf("test_varswap\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    printf("test_varswap_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    printf("test_varswap_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    printf("test_sift_down.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_siftpos.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_siftpos)) return 1;
+    printf("test_reorder_perm.\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_reorder\n"); RUN(test_reorder);
+    return 0;
+}
+
+int main()
+{
+    lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
+
+    sylvan_set_sizes(1LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
+    sylvan_gc_enable();
 
-    return utest_lace_main(argc, argv); // we handle Sylvan and Lace terminations here.
+    sylvan_set_reorder_threshold(1);
+    sylvan_set_reorder_maxgrowth(1.2f);
+
+    size_t ntests = 2;
+
+    int res = RUN(runtests, ntests);
+
+    sylvan_quit();
+    lace_stop();
+
+    return res;
 }

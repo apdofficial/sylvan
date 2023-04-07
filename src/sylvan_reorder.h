@@ -23,27 +23,32 @@
 extern "C" {
 #endif /* __cplusplus */
 
-__attribute__((unused))
+typedef struct sifting_state
+{
+    BDDLABEL pos;
+    size_t size;
+    BDDLABEL best_pos;
+    size_t best_size;
+    BDDLABEL low;
+    BDDLABEL high;
+} sifting_state_t;
+
 void sylvan_init_reorder(void);
 
-__attribute__((unused))
 void sylvan_quit_reorder(void);
 
 typedef int (*reorder_termination_cb)();
-__attribute__((unused))
+
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
-
-__attribute__((unused)) 
 /**
  * @brief Set threshold for the number of nodes per level to consider during the reordering.
  * @details If the number of nodes per level is less than the threshold, the level is skipped during the reordering.
  *         The default value is 32.
  * @param threshold The threshold for the number of nodes per level.
 */
-void sylvan_set_reorder_threshold(size_t threshold);
+void sylvan_set_reorder_threshold(uint32_t threshold);
 
-__attribute__((unused)) 
 /**
  * @brief Set the maximum growth coefficient.
  * @details The maximum growth coefficient is used to calculate the maximum growth of the number of nodes during the reordering.
@@ -52,31 +57,28 @@ __attribute__((unused))
 */
 void sylvan_set_reorder_maxgrowth(float max_growth);
 
-__attribute__((unused))
 /**
  * @brief Set the maximum number of swaps per sifting.
  * @details The default value is 10000.
  * @param max_swap The maximum number of swaps per sifting.
 */
-void sylvan_set_reorder_maxswap(size_t max_swap);
+void sylvan_set_reorder_maxswap(uint32_t max_swap);
 
-__attribute__((unused)) 
 /**
  * @brief Set the maximum number of vars swapped per sifting.
  * @details The default value is 2000.
  * @param max_var The maximum number of vars swapped per sifting.
 */
-void sylvan_set_reorder_maxvar(size_t max_var);
+void sylvan_set_reorder_maxvar(uint32_t max_var);
 
-__attribute__((unused))
 /**
  * @brief Set the time limit for the reordering.
  * @details The default value is 50000 milliseconds.
  * @param time_limit The time limit for the reordering.
 */
-void sylvan_set_reorder_timelimit(size_t time_limit);
+void sylvan_set_reorder_timelimit(uint64_t time_limit);
 
-TASK_DECL_5(varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
  *
@@ -88,9 +90,9 @@ TASK_DECL_5(varswap_res_t, sift_up, size_t*, size_t, size_t*, size_t*, size_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sift_down(var, high, curSize, bestSize, bestPos) RUN(sift_down, var, high, curSize, bestSize, bestPos)
+#define sylvan_siftdown(state) RUN(sylvan_siftdown, state)
 
-TASK_DECL_5(varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*);
+TASK_DECL_1(varswap_t, sylvan_siftup, sifting_state_t*);
 /**
  * \brief Sift given variable down from its current level to the target level.
  *
@@ -102,17 +104,17 @@ TASK_DECL_5(varswap_res_t, sift_down, size_t*, size_t, size_t*, size_t*, size_t*
  *
  * \sideeffect order of variables is changed
  */
-#define sift_up(var, low, curSize, bestSize, bestPos) RUN(sift_up, var, low, curSize, bestSize, bestPos)
+#define sylvan_siftup(state) RUN(sylvan_siftup, state)
 
-TASK_DECL_2(varswap_res_t, sift_to_pos, size_t, size_t);
+TASK_DECL_2(varswap_t, sylvan_siftpos, BDDLABEL, BDDLABEL);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
  * \param targetPos - target position (w.r.t. dynamic variable reordering)
  */
-#define sift_to_pos(var, targetPos) RUN(sift_to_pos, var, targetPos)
+#define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
 
-VOID_TASK_DECL_2(sylvan_reorder, uint32_t, uint32_t);
+TASK_DECL_2(varswap_t, sylvan_reorder, BDDLABEL, BDDLABEL);
 /**
   \brief Implementation of Rudell's sifting algorithm.
 
@@ -130,7 +132,20 @@ VOID_TASK_DECL_2(sylvan_reorder, uint32_t, uint32_t);
 
   \sideeffect order and number of variables might change
 */
-#define sylvan_reorder(low, high)  CALL(sylvan_reorder, low, high)
+#define sylvan_reorder(low, high)  RUN(sylvan_reorder, low, high)
+
+#define sylvan_reorder_all()  sylvan_reorder(0, 0)
+
+TASK_DECL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*);
+/**
+  @brief Reorder the variables in the BDDs according to the given permutation.
+
+  @details The permutation is an array of BDD labels, where the i-th element is the label
+  of the variable that should be moved to position i. The size
+  of the array should be equal or greater to the number of variables
+  currently in use.
+ */
+#define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
 
 #ifdef __cplusplus
 }

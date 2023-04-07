@@ -3,17 +3,20 @@
 #include "sylvan_mtbdd_int.h"
 
 /// Handling of variable levels
-static uint32_t* var_to_level = NULL;  // get the level of a "real variable"
-static uint32_t* level_to_var = NULL;  // get the "real variable" of a level
-static MTBDD* levels = NULL;           // array holding the 1-node BDD for each level
-
-static int* orderlocks = NULL;        // array holding orderlock marks, 1 means locked, 0 otherwise
-
-static size_t levels_count = 0;        // number of created levels
-static size_t levels_size = 0;         // size of the 3 arrays
+static BDDLEVEL *level_to_var = NULL;   // get the level of a "real variable"
+static BDDVAR *var_to_level = NULL;   // get the variable label of a level
+static MTBDD *levels = NULL;            // array holding the 1-node BDD for each level
+static size_t levels_count = 0;         // number of created levels
+static size_t levels_size = 0;          // size of the 3 arrays
 
 
-void mtbdd_levels_new(size_t amount)
+MTBDD mtbdd_newlevel(void)
+{
+    mtbdd_newlevels(1);
+    return levels[levels_count - 1];
+}
+
+int mtbdd_newlevels(size_t amount)
 {
     if (levels_count + amount >= levels_size) {
 #if 0
@@ -25,76 +28,59 @@ void mtbdd_levels_new(size_t amount)
         levels_size = (levels_count + amount + 63) & (~63LL);
 #endif
         levels = realloc(levels, sizeof(MTBDD[levels_size]));
-        orderlocks = realloc(orderlocks, sizeof(int[levels_size]));
-        var_to_level = realloc(var_to_level, sizeof(uint32_t[levels_size]));
-        level_to_var = realloc(level_to_var, sizeof(uint32_t[levels_size]));
+        level_to_var = realloc(level_to_var, sizeof(BDDLEVEL[levels_size]));
+        var_to_level = realloc(var_to_level, sizeof(BDDVAR[levels_size]));
+
+        if (!(levels && level_to_var && var_to_level)) {
+            fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
+            return 0;
+        }
     }
     for (size_t i = 0; i < amount; i++) {
         // reminder: makenode(var, low, high)
         levels[levels_count] = mtbdd_makenode(levels_count, mtbdd_false, mtbdd_true);
-        var_to_level[levels_count] = levels_count;
         level_to_var[levels_count] = levels_count;
+        var_to_level[levels_count] = levels_count;
         levels_count++;
-        orderlocks[levels_count] = 0;
     }
-    if(!(levels && orderlocks && var_to_level && level_to_var)) {
-        fprintf(stderr, "mtbdd_levels_new failed to allocate new memory!");
+    return 1;
+}
+
+void mtbdd_resetlevels(void)
+{
+    if (levels_size != 0) {
+        free(levels);
+        levels = NULL;
+        free(level_to_var);
+        level_to_var = NULL;
+        free(var_to_level);
+        var_to_level = NULL;
+        levels_count = 0;
+        levels_size = 0;
     }
 }
 
-int mtbdd_getorderlock(uint32_t level)
-{
-    assert((int)level >= 0  && level < mtbdd_levels_size()); // bound check
-    return orderlocks[level];
-}
-
-void mtbdd_setorderlock(uint32_t level, int is_locked)
-{
-    assert((int)level >= 0  && level < mtbdd_levels_size()); // bound check
-    assert(is_locked == 0 || is_locked == 1); // orderlock check
-    orderlocks[level] = is_locked;
-}
-
-void mtbdd_levels_reset(void)
-{
-    levels_count = 0;
-}
-
-size_t mtbdd_levels_size(void)
+size_t mtbdd_levelscount(void)
 {
     return levels_count;
 }
 
-MTBDD mtbdd_ithlevel(uint32_t level)
+MTBDD mtbdd_ithlevel(BDDLEVEL level)
 {
-    if (level < levels_count) {
-        return levels[level_to_var[level]];
-    } else {
-        return mtbdd_invalid;
-    }
+    if (level < levels_count) return levels[level_to_var[level]];
+    else return mtbdd_invalid;
 }
 
-uint32_t mtbdd_var_to_level(uint32_t var)
+BDDLEVEL mtbdd_var_to_level(BDDVAR var)
 {
-    if (var < levels_count) {
-        return var_to_level[var];
-    } else {
-        return var;
-    }
+    if (var < levels_count) return var_to_level[var];
+    else return var;
 }
 
-uint32_t mtbdd_level_to_var(uint32_t level)
+BDDVAR mtbdd_level_to_var(BDDLEVEL level)
 {
-    if (level < levels_count) {
-        return level_to_var[level];
-    } else {
-        return level;
-    }
-}
-
-uint32_t mtbdd_node_to_level(MTBDD node)
-{
-    return mtbdd_var_to_level(mtbdd_getvar(node));
+    if (level < levels_count) return level_to_var[level];
+    else return level;
 }
 
 /**
@@ -113,30 +99,13 @@ void mtbdd_levels_gc_add_mark_managed_refs(void)
     sylvan_gc_add_mark(TASK(mtbdd_gc_mark_managed_refs));
 }
 
-void mtbdd_varswap(uint32_t var)
+void mtbdd_varswap(BDDVAR var)
 {
-    level_to_var[var_to_level[var]] = var + 1;
-    level_to_var[var_to_level[var + 1]] = var;
-    uint32_t save = var_to_level[var];
-    var_to_level[var] = var_to_level[var + 1];
-    var_to_level[var + 1] = save;
-}
-
-
-void sylvan_levels_destroy(void)
-{
-    if (levels_size != 0) {
-        free(levels);
-        levels = NULL;
-        free(var_to_level);
-        var_to_level = NULL;
-        free(level_to_var);
-        level_to_var = NULL;
-        levels_count = 0;
-        levels_size = 0;
-        free(orderlocks);
-        orderlocks = NULL;
-    }
+    var_to_level[level_to_var[var]] = var + 1;
+    var_to_level[level_to_var[var + 1]] = var;
+    uint32_t save = level_to_var[var];
+    level_to_var[var] = level_to_var[var + 1];
+    level_to_var[var + 1] = save;
 }
 
 /**
@@ -144,12 +113,11 @@ void sylvan_levels_destroy(void)
  * @param level
  * @param level_counts
  */
-static inline void sort_level_counts(int* levels, const size_t* level_counts)
+void gnome_sort(int *levels, const size_t *level_counts)
 {
-    //TODO: consider std qsort
     unsigned int i = 1;
     unsigned int j = 2;
-    while (i < mtbdd_levels_size()) {
+    while (i < mtbdd_levelscount()) {
         long p = levels[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels[i - 1])];
         long q = levels[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels[i])];
         if (p < q) {
@@ -162,18 +130,17 @@ static inline void sort_level_counts(int* levels, const size_t* level_counts)
     }
 }
 
-
-VOID_TASK_IMPL_3(mtbdd_count_levels, size_t*, arr, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_count_nodes, size_t*, arr, size_t, first, size_t, count)
 {
     // Divide-and-conquer if count above COUNT_NODES_BLOCK_SIZE
     if (count > COUNT_NODES_BLOCK_SIZE) {
-        SPAWN(mtbdd_count_levels, arr, first, count / 2);
-        CALL(mtbdd_count_levels, arr, first + count / 2, count - count / 2);
-        SYNC(mtbdd_count_levels);
+        SPAWN(sylvan_count_nodes, arr, first, count / 2);
+        CALL(sylvan_count_nodes, arr, first + count / 2, count - count / 2);
+        SYNC(sylvan_count_nodes);
     } else {
-        size_t tmp[mtbdd_levels_size()];
+        size_t tmp[mtbdd_levelscount()];
         size_t i;
-        for (i = 0; i < mtbdd_levels_size(); i++) tmp[i] = 0;
+        for (i = 0; i < mtbdd_levelscount(); i++) tmp[i] = 0;
 
         const size_t end = first + count;
 
@@ -185,27 +152,15 @@ VOID_TASK_IMPL_3(mtbdd_count_levels, size_t*, arr, size_t, first, size_t, count)
         }
         /* these are atomic operations on a hot location with false sharing inside another
            thread's program stack... can't get much worse! */
-        for (i = 0; i < mtbdd_levels_size(); i++) __sync_add_and_fetch(&arr[i], tmp[i]);
+        for (i = 0; i < mtbdd_levelscount(); i++) __sync_add_and_fetch(&arr[i], tmp[i]);
     }
 }
 
-VOID_TASK_IMPL_2(mtbdd_count_sort_levels, int*, levels, size_t, threshold)
+// set levels below the threshold to -1
+void mtbdd_mark_threshold(int *level, const size_t *level_counts, uint32_t threshold)
 {
-    size_t level_counts[mtbdd_levels_size()];
-    for (size_t i = 0; i < mtbdd_levels_size(); i++) level_counts[i] = 0;
-
-    mtbdd_count_levels(level_counts);
-
-    // set levels below the threshold to -1
-    for (int i = 0; i < (int) mtbdd_levels_size(); i++) {
-        if (level_counts[mtbdd_level_to_var(i)] < threshold) {
-            levels[i] = -1;
-        } else {
-            levels[i] = i;
-        }
+    for (unsigned int i = 0; i < levels_count; i++) {
+        if (level_counts[mtbdd_level_to_var(i)] < threshold) level[i] = -1;
+        else level[i] = i;
     }
-
-    sort_level_counts(levels, level_counts);
 }
-
-
