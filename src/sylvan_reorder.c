@@ -25,11 +25,11 @@
  */
 #define BLOCKSIZE 128
 
-#define STATS 1 // useful information w.r.t. dynamic reordering
+#define STATS 0 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 
-typedef struct sifting_config
+struct sifting_config
 {
     reorder_termination_cb termination_cb;      // termination callback
     double t_start_sifting;                     // start time of the sifting
@@ -40,10 +40,10 @@ typedef struct sifting_config
     uint32_t max_var;                           // maximum number of vars swapped per sifting
     uint32_t total_num_var;                     // number of vars sifted
     double time_limit_ms;                       // time limit in milliseconds
-} reorder_config_t;
+};
 
 /// reordering configurations
-static reorder_config_t configs = {
+static struct sifting_config configs = {
         .termination_cb = NULL,
         .t_start_sifting = 0,
         .threshold = 64,
@@ -52,7 +52,7 @@ static reorder_config_t configs = {
         .total_num_swap = 0,
         .max_var = 2000,
         .total_num_var = 0,
-        .time_limit_ms = 1 * 60000 // 1 minute
+        .time_limit_ms = 1 * 60 * 1000 // 1 minute
 };
 
 static double wctime()
@@ -72,7 +72,7 @@ static inline double wctime_ms_elapsed(double start)
     return wctime_sec_elapsed(start) * 1000;
 }
 
-static int should_terminate_reordering(const reorder_config_t *reorder_config);
+static int should_terminate_reordering(const struct sifting_config *reorder_config);
 
 void sylvan_init_reorder()
 {
@@ -89,6 +89,11 @@ void sylvan_quit_reorder()
 {
     mtbdd_resetlevels();
     reorder_initialized = 0;
+}
+
+reorder_config_t sylvan_get_reorder_config()
+{
+    return (reorder_config_t) &configs;
 }
 
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback)
@@ -185,6 +190,9 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
 
 TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
+    sylvan_gc();
+    sylvan_gc_disable();
+
     varswap_t res = SYLVAN_VARSWAP_SUCCESS;
     int identity = 1;
 
@@ -204,11 +212,17 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
         if (!sylvan_varswap_issuccess(res)) break;
     }
 
+    sylvan_gc_enable();
+    sylvan_gc();
+
     return res;
 }
 
 TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 {
+    sylvan_gc();
+    sylvan_gc_disable();
+
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
 
     configs.t_start_sifting = wctime();
@@ -280,10 +294,13 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     printf("Reordering reduced the number of nodes from %zu to %zu\n", before_size, after_size);
 #endif
 
+    sylvan_gc_enable();
+    sylvan_gc();
+
     return res;
 }
 
-static int should_terminate_reordering(const reorder_config_t *reorder_config)
+static int should_terminate_reordering(const struct sifting_config *reorder_config)
 {
     if (reorder_config->termination_cb != NULL && reorder_config->termination_cb()) {
 #if STATS

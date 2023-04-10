@@ -22,6 +22,28 @@ void print_var_to_level(){
     printf("\n");
 }
 
+int are_equal(BDD a, BDD b)
+{
+    if (a == b) return 1;
+
+    if (a == sylvan_invalid) {
+        fprintf(stderr, "a is invalid!\n");
+        return 0;
+    }
+
+    if (b == sylvan_invalid) {
+        fprintf(stderr, "b is invalid!\n");
+        return 0;
+    }
+
+    fprintf(stderr, "a and b are not equal!\n");
+
+    sylvan_fprint(stderr, a);fprintf(stderr, "\n");
+    sylvan_fprint(stderr, b);fprintf(stderr, "\n");
+
+    return 0;
+}
+
 uint64_t
 xorshift_rand(void)
 {

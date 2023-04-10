@@ -59,8 +59,14 @@ void mtbdd_resetlevels(void);
  */
 MTBDD mtbdd_ithlevel(BDDLEVEL level);
 
+/**
+ * @brief  Get the level of the given variable
+ */
 BDDLEVEL mtbdd_var_to_level(BDDVAR var);
 
+/**
+ * @brief  Get the variable of the given level
+ */
 BDDVAR mtbdd_level_to_var(BDDLEVEL level);
 
 /**
@@ -91,8 +97,14 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
  */
 void mtbdd_varswap(BDDVAR var);
 
+/**
+ * @brief  Mark all nodes that are reachable from the given level.
+ */
 void mtbdd_mark_threshold(int* level, const size_t* level_counts, uint32_t threshold);
 
+/**
+ * @brief  Sort the levels in descending order according to the number of nodes.
+ */
 void gnome_sort(int *levels, const size_t *level_counts);
 
 #ifdef __cplusplus
