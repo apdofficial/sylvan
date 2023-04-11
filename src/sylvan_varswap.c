@@ -304,9 +304,9 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
         }
 
         // nvar == <var>
-        if (mtbddnode_getp2mark(node)) {
+        if (mtbddnode_getflag(node)) {
             // marked node, remove mark and rehash (we are apparently recovering)
-            mtbddnode_setp2mark(node, 0);
+            mtbddnode_setflag(node, 0);
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
                 fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
@@ -333,7 +333,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                     }
                 } else {
                     // mark for phase 2
-                    mtbddnode_setp2mark(node, 1);
+                    mtbddnode_setflag(node, 1);
                     marked++;
                 }
             }
@@ -353,7 +353,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             }
             if (p2) {
                 // mark for phase 2
-                mtbddnode_setp2mark(node, 1);
+                mtbddnode_setflag(node, 1);
                 marked++;
             } else {
                 mtbddnode_setvariable(node, var + 1);
@@ -407,7 +407,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
-        if (!mtbddnode_getp2mark(node)) continue; // an unmarked node
+        if (!mtbddnode_getflag(node)) continue; // an unmarked node
 
         if (mtbddnode_ismapnode(node)) {
             // it is a map node, swap places with next in chain

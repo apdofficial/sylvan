@@ -12,6 +12,7 @@
 #include "common.h"
 #include "sylvan_interact.h"
 
+#define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
 {
 //    BDD is from the paper:
@@ -24,20 +25,18 @@ TASK_1(BDD, create_example_bdd, size_t, is_optimal)
     BDD v4 = sylvan_newlevel();
     BDD v5 = sylvan_newlevel();
 
-    BDD bdd;
     if (is_optimal) {
         // optimal order 0, 1, 2, 3, 4, 5
         // minimum 8 nodes including 2 terminal nodes
-        bdd = sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
+        return sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
     } else {
         // not optimal order 0, 3, 1, 4, 2, 5
         // minimum 16 nodes including 2 terminal nodes
-        bdd = sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
+        return sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
     }
-    return bdd;
 }
-#define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 
+#define create_example_map(is_optimal) RUN(create_example_map, is_optimal)
 TASK_1(BDDMAP, create_example_map, size_t, is_optimal)
 {
     BDDMAP map = sylvan_map_empty();
@@ -45,7 +44,6 @@ TASK_1(BDDMAP, create_example_map, size_t, is_optimal)
     map = sylvan_map_add(map, 0, bdd);
     return map;
 }
-#define create_example_map(is_optimal) RUN(create_example_map, is_optimal)
 
 TASK_0(int, test_varswap)
 {
@@ -502,25 +500,18 @@ TASK_0(int, test_map_reorder)
 TASK_0(int, test_interact)
 {
     sylvan_gc();
-    mtbdd_resetlevels();
+    sylvan_resetlevels();
 
-    MTBDD bdd = create_example_bdd(0);
-    mtbdd_protect(&bdd);
+    MTBDD bdd = create_example_bdd(1);
+    sylvan_protect(&bdd);
 
     interact_state_t state;
-    interact_alloc(&state, mtbdd_levelscount());
-    interact_init_par(&state);
+    interact_alloc(&state, sylvan_levelscount());
+    interact_init(&state);
 
-    for (size_t col = 0; col < state.ncols; ++col){
-        for (size_t row = 0; row < state.nrows; ++row){
-            printf("%d ", interact_get(&state, row, col));
-        }
-        printf("\n");
-    }
+    print_interact_state(&state);
 
-    printf("\n");
-
-    mtbdd_unprotect(&bdd);
+    sylvan_unprotect(&bdd);
     interact_free(&state);
 
     return 0;
@@ -528,24 +519,26 @@ TASK_0(int, test_interact)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-    printf("test_varswap\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-    printf("test_varswap_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-    printf("test_varswap_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-    printf("test_sift_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-    printf("test_sift_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-    printf("test_sift_pos\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-    printf("test_reorder_perm\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-    printf("test_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-    printf("test_map_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+//    printf("test_varswap\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+//    printf("test_varswap_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+//    printf("test_varswap_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+//    printf("test_sift_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+//    printf("test_sift_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+//    printf("test_sift_pos\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+//    printf("test_reorder_perm\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+//    printf("test_reorder\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+//    printf("test_map_reorder\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_interact\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
 }
 

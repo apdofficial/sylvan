@@ -52,24 +52,14 @@ static inline uint8_t interact_test(const interact_state_t *state, BDDVAR x, BDD
 */
 void interact_update(interact_state_t *state, uint8_t* support);
 
-
-VOID_TASK_DECL_4(interact_find_support_par, mtbddnode_t, volatile uint8_t*, size_t, size_t)
+VOID_TASK_DECL_1(interact_init, interact_state_t*)
 /**
   @brief Find the support of f. (parallel)
 
   @sideeffect Accumulates in support the variables on which f depends.
 
 */
-#define interact_find_support_par(node, support) RUN(interact_find_support_par, node, support, 0, nodes->table_size)
-
-VOID_TASK_DECL_1(interact_init_par, interact_state_t*)
-/**
-  @brief Find the support of f. (parallel)
-
-  @sideeffect Accumulates in support the variables on which f depends.
-
-*/
-#define interact_init_par(state) RUN(interact_init_par, state)
+#define interact_init(state) RUN(interact_init, state)
 
 #ifdef __cplusplus
 }
