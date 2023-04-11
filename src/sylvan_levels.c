@@ -113,17 +113,17 @@ void mtbdd_varswap(BDDVAR var)
  * @param level
  * @param level_counts
  */
-void gnome_sort(int *levels, const size_t *level_counts)
+void gnome_sort(int *levels_arr, const size_t *level_counts)
 {
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < mtbdd_levelscount()) {
-        long p = levels[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels[i - 1])];
-        long q = levels[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels[i])];
+        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i - 1])];
+        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i])];
         if (p < q) {
-            int t = levels[i];
-            levels[i] = levels[i - 1];
-            levels[i - 1] = t;
+            int t = levels_arr[i];
+            levels_arr[i] = levels_arr[i - 1];
+            levels_arr[i - 1] = t;
             if (--i) continue;
         }
         i = j++;

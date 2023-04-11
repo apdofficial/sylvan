@@ -17,6 +17,7 @@
 #ifndef SYLVAN_OBJ_H
 #define SYLVAN_OBJ_H
 
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -35,17 +36,46 @@ class Bdd {
     friend class Mtbdd;
 
 public:
-    Bdd() { bdd = sylvan_false; sylvan_protect(&bdd); }
+    Bdd() { bdd = sylvan_false; sylvan_protect(&bdd);}
     Bdd(const BDD from) : bdd(from) { sylvan_protect(&bdd); }
     Bdd(const Bdd &from) : bdd(from.bdd) { sylvan_protect(&bdd); }
     Bdd(const uint32_t var) { bdd = sylvan_ithvar(var); sylvan_protect(&bdd); }
-    ~Bdd() { sylvan_unprotect(&bdd); }
+    ~Bdd() { sylvan_unprotect(&bdd);}
 
     /**
      * @brief Creates a Bdd representing just the variable index in its positive form
      * The variable index must be a 0<=index<=2^23 (we use 24 bits internally)
      */
     static Bdd bddVar(uint32_t index);
+
+    /**
+     * @brief Create the next level and return the BDD representing the variable (ithlevel)
+     * @details The BDDs representing managed levels are always kept during garbage collection.
+     * NOTE: not currently thread-safe.
+     */
+    static Bdd newLevel();
+
+    /**
+     * @brief Create the next <amount> levels
+     * @details The MTBDDs representing managed levels are always kept during garbage collection.
+     * NOTE: Not currently thread-safe.
+     */
+    static int newLevels(size_t amount);
+
+    /**
+     * @brief  Reset all levels.
+     */
+    static void resetLevels();
+
+    /**
+     * @brief Get a MTBDD representing just the level index in its positive form
+     */
+    static Bdd bddLevel(uint32_t index);
+
+    /**
+     * @brief  Get the level of the given variable label
+     */
+    static uint32_t bddVarToLevel(uint32_t index);
 
     /**
      * @brief Returns the Bdd representing "True"
@@ -559,6 +589,35 @@ public:
     static Mtbdd mtbddVar(uint32_t variable);
 
     /**
+     * @brief Create the next level and return the BDD representing the variable (ithlevel)
+     * @details The BDDs representing managed levels are always kept during garbage collection.
+     * NOTE: not currently thread-safe.
+     */
+    static Mtbdd newLevel();
+
+    /**
+     * @brief Create the next <amount> levels
+     * @details The MTBDDs representing managed levels are always kept during garbage collection.
+     * NOTE: Not currently thread-safe.
+     */
+    static int newLevels(size_t amount);
+
+    /**
+     * @brief  Reset all levels.
+     */
+    static void resetLevels();
+
+    /**
+     * @brief Get a MTBDD representing just the level index in its positive form
+     */
+    static Mtbdd mtbddLevel(uint32_t index);
+
+    /**
+     * @brief  Get the level of the given variable label
+     */
+    static uint32_t bddVarToLevel(uint32_t index);
+
+    /**
      * @brief Returns the Boolean Mtbdd representing "True"
      */
     static Mtbdd mtbddOne();
@@ -848,6 +907,77 @@ public:
      * @brief Initializes the MTBDD module of the Sylvan framework.
      */
     static void initMtbdd();
+
+    /**
+     * @brief Initializes the Dynamic variable reordering module of the Sylvan framework.
+     */
+    static void initReorder();
+
+    /**
+     * @brief Set threshold for the number of nodes per level to consider during the reordering.
+     * @details If the number of nodes per level is less than the threshold, the level is skipped during the reordering.
+     *         The default value is 32.
+     * @param threshold The threshold for the number of nodes per level.
+    */
+    static void setReorderThreshold(uint32_t threshold);
+
+    /**
+     * @brief Set the maximum growth coefficient.
+     * @details The maximum growth coefficient is used to calculate the maximum growth of the number of nodes during the reordering.
+     *        If the number of nodes grows more than the maximum growth coefficient , sift up/down is terminated.
+    */
+    static void setReorderMaxGrowth(float max_growth);
+
+    /**
+     * @brief Set the maximum number of swaps per sifting.
+    */
+    static void setReorderMaxSwap(uint32_t max_swap);
+
+    /**
+     * @brief Set the maximum number of vars swapped per sifting.
+    */
+    static void setReorderMaxVar(uint32_t max_var);
+
+    /**
+     * @brief Set the time limit for the reordering.
+    */
+    static void setReorderTimeLimit(double time_limit);
+
+    /**
+      @brief Reduce the heap size in the entire forest.
+
+      @details Implementation of Rudell's sifting algorithm.
+        <ol>
+        <li> Order all the variables according to the number of entries
+        in each unique table.
+        <li> Sift the variable up and down, remembering each time the
+        total size of the bdd size.
+        <li> Select the best permutation.
+        <li> Repeat 2 and 3 for all variables in given range.
+        </ol>
+    */
+    static varswap_t reorderAll();
+
+    /**
+      @brief Reorder the variables in the BDDs according to the given permutation.
+
+      @details The permutation is an array of BDD labels, where the i-th element is the label
+      of the variable that should be moved to position i. The size
+      of the array should be equal or greater to the number of variables
+      currently in use and and should be less or equal to the number of levels.
+     */
+    static varswap_t reorderPerm(const std::vector<uint32_t> &perm);
+
+    static reorder_config_t getReorderConfig();
+
+    static void printLevelToVar();
+
+    static void printVarToLevel();
+
+    /**
+     * @brief Get the number of created levels
+     */
+    static uint32_t getLevelsCount();
 
     /**
      * @brief Frees all memory in use by Sylvan.

@@ -97,28 +97,6 @@ make_random_ldd_set(int depth, int maxvalue, int elements)
     return result;
 }
 
-int testEqual(BDD a, BDD b)
-{
-    if (a == b) return 1;
-
-    if (a == sylvan_invalid) {
-        fprintf(stderr, "a is invalid!\n");
-        return 0;
-    }
-
-    if (b == sylvan_invalid) {
-        fprintf(stderr, "b is invalid!\n");
-        return 0;
-    }
-
-    fprintf(stderr, "a and b are not equal!\n");
-
-    sylvan_fprint(stderr, a);fprintf(stderr, "\n");
-    sylvan_fprint(stderr, b);fprintf(stderr, "\n");
-
-    return 0;
-}
-
 int
 test_bdd()
 {
@@ -144,19 +122,19 @@ test_cube()
     for (i=0; i<6;i++) test_assert(cube[i] == check[i] || (cube[i] == 2 && check[i] == 0));
 
     BDD picked_single = sylvan_pick_single_cube(bdd, vars);
-    test_assert(testEqual(sylvan_and(picked_single, bdd), picked_single));
+    test_assert(are_equal(sylvan_and(picked_single, bdd), picked_single));
     assert(sylvan_satcount(picked_single, vars)==1);
 
     BDD picked = sylvan_pick_cube(bdd);
-    test_assert(testEqual(sylvan_and(picked, bdd), picked));
+    test_assert(are_equal(sylvan_and(picked, bdd), picked));
 
     BDD t1 = sylvan_cube(vars, ((uint8_t[]){1,1,2,2,0,0}));
     BDD t2 = sylvan_cube(vars, ((uint8_t[]){1,1,1,0,0,2}));
-    test_assert(testEqual(sylvan_union_cube(t1, vars, ((uint8_t[]){1,1,1,0,0,2})), sylvan_or(t1, t2)));
+    test_assert(are_equal(sylvan_union_cube(t1, vars, ((uint8_t[]) {1, 1, 1, 0, 0, 2})), sylvan_or(t1, t2)));
     t2 = sylvan_cube(vars, ((uint8_t[]){2,2,2,1,1,0}));
-    test_assert(testEqual(sylvan_union_cube(t1, vars, ((uint8_t[]){2,2,2,1,1,0})), sylvan_or(t1, t2)));
+    test_assert(are_equal(sylvan_union_cube(t1, vars, ((uint8_t[]) {2, 2, 2, 1, 1, 0})), sylvan_or(t1, t2)));
     t2 = sylvan_cube(vars, ((uint8_t[]){1,1,1,0,0,0}));
-    test_assert(testEqual(sylvan_union_cube(t1, vars, ((uint8_t[]){1,1,1,0,0,0})), sylvan_or(t1, t2)));
+    test_assert(are_equal(sylvan_union_cube(t1, vars, ((uint8_t[]) {1, 1, 1, 0, 0, 0})), sylvan_or(t1, t2)));
 
     bdd = make_random(1, 16);
     for (j=0;j<10;j++) {
@@ -167,7 +145,7 @@ test_cube()
 
     for (i=0;i<10;i++) {
         picked = sylvan_pick_cube(bdd);
-        test_assert(testEqual(sylvan_and(picked, bdd), picked));
+        test_assert(are_equal(sylvan_and(picked, bdd), picked));
     }
 
     // simple test for mtbdd_enum_all
@@ -212,56 +190,56 @@ test_operators()
     BDD two = make_random(6, 24);
 
     // Test or
-    test_assert(testEqual(sylvan_or(a, b), sylvan_makenode(1, b, sylvan_true)));
-    test_assert(testEqual(sylvan_or(a, b), sylvan_or(b, a)));
-    test_assert(testEqual(sylvan_or(one, two), sylvan_or(two, one)));
+    test_assert(are_equal(sylvan_or(a, b), sylvan_makenode(1, b, sylvan_true)));
+    test_assert(are_equal(sylvan_or(a, b), sylvan_or(b, a)));
+    test_assert(are_equal(sylvan_or(one, two), sylvan_or(two, one)));
 
     // Test and
-    test_assert(testEqual(sylvan_and(a, b), sylvan_makenode(1, sylvan_false, b)));
-    test_assert(testEqual(sylvan_and(a, b), sylvan_and(b, a)));
-    test_assert(testEqual(sylvan_and(one, two), sylvan_and(two, one)));
+    test_assert(are_equal(sylvan_and(a, b), sylvan_makenode(1, sylvan_false, b)));
+    test_assert(are_equal(sylvan_and(a, b), sylvan_and(b, a)));
+    test_assert(are_equal(sylvan_and(one, two), sylvan_and(two, one)));
 
     // Test xor
-    test_assert(testEqual(sylvan_xor(a, b), sylvan_makenode(1, b, sylvan_not(b))));
-    test_assert(testEqual(sylvan_xor(a, b), sylvan_xor(a, b)));
-    test_assert(testEqual(sylvan_xor(a, b), sylvan_xor(b, a)));
-    test_assert(testEqual(sylvan_xor(one, two), sylvan_xor(two, one)));
-    test_assert(testEqual(sylvan_xor(a, b), sylvan_ite(a, sylvan_not(b), b)));
+    test_assert(are_equal(sylvan_xor(a, b), sylvan_makenode(1, b, sylvan_not(b))));
+    test_assert(are_equal(sylvan_xor(a, b), sylvan_xor(a, b)));
+    test_assert(are_equal(sylvan_xor(a, b), sylvan_xor(b, a)));
+    test_assert(are_equal(sylvan_xor(one, two), sylvan_xor(two, one)));
+    test_assert(are_equal(sylvan_xor(a, b), sylvan_ite(a, sylvan_not(b), b)));
 
     // Test diff
-    test_assert(testEqual(sylvan_diff(a, b), sylvan_diff(a, b)));
-    test_assert(testEqual(sylvan_diff(a, b), sylvan_diff(a, sylvan_and(a, b))));
-    test_assert(testEqual(sylvan_diff(a, b), sylvan_and(a, sylvan_not(b))));
-    test_assert(testEqual(sylvan_diff(a, b), sylvan_ite(b, sylvan_false, a)));
-    test_assert(testEqual(sylvan_diff(one, two), sylvan_diff(one, two)));
-    test_assert(testEqual(sylvan_diff(one, two), sylvan_diff(one, sylvan_and(one, two))));
-    test_assert(testEqual(sylvan_diff(one, two), sylvan_and(one, sylvan_not(two))));
-    test_assert(testEqual(sylvan_diff(one, two), sylvan_ite(two, sylvan_false, one)));
+    test_assert(are_equal(sylvan_diff(a, b), sylvan_diff(a, b)));
+    test_assert(are_equal(sylvan_diff(a, b), sylvan_diff(a, sylvan_and(a, b))));
+    test_assert(are_equal(sylvan_diff(a, b), sylvan_and(a, sylvan_not(b))));
+    test_assert(are_equal(sylvan_diff(a, b), sylvan_ite(b, sylvan_false, a)));
+    test_assert(are_equal(sylvan_diff(one, two), sylvan_diff(one, two)));
+    test_assert(are_equal(sylvan_diff(one, two), sylvan_diff(one, sylvan_and(one, two))));
+    test_assert(are_equal(sylvan_diff(one, two), sylvan_and(one, sylvan_not(two))));
+    test_assert(are_equal(sylvan_diff(one, two), sylvan_ite(two, sylvan_false, one)));
 
     // Test biimp
-    test_assert(testEqual(sylvan_biimp(a, b), sylvan_makenode(1, sylvan_not(b), b)));
-    test_assert(testEqual(sylvan_biimp(a, b), sylvan_biimp(b, a)));
-    test_assert(testEqual(sylvan_biimp(one, two), sylvan_biimp(two, one)));
+    test_assert(are_equal(sylvan_biimp(a, b), sylvan_makenode(1, sylvan_not(b), b)));
+    test_assert(are_equal(sylvan_biimp(a, b), sylvan_biimp(b, a)));
+    test_assert(are_equal(sylvan_biimp(one, two), sylvan_biimp(two, one)));
 
     // Test nand / and
-    test_assert(testEqual(sylvan_not(sylvan_and(a, b)), sylvan_nand(b, a)));
-    test_assert(testEqual(sylvan_not(sylvan_and(one, two)), sylvan_nand(two, one)));
+    test_assert(are_equal(sylvan_not(sylvan_and(a, b)), sylvan_nand(b, a)));
+    test_assert(are_equal(sylvan_not(sylvan_and(one, two)), sylvan_nand(two, one)));
 
     // Test nor / or
-    test_assert(testEqual(sylvan_not(sylvan_or(a, b)), sylvan_nor(b, a)));
-    test_assert(testEqual(sylvan_not(sylvan_or(one, two)), sylvan_nor(two, one)));
+    test_assert(are_equal(sylvan_not(sylvan_or(a, b)), sylvan_nor(b, a)));
+    test_assert(are_equal(sylvan_not(sylvan_or(one, two)), sylvan_nor(two, one)));
 
     // Test xor / biimp
-    test_assert(testEqual(sylvan_xor(a, b), sylvan_not(sylvan_biimp(b, a))));
-    test_assert(testEqual(sylvan_xor(one, two), sylvan_not(sylvan_biimp(two, one))));
+    test_assert(are_equal(sylvan_xor(a, b), sylvan_not(sylvan_biimp(b, a))));
+    test_assert(are_equal(sylvan_xor(one, two), sylvan_not(sylvan_biimp(two, one))));
 
     // Test imp
-    test_assert(testEqual(sylvan_imp(a, b), sylvan_ite(a, b, sylvan_true)));
-    test_assert(testEqual(sylvan_imp(one, two), sylvan_ite(one, two, sylvan_true)));
-    test_assert(testEqual(sylvan_imp(one, two), sylvan_not(sylvan_diff(one, two))));
-    test_assert(testEqual(sylvan_invimp(one, two), sylvan_not(sylvan_less(one, two))));
-    test_assert(testEqual(sylvan_imp(a, b), sylvan_invimp(b, a)));
-    test_assert(testEqual(sylvan_imp(one, two), sylvan_invimp(two, one)));
+    test_assert(are_equal(sylvan_imp(a, b), sylvan_ite(a, b, sylvan_true)));
+    test_assert(are_equal(sylvan_imp(one, two), sylvan_ite(one, two, sylvan_true)));
+    test_assert(are_equal(sylvan_imp(one, two), sylvan_not(sylvan_diff(one, two))));
+    test_assert(are_equal(sylvan_invimp(one, two), sylvan_not(sylvan_less(one, two))));
+    test_assert(are_equal(sylvan_imp(a, b), sylvan_invimp(b, a)));
+    test_assert(are_equal(sylvan_imp(one, two), sylvan_invimp(two, one)));
 
     return 0;
 }
@@ -334,26 +312,26 @@ test_compose()
     test_assert(sylvan_map_key(sylvan_map_next(map)) == 2);
     test_assert(sylvan_map_value(sylvan_map_next(map)) == two);
 
-    test_assert(testEqual(one, sylvan_compose(a, map)));
-    test_assert(testEqual(two, sylvan_compose(b, map)));
+    test_assert(are_equal(one, sylvan_compose(a, map)));
+    test_assert(are_equal(two, sylvan_compose(b, map)));
 
-    test_assert(testEqual(sylvan_or(one, two), sylvan_compose(a_or_b, map)));
+    test_assert(are_equal(sylvan_or(one, two), sylvan_compose(a_or_b, map)));
 
     map = sylvan_map_add(map, 2, one);
-    test_assert(testEqual(sylvan_compose(a_or_b, map), one));
+    test_assert(are_equal(sylvan_compose(a_or_b, map), one));
 
     map = sylvan_map_add(map, 1, two);
-    test_assert(testEqual(sylvan_or(one, two), sylvan_compose(a_or_b, map)));
+    test_assert(are_equal(sylvan_or(one, two), sylvan_compose(a_or_b, map)));
 
-    test_assert(testEqual(sylvan_and(one, two), sylvan_compose(sylvan_and(a, b), map)));
+    test_assert(are_equal(sylvan_and(one, two), sylvan_compose(sylvan_and(a, b), map)));
 
     // test that composing [0:=true] on "0" yields true
     map = sylvan_map_add(sylvan_map_empty(), 1, sylvan_true);
-    test_assert(testEqual(sylvan_compose(a, map), sylvan_true));
+    test_assert(are_equal(sylvan_compose(a, map), sylvan_true));
 
     // test that composing [0:=false] on "0" yields false
     map = sylvan_map_add(sylvan_map_empty(), 1, sylvan_false);
-    test_assert(testEqual(sylvan_compose(a, map), sylvan_false));
+    test_assert(are_equal(sylvan_compose(a, map), sylvan_false));
 
     return 0;
 }

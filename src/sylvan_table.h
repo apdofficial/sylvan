@@ -66,15 +66,21 @@ typedef struct llmsset
     llmsset_equals_cb equals_cb;    // custom equals function
     llmsset_create_cb create_cb;    // custom create function
     llmsset_destroy_cb destroy_cb;  // custom destroy function
-#if SYLVAN_USE_LIMITED_PROBE_SEQUENCE
     int16_t           threshold;    // number of iterations for insertion until returning error, only used with probing
-#endif
 } *llmsset_t;
 
 /**
  * Retrieve a pointer to the data associated with the 42-bit value.
  */
-void* llmsset_index_to_ptr(const llmsset_t dbs, size_t index);
+static inline void*
+llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
+{
+#if SYLVAN_USE_CHAINING
+    return dbs->data + index * 24 + 8;
+#else
+    return dbs->data + index * 16;
+#endif
+}
 
 /**
  * Create the set.
@@ -111,7 +117,30 @@ llmsset_get_size(const llmsset_t dbs)
  * Typically called during garbage collection, after clear and before rehash.
  * Returns 0 if dbs->table_size > dbs->max_size!
  */
-void llmsset_set_size(llmsset_t dbs, size_t size);
+/**
+ * Set the table size of the set.
+ * Typically called during garbage collection, after clear and before rehash.
+ * Returns 0 if dbs->table_size > dbs->max_size!
+ */
+static inline void
+llmsset_set_size(llmsset_t dbs, size_t size)
+{
+    /* check bounds (don't be rediculous) */
+    if (size > 128 && size <= dbs->max_size) {
+        dbs->table_size = size;
+#if LLMSSET_MASK && SYLVAN_USE_CHAINING
+        /* Warning: if size is not a power of two, you will get interesting behavior */
+        dbs->mask = dbs->table_size/2 - 1;
+#elif LLMSSET_MASK && !SYLVAN_USE_CHAINING
+        /* Warning: if size is not a power of two, you will get interesting behavior */
+        dbs->mask = dbs->table_size - 1;
+#endif
+#if !SYLVAN_USE_CHAINING
+        /* Set threshold: number of cache lines to probe before giving up on node insertion */
+        dbs->threshold = 192 - 2 * __builtin_clzll(dbs->table_size);
+#endif
+    }
+}
 
 /**
  * Core function: find existing data or add new.

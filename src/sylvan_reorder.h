@@ -33,11 +33,16 @@ typedef struct sifting_state
     BDDLABEL high;
 } sifting_state_t;
 
+typedef int (*reorder_termination_cb)();
+
+// opaque type
+typedef struct reorder_config *reorder_config_t;
+
 void sylvan_init_reorder(void);
 
 void sylvan_quit_reorder(void);
 
-typedef int (*reorder_termination_cb)();
+reorder_config_t sylvan_get_reorder_config();
 
 void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
@@ -76,7 +81,7 @@ void sylvan_set_reorder_maxvar(uint32_t max_var);
  * @details The default value is 50000 milliseconds.
  * @param time_limit The time limit for the reordering.
 */
-void sylvan_set_reorder_timelimit(uint64_t time_limit);
+void sylvan_set_reorder_timelimit(double time_limit);
 
 TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
 /**
@@ -116,27 +121,39 @@ TASK_DECL_2(varswap_t, sylvan_siftpos, BDDLABEL, BDDLABEL);
 
 TASK_DECL_2(varswap_t, sylvan_reorder, BDDLABEL, BDDLABEL);
 /**
-  \brief Implementation of Rudell's sifting algorithm.
+      @brief Reduce the heap size in the entire forest.
 
-  \details
-    <ol>
-    <li> Order all the variables according to the number of entries
-    in each unique table.
-    <li> Sift the variable up and down, remembering each time the
-    total size of the bdd size.
-    <li> Select the best permutation.
-    <li> Repeat 2 and 3 for all variables in given range.
-    </ol>
-  \param low - the lowest position to sift
-  \param high - the highest position to sift
+      @details Implementation of Rudell's sifting algorithm.
+        <ol>
+        <li> Order all the variables according to the number of entries
+        in each unique table.
+        <li> Sift the variable up and down, remembering each time the
+        total size of the bdd size.
+        <li> Select the best permutation.
+        <li> Repeat 2 and 3 for all variables in given range.
+        </ol>
 
-  \sideeffect order and number of variables might change
+      @param low - the lowest position to sift
+      @param high - the highest position to sift
 */
 #define sylvan_reorder(low, high)  RUN(sylvan_reorder, low, high)
 
+/**
+      @brief Reduce the heap size in the entire forest.
+
+      @details Implementation of Rudell's sifting algorithm.
+        <ol>
+        <li> Order all the variables according to the number of entries
+        in each unique table.
+        <li> Sift the variable up and down, remembering each time the
+        total size of the bdd size.
+        <li> Select the best permutation.
+        <li> Repeat 2 and 3 for all variables in given range.
+        </ol>
+*/
 #define sylvan_reorder_all()  sylvan_reorder(0, 0)
 
-TASK_DECL_1(varswap_t, sylvan_reorder_perm, BDDLABEL*);
+TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
 /**
   @brief Reorder the variables in the BDDs according to the given permutation.
 

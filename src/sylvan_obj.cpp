@@ -432,6 +432,36 @@ Bdd::bddVar(uint32_t index)
 }
 
 Bdd
+Bdd::newLevel()
+{
+    return sylvan_newlevel();
+}
+
+int
+Bdd::newLevels(size_t amount)
+{
+    return sylvan_newlevels(amount);
+}
+
+void
+Bdd::resetLevels()
+{
+    sylvan_resetlevels();
+}
+
+Bdd
+Bdd::bddLevel(uint32_t index)
+{
+    return sylvan_level_to_var(index);
+}
+
+uint32_t
+bddVarToLevel(uint32_t index)
+{
+    return sylvan_var_to_level(index);
+}
+
+Bdd
 Bdd::bddCube(const BddSet &variables, uint8_t *values)
 {
     return sylvan_cube(variables.set.bdd, values);
@@ -579,6 +609,36 @@ Mtbdd
 Mtbdd::mtbddVar(uint32_t variable)
 {
     return mtbdd_makenode(variable, mtbdd_false, mtbdd_true);
+}
+
+Mtbdd
+Mtbdd::newLevel()
+{
+    return sylvan_newlevel();
+}
+
+int
+Mtbdd::newLevels(size_t amount)
+{
+    return sylvan_newlevels(amount);
+}
+
+void
+Mtbdd::resetLevels()
+{
+    sylvan_resetlevels();
+}
+
+Mtbdd
+Mtbdd::mtbddLevel(uint32_t index)
+{
+    return sylvan_level_to_var(index);
+}
+
+uint32_t
+Mtbdd::bddVarToLevel(uint32_t index)
+{
+    return sylvan_var_to_level(index);
 }
 
 Mtbdd
@@ -874,7 +934,6 @@ Mtbdd::NodeCount() const
     return mtbdd_nodecount(mtbdd);
 }
 
-
 /***
  * Implementation of class MtbddMap
  */
@@ -975,3 +1034,72 @@ Sylvan::quitPackage()
 {
     sylvan_quit();
 }
+
+void Sylvan::initReorder()
+{
+    sylvan_init_reorder();
+}
+
+void Sylvan::setReorderThreshold(uint32_t threshold)
+{
+    sylvan_set_reorder_threshold(threshold);
+}
+
+void Sylvan::setReorderMaxGrowth(float max_growth)
+{
+    sylvan_set_reorder_maxgrowth(max_growth);
+}
+
+void Sylvan::setReorderMaxSwap(uint32_t max_swap)
+{
+    sylvan_set_reorder_maxswap(max_swap);
+}
+
+void Sylvan::setReorderMaxVar(uint32_t max_var)
+{
+    sylvan_set_reorder_maxvar(max_var);
+}
+
+void Sylvan::setReorderTimeLimit(double time_limit)
+{
+    sylvan_set_reorder_timelimit(time_limit);
+}
+
+varswap_t Sylvan::reorderAll()
+{
+    return sylvan_reorder_all();
+}
+
+varswap_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
+{
+    return sylvan_reorder_perm(perm.data());
+}
+
+reorder_config_t Sylvan::getReorderConfig()
+{
+    return sylvan_get_reorder_config();
+}
+
+void Sylvan::printLevelToVar()
+{
+    printf("level_to_var: ");
+    for (size_t i = 0; i < sylvan_levelscount(); ++i){
+        printf("%u ", mtbdd_level_to_var(i));
+    }
+    printf("\n");
+}
+
+void Sylvan::printVarToLevel()
+{
+    printf("var_to_level: ");
+    for (size_t i = 0; i < sylvan_levelscount(); ++i){
+        printf("%llu ", mtbdd_var_to_level(i));
+    }
+    printf("\n");
+}
+
+uint32_t Sylvan::getLevelsCount()
+{
+    return sylvan_levelscount();
+}
+

@@ -191,7 +191,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int* created, const
         idx = (idx & CL_MASK) | ((idx+1) & CL_MASK_R);
         if (idx == last) {
 
-#if SYLVAN_USE_LIMITED_PROBE_SEQUENCE
+#if SYLVAN_LIMIT_PROBE_SEQUENCE
             if (++i == dbs->threshold) return 0; // failed to find empty spot in probe sequence
 #endif
             // go to next cache line in probe sequence
@@ -263,27 +263,6 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 #endif
         }
     }
-}
-
-void
-llmsset_set_size(llmsset_t dbs, size_t size)
-{
-    /* check bounds (don't be rediculous) */
-    if (size > 128 && size <= dbs->max_size) {
-        dbs->table_size = size;
-#if LLMSSET_MASK
-        /* Warning: if size is not a power of two, you will get interesting behavior */
-        dbs->mask = dbs->table_size - 1;
-#endif
-        /* Set threshold: number of cache lines to probe before giving up on node insertion */
-        dbs->threshold = 192 - 2 * __builtin_clzll(dbs->table_size);
-    }
-}
-
-void*
-llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
-{
-    return dbs->data + index * 16;
 }
 
 llmsset_t
