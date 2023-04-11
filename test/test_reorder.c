@@ -392,6 +392,8 @@ TASK_0(int, test_sift_pos)
 
 TASK_0(int, test_reorder_perm)
 {
+    // we need fixed variables for the test
+    // therefore we reset the levels and create new one
     sylvan_gc();
     sylvan_resetlevels();
     sylvan_newlevels(4);
@@ -441,14 +443,41 @@ TASK_0(int, test_reorder_perm)
 
 TASK_0(int, test_reorder)
 {
+    // we need fixed variables for the test
+    // therefore we reset the levels and create new ones
+    sylvan_gc();
+    sylvan_resetlevels();
+
     BDD bdd = create_example_bdd(0);
     sylvan_protect(&bdd);
 
-    size_t size_before = sylvan_nodecount(bdd);
+    size_t not_optimal_order_size = sylvan_nodecount(bdd);
     sylvan_reorder_all();
-    size_t size_after = sylvan_nodecount(bdd);
+    size_t not_optimal_order_reordered_size = sylvan_nodecount(bdd);
 
-    test_assert(size_after < size_before);
+    test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
+
+    uint32_t perm[6] = { 0, 1, 2, 3, 4, 5 };
+    int identity = 1;
+    // check if the new order is identity with the old order
+    for (size_t i = 0; i < sylvan_levelscount(); i++) {
+        if (sylvan_var_to_level(i) != perm[i]) {
+            identity = 0;
+            break;
+        }
+    }
+
+//     if we gave it not optimal ordering then the new ordering should not be identity
+    test_assert(identity == 0);
+
+    sylvan_reorder_perm(perm);
+    size_t not_optimal_size_again = sylvan_nodecount(bdd);
+    test_assert(not_optimal_order_size == not_optimal_size_again);
+
+    for (size_t i = 0; i < sylvan_levelscount(); i++) {
+        test_assert(sylvan_var_to_level(i) == perm[i]);
+    }
+
     sylvan_unprotect(&bdd);
 
     return 0;
@@ -464,7 +493,7 @@ TASK_0(int, test_map_reorder)
     size_t size_after = sylvan_nodecount(map);
 
     test_assert(size_after < size_before);
-    sylvan_protect(&map);
+    sylvan_unprotect(&map);
 
     return 0;
 }
