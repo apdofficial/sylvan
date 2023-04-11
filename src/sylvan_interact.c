@@ -48,6 +48,7 @@ void interact_update(interact_state_t *state, uint8_t* support)
 
 void print_interact(const interact_state_t *state)
 {
+    printf("Interaction matrix: \n");
     for (size_t col = 0; col < state->ncols; ++col){
         for (size_t row = 0; row < state->nrows; ++row){
             printf("%d ", interact_get(state, row, col));
@@ -59,11 +60,16 @@ void print_interact(const interact_state_t *state)
 }
 
 /**
+ *
+ * @brief Find the support of f. (parallel)
+ *
+ * @sideeffect Accumulates in support the variables on which f depends.
+ *
  * If F00 = F01 and F10 = F11, then F does not depend on <y>.
  * Therefore, it is not moved or changed by the swap. If this is the case
  * for all the nodes of variable <x>, we say that variables <x> and <y> do not interact.
  *
- * Performs a depth-first search on the BDD to accumulate the support array of the variables on which f depends.
+ * Performs a DFS on the BDD to accumulate the support array of the variables on which f depends.
  *
  *        (x) F
  *       /   \
@@ -71,39 +77,33 @@ void print_interact(const interact_state_t *state)
  *    / \     / \
  *  F00 F01 F10 F11
  */
-/**
-  @brief Find the support of f. (parallel)
-
-  @sideeffect Accumulates in support the variables on which f depends.
-
-*/
 #define find_support(f, support) RUN(find_support, f, support)
-VOID_TASK_2(find_support, mtbddnode_t, f, volatile uint8_t*, support)
+VOID_TASK_2(find_support, MTBDD, f, volatile uint8_t*, support)
 {
-    if (mtbddnode_isleaf(f) || mtbddnode_getflag(f)) return; // a leaf or already visited node
-
-    BDDVAR var = mtbddnode_getvariable(f);
+    if (mtbdd_isleaf(f) || mtbddnode_getflag(MTBDD_GETNODE(f))) return; // a leaf or already visited node
+    BDDVAR var = mtbdd_getvar(f);
     // these are atomic operations on a hot location with false sharing inside
     // another thread's program stack
     __sync_add_and_fetch(&support[var], 1);
 
-    SPAWN(find_support, MTBDD_GETNODE(mtbddnode_gethigh(f)), support);
-    CALL(find_support, MTBDD_GETNODE(mtbddnode_getlow(f)), support);
+    SPAWN(find_support, mtbdd_getlow(f), support);
+    CALL(find_support, mtbdd_gethigh(f), support);
     SYNC(find_support);
 
-    mtbddnode_setflag(MTBDD_GETNODE(mtbddnode_gethigh(f)), 1);
-    mtbddnode_setvisited(f, 1);
+    // local visited node used for calculating support array
+    mtbddnode_setflag(MTBDD_GETNODE(mtbdd_gethigh(f)), 1);
+    // global visited node used to determining root nodes
+    mtbddnode_setvisited(MTBDD_GETNODE(f), 1);
 }
 
 #define clear_flags(f) RUN(clear_flags, f)
-VOID_TASK_1(clear_flags, mtbddnode_t, f)
+VOID_TASK_1(clear_flags, MTBDD, f)
 {
-    if (mtbddnode_isleaf(f) || !mtbddnode_getflag(MTBDD_GETNODE(mtbddnode_gethigh(f)))) return;
+    if (mtbdd_isleaf(f) || !mtbddnode_getflag(MTBDD_GETNODE(mtbdd_gethigh(f)))) return;
+    mtbddnode_setvisited(MTBDD_GETNODE(f), 0);
 
-    mtbddnode_setvisited(f, 0);
-
-    SPAWN(clear_flags, MTBDD_GETNODE(mtbddnode_gethigh(f)));
-    CALL(clear_flags, MTBDD_GETNODE(mtbddnode_getlow(f)));
+    SPAWN(clear_flags, mtbdd_getlow(f));
+    CALL(clear_flags, mtbdd_gethigh(f));
     SYNC(clear_flags);
 }
 
@@ -112,8 +112,9 @@ VOID_TASK_2(clear_visited, size_t, first, size_t, count)
 {
     // Divide-and-conquer if count above COUNT_NODES_BLOCK_SIZE
     if (count > COUNT_NODES_BLOCK_SIZE) {
-        SPAWN(clear_visited, first, count / 2);
-        CALL(clear_visited, first + count / 2, count - count / 2);
+        size_t split = count/2;
+        SPAWN(clear_visited, first, split);
+        CALL(clear_visited, first + split, count - split);
         SYNC(clear_visited);
     } else {
         const size_t end = first + count;
@@ -131,18 +132,17 @@ VOID_TASK_IMPL_1(interact_init, interact_state_t*, state)
     uint8_t* support = calloc(n, sizeof(uint8_t));
     for (size_t i = 0; i < n; i++) support[i] = 0;
 
-    for (size_t i = 0; i < nodes->table_size; ++i){
+    for (size_t i = 0; i < nodes->table_size; i++){
         if (!llmsset_is_marked(nodes, i)) continue; // unused bucket
         mtbddnode_t f = MTBDD_GETNODE(i);
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous depth-first searches,
         // then it is a root, and we start a new depth-first search from it.
         if(!mtbddnode_getvisited(f)){
-            find_support(f, support);
-            clear_flags(f);
+            find_support(i, support);
+            clear_flags(i);
             interact_update(state, support);
         }
-        print_interact(state);
     }
     clear_visited();
     free(support);

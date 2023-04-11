@@ -54,10 +54,7 @@ void interact_update(interact_state_t *state, uint8_t* support);
 
 VOID_TASK_DECL_1(interact_init, interact_state_t*)
 /**
-  @brief Find the support of f. (parallel)
-
-  @sideeffect Accumulates in support the variables on which f depends.
-
+  @brief Initialize the variable interaction matrix.
 */
 #define interact_init(state) RUN(interact_init, state)
 
