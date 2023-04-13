@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(sylvan
-    VERSION 1.8.0
+    VERSION 1.7.1
     DESCRIPTION "Sylvan, a parallel decision diagram library"
     HOMEPAGE_URL "https://github.com/trolando/sylvan"
     LANGUAGES C CXX
@@ -21,6 +21,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 
 # Add the Sylvan library target
 add_subdirectory(src)
+
+option(SYLVAN_USE_CHAINING "Use Sylvan chaining" ON)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     # If we are in the root, add some options to build examples/tests
