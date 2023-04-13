@@ -970,10 +970,6 @@ public:
 
     static reorder_config_t getReorderConfig();
 
-    static void printLevelToVar();
-
-    static void printVarToLevel();
-
     /**
      * @brief Get the number of created levels
      */
