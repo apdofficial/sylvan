@@ -5,7 +5,13 @@
 
 #define STATS 0 // useful information w.r.t. dynamic reordering
 
-#if SYLVAN_USE_CHAINING
+#if SYLVAN_USE_LINEAR_PROBING
+/*!
+   \brief Adjacent variable swap phase 0 (Linear probing compatible)
+   \details Clear hashes of the entire table.
+*/
+#define sylvan_varswap_p0() llmsset_clear_hashes(nodes);
+#else
 VOID_TASK_DECL_4(sylvan_varswap_p0, BDDLABEL, uint64_t, uint64_t, volatile varswap_t*);
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
@@ -17,12 +23,6 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, BDDLABEL, uint64_t, uint64_t, volatile varsw
    \param result pointer to sylvan_var_swap_res_t
 */
 #define sylvan_varswap_p0(var, first, count, result) CALL(sylvan_varswap_p0, var, first, count, result)
-#else
-/*!
-   \brief Adjacent variable swap phase 0 (Linear probing compatible)
-   \details Clear hashes of the entire table.
-*/
-#define sylvan_varswap_p0() llmsset_clear_hashes(nodes);
 #endif
 
 TASK_DECL_4(size_t, sylvan_varswap_p1, BDDLABEL, size_t, size_t, volatile varswap_t*);
@@ -150,12 +150,12 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
     // ensure that the cache is cleared
     sylvan_clear_cache();
 
-#if SYLVAN_USE_CHAINING
-    // first clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
-#else
+#if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     sylvan_varswap_p0();
+#else
+    // first clear hashes of nodes with <var> and <var+1>
+    sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
 #endif
 
     // handle all trivial cases, mark cases that are not trivial
@@ -169,12 +169,12 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
 #if STATS
             printf("Recovery time!\n");
 #endif
-#if SYLVAN_USE_CHAINING
-            // first clear hashes of nodes with <var> and <var+1>
-            sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
-#else
+#if SYLVAN_USE_LINEAR_PROBING
             // clear the entire table
             sylvan_varswap_p0();
+#else
+            // first clear hashes of nodes with <var> and <var+1>
+            sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
 #endif
             // handle all trivial cases, mark cases that are not trivial
             marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
@@ -205,7 +205,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
     return result;
 }
 
-#if SYLVAN_USE_CHAINING
+#if !SYLVAN_USE_LINEAR_PROBING
 /**
  * Implementation of the zero phase of variable swapping.
  * For all <var+1> nodes, make <var> and rehash.

@@ -6,6 +6,22 @@
 
 __thread uint64_t seed = 1;
 
+void print_level_to_var(){
+    printf("level_to_var: ");
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i){
+        printf("%zu ", (size_t)mtbdd_level_to_var(i));
+    }
+    printf("\n");
+}
+
+void print_var_to_level(){
+    printf("var_to_level: ");
+    for (size_t i = 0; i < mtbdd_levelscount(); ++i){
+        printf("%zu ", (size_t)mtbdd_var_to_level(i));
+    }
+    printf("\n");
+}
+
 int are_equal(BDD a, BDD b)
 {
     if (a == b) return 1;
