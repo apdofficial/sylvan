@@ -30,8 +30,8 @@
 #endif
 
 /* Either use chaining or linear implementation as a hash collision strategy */
-#ifndef SYLVAN_USE_CHAINING
-#define SYLVAN_USE_CHAINING 0
+#ifndef SYLVAN_USE_LINEAR_PROBING
+#define SYLVAN_USE_LINEAR_PROBING 0
 #endif
 
 /* Either use chaining or linear implementation as a hash collision strategy */
