@@ -701,6 +701,12 @@ public:
     Mtbdd Else() const;
 
     /**
+     * @brief Returns the log of the MTBDD
+     * Use this only for Double MTBDDs.
+     */
+    Mtbdd Log() const;
+
+    /**
      * @brief Returns the negation of the MTBDD (every terminal negative)
      * Do not use this for Boolean MTBDDs, only for Integer/Double/Fraction MTBDDs.
      */
@@ -733,6 +739,11 @@ public:
      */
     Mtbdd Plus(const Mtbdd &other) const;
 
+     /**
+     * @brief Computes log(exp(f) + exp(g)) avoiding under/over flow
+     */
+    Mtbdd LogSumExp(const Mtbdd &other) const;
+
     /**
      * @brief Computes f * g
      */
@@ -752,6 +763,11 @@ public:
      * @brief Computes abstraction by summation (existential quantification)
      */
     Mtbdd AbstractPlus(const BddSet &variables) const;
+
+    /**
+     * @brief Computes abstraction by summation (existential quantification)
+     */
+    Mtbdd AbstractLogSumExp(const BddSet &variables) const;
 
     /**
      * @brief Computes abstraction by multiplication (universal quantification)
@@ -969,10 +985,6 @@ public:
     static varswap_t reorderPerm(const std::vector<uint32_t> &perm);
 
     static reorder_config_t getReorderConfig();
-
-    static void printLevelToVar();
-
-    static void printVarToLevel();
 
     /**
      * @brief Get the number of created levels

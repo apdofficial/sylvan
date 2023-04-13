@@ -709,9 +709,21 @@ Mtbdd::Else() const
 }
 
 Mtbdd
+Mtbdd::Log() const
+{
+    return mtbdd_log(mtbdd);
+}
+
+Mtbdd
 Mtbdd::Negate() const
 {
     return mtbdd_negate(mtbdd);
+}
+
+Mtbdd
+Mtbdd::AbstractLogSumExp(const BddSet &variables) const
+{
+    return mtbdd_abstract_logsumexp(mtbdd, variables.set.bdd);
 }
 
 Mtbdd
@@ -742,6 +754,13 @@ Mtbdd
 Mtbdd::Plus(const Mtbdd &other) const
 {
     return mtbdd_plus(mtbdd, other.mtbdd);
+}
+
+
+Mtbdd
+Mtbdd::LogSumExp(const Mtbdd &other) const
+{
+    return mtbdd_logsumexp(mtbdd, other.mtbdd);
 }
 
 Mtbdd
@@ -1078,24 +1097,6 @@ varswap_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
 reorder_config_t Sylvan::getReorderConfig()
 {
     return sylvan_get_reorder_config();
-}
-
-void Sylvan::printLevelToVar()
-{
-    printf("level_to_var: ");
-    for (size_t i = 0; i < sylvan_levelscount(); ++i){
-        printf("%u ", mtbdd_level_to_var(i));
-    }
-    printf("\n");
-}
-
-void Sylvan::printVarToLevel()
-{
-    printf("var_to_level: ");
-    for (size_t i = 0; i < sylvan_levelscount(); ++i){
-        printf("%llu ", mtbdd_var_to_level(i));
-    }
-    printf("\n");
 }
 
 uint32_t Sylvan::getLevelsCount()
