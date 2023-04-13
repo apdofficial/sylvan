@@ -24,8 +24,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include <sys/time.h>
-
 /**
  * Initialize the Sylvan parallel decision diagrams package.
  *
@@ -214,20 +212,6 @@ VOID_TASK_DECL_0(sylvan_gc_aggressive_resize);
  */
 VOID_TASK_DECL_0(sylvan_gc_normal_resize);
 
-static inline double clock_sec_elapsed(clock_t start)
-{
-    return ((double)clock() - start)/CLOCKS_PER_SEC;
-}
-
-static inline size_t clock_ms_elapsed(clock_t start)
-{
-    return (size_t)(clock_sec_elapsed(start) * 1000);
-}
-
-static inline size_t clock_ns_elapsed(clock_t start)
-{
-    return clock_ms_elapsed(start) * 1000;
-}
 
 #ifdef __cplusplus
 }
