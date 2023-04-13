@@ -212,7 +212,6 @@ VOID_TASK_DECL_0(sylvan_gc_aggressive_resize);
  */
 VOID_TASK_DECL_0(sylvan_gc_normal_resize);
 
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

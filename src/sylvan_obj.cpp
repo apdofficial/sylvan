@@ -1099,6 +1099,7 @@ reorder_config_t Sylvan::getReorderConfig()
     return sylvan_get_reorder_config();
 }
 
+
 uint32_t Sylvan::getLevelsCount()
 {
     return sylvan_levelscount();

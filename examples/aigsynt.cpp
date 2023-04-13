@@ -487,7 +487,7 @@ VOID_TASK_0(parse)
     mtbdd_protect(&Xc);
     mtbdd_protect(&Xu);
 
-    // Now read the [[optional]] labels to find controllable vars 
+    // Now read the [[optional]] labels to find controllable vars
     while (1) {
         int c = parser_peek();
         if (c != 'l' and c != 'i' and c != 'o') break;
