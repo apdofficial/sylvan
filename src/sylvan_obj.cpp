@@ -1099,24 +1099,6 @@ reorder_config_t Sylvan::getReorderConfig()
     return sylvan_get_reorder_config();
 }
 
-void Sylvan::printLevelToVar()
-{
-    printf("level_to_var: ");
-    for (size_t i = 0; i < sylvan_levelscount(); ++i){
-        printf("%zu ", (size_t)mtbdd_level_to_var(i));
-    }
-    printf("\n");
-}
-
-void Sylvan::printVarToLevel()
-{
-    printf("var_to_level: ");
-    for (size_t i = 0; i < sylvan_levelscount(); ++i){
-        printf("%zu ", (size_t)mtbdd_var_to_level(i));
-    }
-    printf("\n");
-}
-
 uint32_t Sylvan::getLevelsCount()
 {
     return sylvan_levelscount();
