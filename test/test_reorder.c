@@ -563,6 +563,35 @@ TASK_1(int, runtests, size_t, ntests)
     return 0;
 }
 
+static int rudells_sifting = 0;
+
+VOID_TASK_0(dyn_reordering_start)
+{
+    rudells_sifting = 1;
+    size_t nnodes = llmsset_count_marked(nodes);
+    printf("Starting dynamic variable reordering: %zu size\n", nnodes);
+}
+
+VOID_TASK_0(dyn_reordering_progress)
+{
+    size_t nnodes = llmsset_count_marked(nodes);
+    printf("Dynamic variable reordering improved size to: %zu size\n", nnodes);
+}
+
+VOID_TASK_0(dyn_reordering_end)
+{
+    rudells_sifting = 0;
+    size_t nnodes = llmsset_count_marked(nodes);
+    printf("Dynamic variable reordering done: %zu size\n", nnodes);
+}
+
+int should_dyn_reordering_terminate()
+{
+    // if sifting is active and # of nodes < 24, stop sifting
+    if (rudells_sifting) return llmsset_count_marked(nodes) < 29;
+    return 0;
+}
+
 int main()
 {
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
@@ -575,11 +604,18 @@ int main()
 
     sylvan_set_reorder_threshold(1);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 1000); // 1 second
+    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
+
+    sylvan_re_hook_prere(TASK(dyn_reordering_start));
+    sylvan_re_hook_postre(TASK(dyn_reordering_end));
+    sylvan_re_hook_progre(TASK(dyn_reordering_progress));
+    sylvan_re_hook_termre(should_dyn_reordering_terminate);
 
     size_t ntests = 2;
 
     int res = RUN(runtests, ntests);
+
+    sylvan_stats_report(stdout);
 
     sylvan_quit();
     lace_stop();
