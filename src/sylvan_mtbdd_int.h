@@ -120,6 +120,19 @@ mtbddnode_getvariable(mtbddnode_t n)
     return (uint32_t)(n->b >> 40);
 }
 
+static inline int __attribute__((unused))
+mtbddnode_getmark(mtbddnode_t n)
+{
+    return n->a & 0x2000000000000000 ? 1 : 0;
+}
+
+static inline void __attribute__((unused))
+mtbddnode_setmark(mtbddnode_t n, int mark)
+{
+    if (mark) n->a |= 0x2000000000000000;
+    else n->a &= 0xdfffffffffffffff;
+}
+
 static inline void __attribute__((unused))
 mtbddnode_setvariable(mtbddnode_t n, uint32_t newvar)
 {
@@ -127,16 +140,44 @@ mtbddnode_setvariable(mtbddnode_t n, uint32_t newvar)
 }
 
 static inline int __attribute__((unused))
-mtbddnode_getp2mark(mtbddnode_t n)
+mtbddnode_getflag(mtbddnode_t n)
 {
-    return n->a & mtbdd_p2mark ? 1 : 0;
+    return n->a & mtbdd_flag ? 1 : 0;
+}
+
+/**
+ * @brief Set a flag on a node.
+ * @detail Currently has two use-cases:
+ * - Marking nodes that ver visited during a DFS when determining a variable interaction matrix
+ * - Marking nodes which need to be handheld during phase 2 of the variable swap.
+ *
+ * @note Set the flag to 0 once you are done with it.
+ */
+static inline void __attribute__((unused))
+mtbddnode_setflag(mtbddnode_t n, int is_marked)
+{
+    if (is_marked) n->a |= mtbdd_flag;
+    else n->a &= ~mtbdd_flag;
+}
+
+/**
+ * @brief Set a visited mark on a node.
+ * @details This is used used as marker to tell whether a node was reached by
+ * at least one DFS. Once the interaction matrix is built, these flags are reset.
+ *
+ * @note Set the flag to 0 once you are done with it.
+ */
+static inline int __attribute__((unused))
+mtbddnode_getvisited(mtbddnode_t n)
+{
+    return n->a & mtbdd_visited ? 1 : 0;
 }
 
 static inline void __attribute__((unused))
-mtbddnode_setp2mark(mtbddnode_t n, int is_marked)
+mtbddnode_setvisited(mtbddnode_t n, int is_visited)
 {
-    if (is_marked) n->a |= mtbdd_p2mark;
-    else n->a &= ~mtbdd_p2mark;
+    if (is_visited) n->a |= mtbdd_visited;
+    else n->a &= ~mtbdd_visited;
 }
 
 static inline void __attribute__((unused))

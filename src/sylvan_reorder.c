@@ -19,6 +19,7 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
+#include "sylvan_interact.h"
 
 /**
  * Block size tunes the granularity of the parallel distribution
@@ -237,6 +238,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     size_t before_size = llmsset_count_marked(nodes);
 #endif
 
+//    interact_state_t interact_state;
+//    interact_alloc(&interact_state, mtbdd_levelscount());
+//    interact_init_par(&interact_state);
+
     // now count all variable levels (parallel...)
     size_t level_counts[mtbdd_levelscount()];
     for (size_t i = 0; i < mtbdd_levelscount(); i++) level_counts[i] = 0;
@@ -248,44 +253,44 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     gnome_sort(levels, level_counts);
 
     varswap_t res;
-    sifting_state_t state;
-    state.low = low;
-    state.high = high;
-    state.size = llmsset_count_marked(nodes);
-    state.best_size = state.size;
+    sifting_state_t sifting_state;
+    sifting_state.low = low;
+    sifting_state.high = high;
+    sifting_state.size = llmsset_count_marked(nodes);
+    sifting_state.best_size = sifting_state.size;
 
     for (size_t i = 0; i < mtbdd_levelscount(); i++) {
         if (levels[i] < 0) break; // marked level, done
         uint64_t lvl = levels[i];
 
-        state.pos = mtbdd_level_to_var(lvl);
-        if (state.pos < low || state.pos > high) continue; // skip, not in range
+        sifting_state.pos = mtbdd_level_to_var(lvl);
+        if (sifting_state.pos < low || sifting_state.pos > high) continue; // skip, not in range
 
-        state.best_pos = state.pos;
+        sifting_state.best_pos = sifting_state.pos;
 
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
         if (lvl > mtbdd_levelscount() / 2) {
-            res = sylvan_siftdown(&state);
+            res = sylvan_siftdown(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftup(&state);
+            res = sylvan_siftup(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
         } else {
-            res = sylvan_siftup(&state);
+            res = sylvan_siftup(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftdown(&state);
+            res = sylvan_siftdown(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
         }
 
         // optimum variable position restoration
-        res = sylvan_siftpos(state.pos, state.best_pos);
+        res = sylvan_siftpos(sifting_state.pos, sifting_state.best_pos);
         if (!sylvan_varswap_issuccess(res)) break;
 
         configs.total_num_var++;
         if (should_terminate_reordering(&configs)) break;
 #if STATS
-        if (state.best_size < state.size)
-            printf("Reduced the number of nodes from %zu to %zu\n", state.size, state.best_size);
+        if (sifting_state.best_size < sifting_state.size)
+            printf("Reduced the number of nodes from %zu to %zu\n", sifting_state.size, sifting_state.best_size);
 #endif
     }
 
