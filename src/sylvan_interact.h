@@ -11,27 +11,28 @@ extern "C" {
 
 typedef struct interact_state
 {
-    uint8_t *interact;   // interacting variable matrix
-    size_t nrows;
-    size_t ncols;
+    char *interact;   // interacting variable matrix
+    size_t len;
 } interact_state_t;
 
-int interact_alloc(interact_state_t *state, size_t len);
+char interact_alloc(interact_state_t *state, size_t len);
 
 void interact_free(interact_state_t *state);
 
-static inline void interact_set(interact_state_t *state, size_t row, size_t column, uint8_t value)
+static inline void interact_set(interact_state_t *state, size_t i, size_t j, char value)
 {
-    state->interact[(row) * state->ncols + (column)] = value;
+    state->interact[(i) * state->len + (j)] = value;
 }
 
-static inline uint8_t interact_get(const interact_state_t *state, size_t row, size_t column)
+static inline int interact_get(const interact_state_t *state, size_t i, size_t j)
 {
-    return state->interact[(row) * state->ncols + (column)];
+    return state->interact[(i) * state->len + (j)];
 }
 
-static inline uint8_t interact_test(const interact_state_t *state, BDDVAR x, BDDVAR y)
+static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR y)
 {
+    // ensure x < y
+    // this is because we only keep the upper triangle of the matrix
     if (x > y) {
         BDDVAR tmp = x;
         x = y;
@@ -45,12 +46,14 @@ static inline uint8_t interact_test(const interact_state_t *state, BDDVAR x, BDD
   support.
 
   @details If support[i] == support[j] == 1, sets the (i,j) entry
-  of the interaction matrix to 1.]
+  of the interaction matrix to 1.
 
   @sideeffect Clears support.
 
 */
-void interact_update(interact_state_t *state, uint8_t* support);
+void interact_update(interact_state_t *state, char* support);
+
+void print_interact_state(const interact_state_t *state, size_t nvars);
 
 VOID_TASK_DECL_1(interact_init, interact_state_t*)
 /**

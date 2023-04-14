@@ -7,18 +7,6 @@
 
 __thread uint64_t seed = 1;
 
-void print_interact_state(const interact_state_t *state)
-{
-    for (size_t col = 0; col < state->ncols; ++col){
-        for (size_t row = 0; row < state->nrows; ++row){
-            printf("%d ", interact_get(state, row, col));
-        }
-        printf("\n");
-    }
-
-    printf("\n");
-}
-
 void print_level_to_var(){
     printf("level_to_var: ");
     for (size_t i = 0; i < mtbdd_levelscount(); ++i){

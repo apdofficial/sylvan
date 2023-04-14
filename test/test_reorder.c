@@ -18,6 +18,8 @@ TASK_1(BDD, create_example_bdd, size_t, is_optimal)
 //    BDD is from the paper:
 //    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
 //    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
+
+    // the variable indexing is relative to the current level
     BDD v0 = sylvan_newlevel();
     BDD v1 = sylvan_newlevel();
     BDD v2 = sylvan_newlevel();
@@ -496,24 +498,66 @@ TASK_0(int, test_map_reorder)
 
     return 0;
 }
+#define visit_par(dd) CALL(visit_par, dd)
+VOID_TASK_1(visit_par, MTBDD, dd)
+{
+    if (!mtbdd_isleaf(dd)) {
+        SPAWN(visit_par, mtbdd_getlow(dd));
+        CALL(visit_par, mtbdd_gethigh(dd));
+        SYNC(visit_par);
+    }
+    printf("%u ", mtbdd_getvar(dd));
+}
+
+#define visit_seq(dd) CALL(visit_seq, dd)
+VOID_TASK_1(visit_seq, MTBDD, dd)
+{
+    if (!mtbdd_isleaf(dd)) {
+//        CALL(visit_seq, mtbdd_getlow(dd));
+        CALL(visit_seq, mtbdd_gethigh(dd));
+    }
+    printf("%u ", mtbdd_getvar(dd));
+}
+
+
 
 TASK_0(int, test_interact)
 {
     sylvan_gc();
     sylvan_resetlevels();
 
-    MTBDD bdd = create_example_bdd(1);
-    sylvan_protect(&bdd);
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
 
     interact_state_t state;
-    interact_alloc(&state, sylvan_levelscount());
+    interact_alloc_max(&state);
     interact_init(&state);
 
-    print_interact_state(&state);
+    print_interact_state(&state, sylvan_levelscount());
 
-    sylvan_unprotect(&bdd);
+    assert(interact_test(&state, 0, 1));
+    assert(interact_test(&state, 1, 0));
+
+    for (size_t i = 2; i < sylvan_levelscount(); ++i) {
+        for (size_t j = i + 1; j < sylvan_levelscount(); ++j) {
+            // test interaction of variables belonging to bdd2
+            assert(interact_test(&state, i, j));
+            assert(interact_test(&state, j, i));
+            // test interaction of variables not belonging to bdd2
+            assert(!interact_test(&state, 0, j));
+            assert(!interact_test(&state, 0, i));
+            assert(!interact_test(&state, 1, j));
+            assert(!interact_test(&state, 1, i));
+        }
+    }
+
     interact_free(&state);
 
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
     return 0;
 }
 
