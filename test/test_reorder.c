@@ -563,6 +563,18 @@ TASK_1(int, runtests, size_t, ntests)
     return 0;
 }
 
+VOID_TASK_0(reordering_start)
+{
+    size_t nnodes = llmsset_count_marked(nodes);
+    printf("Starting dynamic variable reordering: %zu size\n", nnodes);
+}
+
+VOID_TASK_0(reordering_end)
+{
+    size_t nnodes = llmsset_count_marked(nodes);
+    printf("Dynamic variable reordering done: %zu size\n", nnodes);
+}
+
 int main()
 {
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
@@ -577,9 +589,14 @@ int main()
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 1000); // 1 second
 
+    sylvan_re_hook_pregc(TASK(reordering_start));
+    sylvan_re_hook_postgc(TASK(reordering_end));
+
     size_t ntests = 2;
 
     int res = RUN(runtests, ntests);
+
+    sylvan_stats_report(stdout);
 
     sylvan_quit();
     lace_stop();

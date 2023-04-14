@@ -56,6 +56,32 @@ static struct sifting_config configs = {
         .time_limit_ms = 1 * 60 * 1000 // 1 minute
 };
 
+
+typedef struct re_hook_entry
+{
+    struct re_hook_entry *next;
+    re_hook_cb cb;
+} *re_hook_entry_t;
+
+static re_hook_entry_t prere_list;
+static re_hook_entry_t postre_list;
+
+void sylvan_re_hook_pregc(re_hook_cb callback)
+{
+    re_hook_entry_t e = (re_hook_entry_t) malloc(sizeof(struct re_hook_entry));
+    e->cb = callback;
+    e->next = prere_list;
+    prere_list = e;
+}
+
+void sylvan_re_hook_postgc(re_hook_cb callback)
+{
+    re_hook_entry_t e = (re_hook_entry_t) malloc(sizeof(struct re_hook_entry));
+    e->cb = callback;
+    e->next = postre_list;
+    postre_list = e;
+}
+
 static double wctime()
 {
     struct timeval tv;
@@ -221,10 +247,17 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
 TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 {
+    sylvan_stats_count(SYLVAN_RE_COUNT);
+    sylvan_timer_start(SYLVAN_RE);
+
     sylvan_gc();
     sylvan_gc_disable();
 
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
+
+    for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
+        WRAP(e->cb);
+    }
 
     configs.t_start_sifting = wctime();
     configs.total_num_swap = 0;
@@ -232,11 +265,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 
     // if high == 0, then we sift all variables
     if (high == 0) high = mtbdd_levelscount() - 1;
-
-#if STATS
-    printf("Sifting between variable labels %d and %d\n", low, high);
-    size_t before_size = llmsset_count_marked(nodes);
-#endif
 
 //    interact_state_t interact_state;
 //    interact_alloc(&interact_state, mtbdd_levelscount());
@@ -294,13 +322,14 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 #endif
     }
 
-#if STATS
-    size_t after_size = llmsset_count_marked(nodes);
-    printf("Reordering reduced the number of nodes from %zu to %zu\n", before_size, after_size);
-#endif
-
     sylvan_gc_enable();
     sylvan_gc();
+
+    for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
+        WRAP(e->cb);
+    }
+
+    sylvan_timer_stop(SYLVAN_RE);
 
     return res;
 }

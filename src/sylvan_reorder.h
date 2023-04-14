@@ -35,6 +35,21 @@ typedef struct sifting_state
 
 typedef int (*reorder_termination_cb)();
 
+/**
+ * Callback type
+ */
+LACE_TYPEDEF_CB(void, re_hook_cb);
+
+/**
+ * Add a hook that is called before dynamic variable reordering begins.
+ */
+void sylvan_re_hook_pregc(re_hook_cb callback);
+
+/**
+ * Add a hook that is called after dynamic variable reordering is finished.
+ */
+void sylvan_re_hook_postgc(re_hook_cb callback);
+
 // opaque type
 typedef struct reorder_config *reorder_config_t;
 
