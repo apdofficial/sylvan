@@ -33,7 +33,32 @@ typedef struct sifting_state
     BDDLABEL high;
 } sifting_state_t;
 
-typedef int (*reorder_termination_cb)();
+typedef int (*re_term_cb)();
+
+/**
+ * Callback type
+ */
+LACE_TYPEDEF_CB(void, re_hook_cb);
+
+/**
+ * Add a hook that is called before dynamic variable reordering begins.
+ */
+void sylvan_re_hook_prere(re_hook_cb callback);
+
+/**
+ * Add a hook that is called after dynamic variable reordering is finished.
+ */
+void sylvan_re_hook_postre(re_hook_cb callback);
+
+/**
+ * Add a hook that is called after dynamic variable reordering managed to reduce number of nodes.
+ */
+void sylvan_re_hook_progre(re_hook_cb callback);
+
+/**
+ * Add a hook that is called regularly to see whether sifting should terminate.
+ */
+void sylvan_re_hook_termre(re_term_cb callback);
 
 // opaque type
 typedef struct reorder_config *reorder_config_t;
@@ -43,8 +68,6 @@ void sylvan_init_reorder(void);
 void sylvan_quit_reorder(void);
 
 reorder_config_t sylvan_get_reorder_config();
-
-void sylvan_set_reorder_terminationcb(reorder_termination_cb callback);
 
 /**
  * @brief Set threshold for the number of nodes per level to consider during the reordering.
