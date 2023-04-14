@@ -498,28 +498,6 @@ TASK_0(int, test_map_reorder)
 
     return 0;
 }
-#define visit_par(dd) CALL(visit_par, dd)
-VOID_TASK_1(visit_par, MTBDD, dd)
-{
-    if (!mtbdd_isleaf(dd)) {
-        SPAWN(visit_par, mtbdd_getlow(dd));
-        CALL(visit_par, mtbdd_gethigh(dd));
-        SYNC(visit_par);
-    }
-    printf("%u ", mtbdd_getvar(dd));
-}
-
-#define visit_seq(dd) CALL(visit_seq, dd)
-VOID_TASK_1(visit_seq, MTBDD, dd)
-{
-    if (!mtbdd_isleaf(dd)) {
-//        CALL(visit_seq, mtbdd_getlow(dd));
-        CALL(visit_seq, mtbdd_gethigh(dd));
-    }
-    printf("%u ", mtbdd_getvar(dd));
-}
-
-
 
 TASK_0(int, test_interact)
 {
@@ -533,10 +511,9 @@ TASK_0(int, test_interact)
     sylvan_protect(&bdd2);
 
     interact_state_t state;
-    interact_alloc_max(&state);
+    int success = interact_alloc(&state, sylvan_levelscount());
+    assert(success);
     interact_init(&state);
-
-    print_interact_state(&state, sylvan_levelscount());
 
     assert(interact_test(&state, 0, 1));
     assert(interact_test(&state, 1, 0));
@@ -563,24 +540,24 @@ TASK_0(int, test_interact)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-//    printf("test_varswap\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-//    printf("test_varswap_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-//    printf("test_varswap_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-//    printf("test_sift_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-//    printf("test_sift_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-//    printf("test_sift_pos\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-//    printf("test_reorder_perm\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-//    printf("test_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-//    printf("test_map_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_varswap\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    printf("test_varswap_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    printf("test_varswap_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    printf("test_sift_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_sift_pos\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+    printf("test_reorder_perm\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    printf("test_map_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
@@ -590,7 +567,7 @@ int main()
 {
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_sizes(4LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
+    sylvan_set_limits(1LL*1LL<<30, 1, 128);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -600,7 +577,7 @@ int main()
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 1000); // 1 second
 
-    size_t ntests = 1;
+    size_t ntests = 2;
 
     int res = RUN(runtests, ntests);
 

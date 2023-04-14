@@ -1,16 +1,28 @@
 #include "sylvan_int.h"
 #include "sylvan_interact.h"
 
-#define interact_alloc_max(state) interact_alloc(state, nodes->table_size);
-char interact_alloc(interact_state_t *state, size_t len)
+char interact_alloc(interact_state_t *state, size_t nvars)
 {
     // TODO: reduce the memory usage, we only use 1 bit out of 8 bit char data type
-    state->len = len;
-    state->interact = calloc(state->len, sizeof(char));
+    state->nrows = nvars;
+    state->ncols = nvars;
+
+    // Allocate rows
+    state->interact = (char **) calloc(state->nrows, sizeof(char *));
+    // Allocate columns for each row
+    for (size_t i = 0; i < state->nrows; i++) {
+        state->interact[i] = (char *) calloc(state->ncols, sizeof(char *));
+         if (!state->interact[i]) {
+            fprintf(stderr, "interact_alloc failed to allocate new memory!");
+            return 0;
+        }
+    }
+
     if (!state->interact) {
         fprintf(stderr, "interact_alloc failed to allocate new memory!");
         return 0;
     }
+
     return 1;
 }
 
@@ -18,10 +30,11 @@ void interact_free(interact_state_t *state)
 {
     free(state->interact);
     state->interact = NULL;
-    state->len = 0;
+    state->nrows = 0;
+    state->ncols = 0;
 }
 
-void interact_update(interact_state_t *state, char* support)
+void interact_update(interact_state_t *state, char *support)
 {
     size_t i, j;
     size_t n = nodes->table_size;
@@ -46,9 +59,9 @@ void print_interact_state(const interact_state_t *state, size_t nvars)
     for (size_t i = 0; i < nvars; ++i) printf("%zu ", i);
     printf("\n");
 
-    for (size_t i = 0; i < nvars; ++i){
+    for (size_t i = 0; i < nvars; ++i) {
         printf("%zu ", i);
-        for (size_t j = 0; j < nvars; ++j){
+        for (size_t j = 0; j < nvars; ++j) {
             printf("%d ", interact_get(state, i, j));
         }
         printf("\n");
@@ -78,7 +91,7 @@ void print_interact_state(const interact_state_t *state, size_t nvars)
 #define find_support(f, support) RUN(find_support, f, support)
 VOID_TASK_2(find_support, MTBDD, f, char*, support)
 {
-    if(mtbdd_isleaf(f)) return;
+    if (mtbdd_isleaf(f)) return;
     mtbddnode_t node = MTBDD_GETNODE(f);
     if (mtbddnode_getflag(node) == 1) return;
 
@@ -86,7 +99,7 @@ VOID_TASK_2(find_support, MTBDD, f, char*, support)
     CALL(find_support, mtbdd_getlow(f), support);
     SYNC(find_support);
 
-    // TODO: investigate affect of updating support array from the thread local stack
+    // TODO: fix array mutation from the thread local stack
     support[mtbddnode_getvariable(node)] = 1;
     // local visited node used for calculating support array
     mtbddnode_setflag(node, 1);
@@ -97,7 +110,7 @@ VOID_TASK_2(find_support, MTBDD, f, char*, support)
 #define clear_flags(f) RUN(clear_flags, f)
 VOID_TASK_1(clear_flags, MTBDD, f)
 {
-    if(mtbdd_isleaf(f)) return;
+    if (mtbdd_isleaf(f)) return;
     mtbddnode_t node = MTBDD_GETNODE(f);
     if (mtbddnode_getflag(node) == 0) return;
 
@@ -112,7 +125,7 @@ VOID_TASK_1(clear_flags, MTBDD, f)
 VOID_TASK_2(clear_visited, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
-        size_t split = count/2;
+        size_t split = count / 2;
         SPAWN(clear_visited, first, split);
         CALL(clear_visited, first + split, count - split);
         SYNC(clear_visited);
@@ -128,20 +141,20 @@ VOID_TASK_2(clear_visited, size_t, first, size_t, count)
 VOID_TASK_IMPL_1(interact_init, interact_state_t*, state)
 {
     size_t n = nodes->table_size;
-    char* support = calloc(n, sizeof(char));
+    char *support = calloc(n, sizeof(char));
     if (!support) {
         fprintf(stderr, "interact_init failed to allocate memory!");
         return;
     }
     for (size_t i = 0; i < n; i++) support[i] = 0;
 
-    for (size_t i = 0; i < n; i++){
+    for (size_t i = 0; i < n; i++) {
         if (!llmsset_is_marked(nodes, i)) continue; // unused bucket
         mtbddnode_t f = MTBDD_GETNODE(i);
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous depth-first searches,
         // then it is a root, and we start a new depth-first search from it.
-        if(!mtbddnode_getvisited(f)){
+        if (!mtbddnode_getvisited(f)) {
             support[mtbddnode_getvariable(f)] = 1;
             mtbddnode_setvisited(f, 1);
 

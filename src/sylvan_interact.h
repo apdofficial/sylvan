@@ -11,22 +11,25 @@ extern "C" {
 
 typedef struct interact_state
 {
-    char *interact;   // interacting variable matrix
-    size_t len;
+    char **interact;   // interacting variable matrix
+    size_t ncols;
+    size_t nrows;
 } interact_state_t;
 
+// number of variables can be at most number of nodes
+#define interact_alloc_max(state) interact_alloc(state, nodes->table_size);
 char interact_alloc(interact_state_t *state, size_t len);
 
 void interact_free(interact_state_t *state);
 
-static inline void interact_set(interact_state_t *state, size_t i, size_t j, char value)
+static inline void interact_set(interact_state_t *state, size_t row, size_t col, char value)
 {
-    state->interact[(i) * state->len + (j)] = value;
+    state->interact[row][col] = value;
 }
 
-static inline int interact_get(const interact_state_t *state, size_t i, size_t j)
+static inline int interact_get(const interact_state_t *state, size_t row, size_t col)
 {
-    return state->interact[(i) * state->len + (j)];
+    return state->interact[row][col];
 }
 
 static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR y)
