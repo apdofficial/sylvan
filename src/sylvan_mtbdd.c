@@ -1206,7 +1206,11 @@ TASK_IMPL_2(MTBDD, mtbdd_op_logsumexp, MTBDD*, pa, MTBDD*, pb)
             return a;
         }
         double m = fmax(f, g);
+#if __APPLE__
+        return mtbdd_double(log10(pow(10, f - m) + pow(10, g - m)) + m);
+#else
         return mtbdd_double(log10(exp10(f - m) + exp10(g - m)) + m);
+#endif
     }
 
     if (a < b) {
