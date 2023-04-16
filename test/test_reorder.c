@@ -10,12 +10,16 @@
 #include "sylvan_reorder.h"
 #include "sylvan_levels.h"
 #include "common.h"
+#include "sylvan_interact.h"
 
+#define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
 {
 //    BDD is from the paper:
 //    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
 //    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
+
+    // the variable indexing is relative to the current level
     BDD v0 = sylvan_newlevel();
     BDD v1 = sylvan_newlevel();
     BDD v2 = sylvan_newlevel();
@@ -23,20 +27,18 @@ TASK_1(BDD, create_example_bdd, size_t, is_optimal)
     BDD v4 = sylvan_newlevel();
     BDD v5 = sylvan_newlevel();
 
-    BDD bdd;
     if (is_optimal) {
         // optimal order 0, 1, 2, 3, 4, 5
         // minimum 8 nodes including 2 terminal nodes
-        bdd = sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
+        return sylvan_or(sylvan_and(v0, v1), sylvan_or(sylvan_and(v2, v3), sylvan_and(v4, v5)));
     } else {
         // not optimal order 0, 3, 1, 4, 2, 5
         // minimum 16 nodes including 2 terminal nodes
-        bdd = sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
+        return sylvan_or(sylvan_and(v0, v3), sylvan_or(sylvan_and(v1, v4), sylvan_and(v2, v5)));
     }
-    return bdd;
 }
-#define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 
+#define create_example_map(is_optimal) RUN(create_example_map, is_optimal)
 TASK_1(BDDMAP, create_example_map, size_t, is_optimal)
 {
     BDDMAP map = sylvan_map_empty();
@@ -44,7 +46,6 @@ TASK_1(BDDMAP, create_example_map, size_t, is_optimal)
     map = sylvan_map_add(map, 0, bdd);
     return map;
 }
-#define create_example_map(is_optimal) RUN(create_example_map, is_optimal)
 
 TASK_0(int, test_varswap)
 {
@@ -498,6 +499,45 @@ TASK_0(int, test_map_reorder)
     return 0;
 }
 
+TASK_0(int, test_interact)
+{
+    sylvan_gc();
+    sylvan_resetlevels();
+
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
+
+    interact_state_t state;
+    int success = interact_alloc(&state, sylvan_levelscount());
+    assert(success);
+    interact_init(&state);
+
+    assert(interact_test(&state, 0, 1));
+    assert(interact_test(&state, 1, 0));
+
+    for (size_t i = 2; i < sylvan_levelscount(); ++i) {
+        for (size_t j = i + 1; j < sylvan_levelscount(); ++j) {
+            // test interaction of variables belonging to bdd2
+            assert(interact_test(&state, i, j));
+            assert(interact_test(&state, j, i));
+            // test interaction of variables not belonging to bdd2
+            assert(!interact_test(&state, 0, j));
+            assert(!interact_test(&state, 0, i));
+            assert(!interact_test(&state, 1, j));
+            assert(!interact_test(&state, 1, i));
+        }
+    }
+
+    interact_free(&state);
+
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
+    return 0;
+}
+
 TASK_1(int, runtests, size_t, ntests)
 {
     printf("test_varswap\n");
@@ -518,14 +558,49 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
     printf("test_map_reorder\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_interact\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
+}
+
+static int terminate_reordering = 0;
+static size_t prev_size = 0;
+
+VOID_TASK_0(dyn_reordering_start)
+{
+    sylvan_gc();
+    size_t size = llmsset_count_marked(nodes);
+    prev_size = size;
+    printf("DRE: reordering: %zu size\n", size);
+}
+
+VOID_TASK_0(dyn_reordering_progress)
+{
+    size_t size = llmsset_count_marked(nodes);
+    if(prev_size == size) terminate_reordering = 1;
+    else prev_size = size;
+    printf("DRE: improved size to: %zu size\n", size);
+}
+
+VOID_TASK_0(dyn_reordering_end)
+{
+    sylvan_gc();
+    size_t size = llmsset_count_marked(nodes);
+    printf("DRE: done: %zu size\n", size);
+    // Report Sylvan statistics (includes info about variable reordering)
+    sylvan_stats_report(stdout);
+}
+
+int should_dyn_reordering_terminate()
+{
+    return terminate_reordering;
 }
 
 int main()
 {
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_sizes(4LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
+    sylvan_set_limits(1LL*1LL<<30, 1, 128);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -533,11 +608,18 @@ int main()
 
     sylvan_set_reorder_threshold(1);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 1000); // 1 second
+    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
 
-    size_t ntests = 5;
+    sylvan_re_hook_prere(TASK(dyn_reordering_start));
+    sylvan_re_hook_postre(TASK(dyn_reordering_end));
+    sylvan_re_hook_progre(TASK(dyn_reordering_progress));
+    sylvan_re_hook_termre(should_dyn_reordering_terminate);
+
+    size_t ntests = 2;
 
     int res = RUN(runtests, ntests);
+
+    sylvan_stats_report(stdout);
 
     sylvan_quit();
     lace_stop();

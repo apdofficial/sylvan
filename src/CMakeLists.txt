@@ -19,6 +19,7 @@ target_sources(sylvan
         sylvan_varswap.c
         sylvan_levels.c
         sylvan_reorder.c
+        sylvan_interact.c
         PUBLIC
         sylvan.h
         sylvan_bdd.h
@@ -41,6 +42,7 @@ target_sources(sylvan
         sylvan_levels.h
         sylvan_reorder.h
         sylvan_table.h
+        sylvan_interact.h
         )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})

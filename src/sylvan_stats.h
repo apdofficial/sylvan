@@ -106,6 +106,7 @@ typedef enum {
 
     /* Other counters */
     SYLVAN_GC_COUNT,
+    SYLVAN_RE_COUNT,
     LLMSSET_LOOKUP,
 
     SYLVAN_COUNTER_COUNTER
@@ -116,6 +117,7 @@ typedef enum {
 typedef enum
 {
     SYLVAN_GC,
+    SYLVAN_RE,
     SYLVAN_TIMER_COUNTER
 } Sylvan_Timers;
 

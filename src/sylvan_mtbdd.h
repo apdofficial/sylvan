@@ -63,8 +63,9 @@ typedef MTBDD MTBDDMAP;
  */
 static const MTBDD mtbdd_complement = 0x8000000000000000LL;
 //static const MTBDD mtbdd_notleaf    = 0x4000000000000000LL;
-static const MTBDD mtbdd_p2mark     = 0x2000000000000000LL;
+static const MTBDD mtbdd_flag     = 0x2000000000000000LL;
 //static const MTBDD mtbdd_mapnode    = 0x1000000000000000LL;
+static const MTBDD mtbdd_visited    = 0x0800000000000000LL;
 static const MTBDD mtbdd_false      = 0;
 static const MTBDD mtbdd_true       = 0x8000000000000000LL;
 static const MTBDD mtbdd_invalid    = 0xffffffffffffffffLL;
