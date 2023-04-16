@@ -38,12 +38,15 @@ Use dynamic reordering and/or static orders
 /* Configuration */
 static int workers = 1; // autodetect
 static int verbose = 1;
-static char* aag_filename = NULL; // filename of DOT file
+static char *aag_filename = NULL; // filename of DOT file
 static int static_reorder = 0;
 static int dynamic_reorder = 0;
 
 static int sloan_w1 = 1;
 static int sloan_w2 = 8;
+
+static int terminate_reordering = 0;
+static size_t prev_size = 0;
 
 /* argp configuration */
 static struct argp_option options[] =
@@ -83,7 +86,7 @@ parse_opt(int key, char *arg, struct argp_state *state)
     return 0;
 }
 
-static struct argp argp = { options, parse_opt, "<aag_file>", 0, 0, 0, 0 };
+static struct argp argp = {options, parse_opt, "<aag_file>", 0, 0, 0, 0};
 
 /* Obtain current wallclock time */
 static double
@@ -104,19 +107,19 @@ static double t_start;
 
 int did_gc = 0;
 
-uint8_t* buf;
+uint8_t *buf;
 size_t pos, size;
 
 int parser_peek()
 {
     if (pos == size) return EOF;
-    return (int)buf[pos];
+    return (int) buf[pos];
 }
 
 int parser_read()
 {
     if (pos == size) return EOF;
-    return (int)buf[pos++];
+    return (int) buf[pos++];
 }
 
 void parser_skip()
@@ -149,7 +152,7 @@ void read_ws()
 
 void read_token(const char *str)
 {
-    while (*str != 0) if (parser_read() != (int)(uint8_t)(*str++)) err();
+    while (*str != 0) if (parser_read() != (int) (uint8_t) (*str++)) err();
 }
 
 uint64_t read_uint()
@@ -159,7 +162,7 @@ uint64_t read_uint()
         int c = parser_peek();
         if (c < '0' || c > '9') return r;
         r *= 10;
-        r += c-'0';
+        r += c - '0';
         parser_skip();
     }
 }
@@ -168,7 +171,7 @@ int64_t read_int()
 {
     if (parser_peek() == '-') {
         parser_skip();
-        return -(int64_t)read_uint();
+        return -(int64_t) read_uint();
     } else {
         return read_uint();
     }
@@ -180,19 +183,19 @@ void read_string(std::string &s)
     while (1) {
         int c = parser_peek();
         if (c == EOF || c == '\n') return;
-        s += (char)c;
+        s += (char) c;
         parser_skip();
     }
 }
 
 int *level_to_var;
 
-#define make_gate(a,b,c,d,e,f) CALL(make_gate,a,b,c,d,e,f)
+#define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
     if (gates[a] != sylvan_invalid) return;
-    int lft = gatelft[a]/2;
-    int rgt = gatergt[a]/2;
+    int lft = gatelft[a] / 2;
+    int rgt = gatergt[a] / 2;
     /*
     if (verbose) {
         INFO("Going to make gate %d with lhs %d (%d) and rhs %d (%d)\n", a, lft, lookup[lft], rgt, lookup[rgt]);
@@ -215,8 +218,8 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
     } else {
         r = mtbdd_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
     }
-    if (gatelft[a]&1) l = sylvan_not(l);
-    if (gatergt[a]&1) r = sylvan_not(r);
+    if (gatelft[a] & 1) l = sylvan_not(l);
+    if (gatergt[a] & 1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
 
@@ -379,27 +382,27 @@ VOID_TASK_0(parse)
             }
         }
 
-         boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
+        boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
         std::vector<Vertex> inv_perm(boost::num_vertices(g));
 
         boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g),
                               boost::get(boost::vertex_priority, g), sloan_w1, sloan_w2);
 
-        level_to_var = new int[M+1];
-        for (unsigned int i=0; i<=M; i++) level_to_var[i] = -1;
+        level_to_var = new int[M + 1];
+        for (unsigned int i = 0; i <= M; i++) level_to_var[i] = -1;
 
         int r = 0;
-        for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
+        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
             int j = index_map[*i];
             printf("%d %d\n", r++, j);
         }
 
         r = 0;
-        for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
-            int j = (*i)+1;
+        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
+            int j = (*i) + 1;
             if (level_to_var[j] != -1) {
                 printf("ERROR: level_to_var of %d is already %d (%d)\n", j, level_to_var[j], r);
-                for (unsigned int i=1; i<=M; i++) {
+                for (unsigned int i = 1; i <= M; i++) {
                     if (level_to_var[i] == -1) printf("%d is still -1\n", i);
                     level_to_var[i] = r++;
                 }
@@ -414,25 +417,25 @@ VOID_TASK_0(parse)
         if (0) {
             for (unsigned m = 0; m < M * M; m++) matrix[m] = 0;
 
-            for (uint64_t i=0; i<I; i++) {
-                int v = level_to_var[inputs[i]/2];
-                matrix[v*M+v] = 1;
+            for (uint64_t i = 0; i < I; i++) {
+                int v = level_to_var[inputs[i] / 2];
+                matrix[v * M + v] = 1;
             }
 
-            for (uint64_t l=0; l<L; l++) {
-                int v = level_to_var[latches[l]/2];
-                int n = level_to_var[l_next[l]/2];
-                matrix[v*M+v] = 1; // l -> l
+            for (uint64_t l = 0; l < L; l++) {
+                int v = level_to_var[latches[l] / 2];
+                int n = level_to_var[l_next[l] / 2];
+                matrix[v * M + v] = 1; // l -> l
                 if (n >= 0) {
                     matrix[v * M + n] = 1; // l -> n
                 }
             }
 
-            for (uint64_t a=0; a<A; a++) {
-                int v = level_to_var[gatelhs[a]/2];
-                int x = level_to_var[gatelft[a]/2];
-                int y = level_to_var[gatergt[a]/2];
-                matrix[v*M+v] = 1;
+            for (uint64_t a = 0; a < A; a++) {
+                int v = level_to_var[gatelhs[a] / 2];
+                int x = level_to_var[gatelft[a] / 2];
+                int y = level_to_var[gatergt[a] / 2];
+                matrix[v * M + v] = 1;
                 if (x >= 0) {
                     matrix[v * M + x] = 1;
                 }
@@ -452,8 +455,8 @@ VOID_TASK_0(parse)
 
         delete[] matrix;
     } else {
-        level_to_var = new int[M+1];
-        for (unsigned int i=0; i<=M; i++) level_to_var[i] = i-1;
+        level_to_var = new int[M + 1];
+        for (unsigned int i = 0; i <= M; i++) level_to_var[i] = i - 1;
     }
 
     /*
@@ -499,9 +502,9 @@ VOID_TASK_0(parse)
         read_wsnl();
         if (c == 'i') {
             if (strncmp(s.c_str(), "controllable_", 13) == 0) {
-                Xc = sylvan_set_add(Xc, level_to_var[inputs[pos]/2]);
+                Xc = sylvan_set_add(Xc, level_to_var[inputs[pos] / 2]);
             } else {
-                Xu = sylvan_set_add(Xu, level_to_var[inputs[pos]/2]);
+                Xu = sylvan_set_add(Xu, level_to_var[inputs[pos] / 2]);
             }
         }
     }
@@ -514,7 +517,7 @@ VOID_TASK_0(parse)
 #endif
 
     INFO("There are %zu controllable and %zu uncontrollable inputs.\n",
-        sylvan_set_count(Xc), sylvan_set_count(Xu));
+         sylvan_set_count(Xc), sylvan_set_count(Xu));
 
     // sylvan_stats_report(stdout);
 
@@ -569,8 +572,8 @@ VOID_TASK_0(parse)
     MTBDD Lvars = sylvan_set_empty();
     mtbdd_protect(&Lvars);
 
-    for (uint64_t l=0; l<L; l++) {
-        Lvars = sylvan_set_add(Lvars, level_to_var[latches[l]/2]);
+    for (uint64_t l = 0; l < L; l++) {
+        Lvars = sylvan_set_add(Lvars, level_to_var[latches[l] / 2]);
     }
 
 #if 0
@@ -586,21 +589,21 @@ VOID_TASK_0(parse)
 
     for (uint64_t l = 0; l < L; l++) {
         MTBDD nxt;
-        if (lookup[l_next[l]/2] == -1) {
-            nxt = mtbdd_ithlevel(level_to_var[l_next[l]/2]);
+        if (lookup[l_next[l] / 2] == -1) {
+            nxt = mtbdd_ithlevel(level_to_var[l_next[l] / 2]);
         } else {
             nxt = gates[lookup[l_next[l] / 2]];
         }
-        if (l_next[l]&1) nxt = sylvan_not(nxt);
-        CV = sylvan_map_add(CV, level_to_var[latches[l]/2], nxt);
+        if (l_next[l] & 1) nxt = sylvan_not(nxt);
+        CV = sylvan_map_add(CV, level_to_var[latches[l] / 2], nxt);
     }
 
     // now make output
-    INFO("output is %d (lookup: %d)\n", outputs[0], lookup[outputs[0]/2]);
+    INFO("output is %d (lookup: %d)\n", outputs[0], lookup[outputs[0] / 2]);
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
-    if (lookup[outputs[0]/2] == -1) {
-        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0]/2]);
+    if (lookup[outputs[0] / 2] == -1) {
+        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0] / 2]);
     } else {
         Unsafe = gates[lookup[outputs[0] / 2]];
     }
@@ -641,7 +644,7 @@ VOID_TASK_0(parse)
         Step = sylvan_forall(Step, Xc);
         // INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
         Step = sylvan_exists(Step, Xu);
-        // INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
+//         INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
 
         /*
         MTBDD supp = sylvan_support(Step);
@@ -683,6 +686,7 @@ VOID_TASK_0(parse)
 
 VOID_TASK_0(gc_mark)
 {
+
 }
 
 VOID_TASK_0(gc_start)
@@ -699,10 +703,7 @@ VOID_TASK_0(gc_end)
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
 }
 
-static int terminate_reordering = 0;
-static size_t prev_size = 0;
-
-VOID_TASK_0(dyn_reordering_start)
+VOID_TASK_0(reordering_start)
 {
     sylvan_gc_enable();
     sylvan_gc();
@@ -711,15 +712,15 @@ VOID_TASK_0(dyn_reordering_start)
     INFO("RE: start: %zu size\n", size);
 }
 
-VOID_TASK_0(dyn_reordering_progress)
+VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    if(prev_size == size) terminate_reordering = 1;
+    if (prev_size == size) terminate_reordering = 1;
     else prev_size = size;
     INFO("RE: progress: %zu size\n", size);
 }
 
-VOID_TASK_0(dyn_reordering_end)
+VOID_TASK_0(reordering_end)
 {
     size_t size = llmsset_count_marked(nodes);
     INFO("RE: end: %zu size\n", size);
@@ -727,7 +728,7 @@ VOID_TASK_0(dyn_reordering_end)
     sylvan_stats_report(stdout);
 }
 
-int should_dyn_reordering_terminate()
+int should_reordering_terminate()
 {
     return terminate_reordering;
 }
@@ -745,7 +746,7 @@ int main(int argc, char **argv)
 
     // Init Sylvan
     // Give 4 GB memory
-    sylvan_set_limits(4LL*1LL<<30, 1, 4);
+    sylvan_set_limits(4LL * 1LL << 30, 1, 4);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -754,10 +755,10 @@ int main(int argc, char **argv)
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(10 * 60 * 1000); // 10 minute
 
-    sylvan_re_hook_prere(TASK(dyn_reordering_start));
-    sylvan_re_hook_postre(TASK(dyn_reordering_end));
-    sylvan_re_hook_progre(TASK(dyn_reordering_progress));
-    sylvan_re_hook_termre(should_dyn_reordering_terminate);
+    sylvan_re_hook_prere(TASK(reordering_start));
+    sylvan_re_hook_postre(TASK(reordering_end));
+    sylvan_re_hook_progre(TASK(reordering_progress));
+    sylvan_re_hook_termre(should_reordering_terminate);
 
     // Set hooks for logging garbage collection
     if (verbose) {
@@ -772,7 +773,7 @@ int main(int argc, char **argv)
     int fd = open(aag_filename, O_RDONLY);
 
     struct stat filestat;
-    if(fstat(fd, &filestat) != 0) Abort("cannot stat file\n");
+    if (fstat(fd, &filestat) != 0) Abort("cannot stat file\n");
     size = filestat.st_size;
 
     buf = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
