@@ -174,7 +174,9 @@ void sylvan_set_reorder_timelimit(double time_limit)
 static inline void update_best_pos(sifting_state_t *state)
 {
     state->size = llmsset_count_marked(nodes);
-    if (state->size < state->best_size) {
+    // update even if the size is the same
+    // because this becomes the best closest position to our current position
+    if (state->size <= state->best_size) {
         state->best_size = state->size;
         state->best_pos = state->pos;
     }
@@ -184,8 +186,6 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
 {
     return ((float) (state->size) >= configs.max_growth * (float) (state->best_size));
 }
-
-
 
 TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 {
@@ -269,7 +269,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
 
-    sylvan_gc();
     sylvan_gc_disable();
 
     if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
@@ -347,7 +346,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     }
 
     sylvan_gc_enable();
-    sylvan_gc();
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
         WRAP(e->cb);
