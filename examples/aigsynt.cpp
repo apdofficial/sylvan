@@ -625,15 +625,15 @@ VOID_TASK_0(parse)
     mtbdd_protect(&OldUnsafe);
     mtbdd_protect(&Step);
 
-    int iteration = 0;
+//    int iteration = 0;
 
 
     while (Unsafe != OldUnsafe) {
         OldUnsafe = Unsafe;
-        iteration++;
-        if (verbose) {
-            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
-        }
+//        iteration++;
+//        if (verbose) {
+//            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
+//        }
         // INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
         // INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
         Step = sylvan_compose(Unsafe, CV);
@@ -704,6 +704,7 @@ static size_t prev_size = 0;
 
 VOID_TASK_0(dyn_reordering_start)
 {
+    sylvan_gc_enable();
     sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
     prev_size = size;
@@ -720,7 +721,6 @@ VOID_TASK_0(dyn_reordering_progress)
 
 VOID_TASK_0(dyn_reordering_end)
 {
-    sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
     INFO("RE: end: %zu size\n", size);
     // Report Sylvan statistics (includes info about variable reordering)
