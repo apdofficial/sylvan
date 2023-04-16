@@ -699,6 +699,39 @@ VOID_TASK_0(gc_end)
     INFO("Garbage collection done of %zu/%zu size\n", used, total);
 }
 
+static int terminate_reordering = 0;
+static size_t prev_size = 0;
+
+VOID_TASK_0(dyn_reordering_start)
+{
+    sylvan_gc();
+    size_t size = llmsset_count_marked(nodes);
+    prev_size = size;
+    INFO("RE: start: %zu size\n", size);
+}
+
+VOID_TASK_0(dyn_reordering_progress)
+{
+    size_t size = llmsset_count_marked(nodes);
+    if(prev_size == size) terminate_reordering = 1;
+    else prev_size = size;
+    INFO("RE: progress: %zu size\n", size);
+}
+
+VOID_TASK_0(dyn_reordering_end)
+{
+    sylvan_gc();
+    size_t size = llmsset_count_marked(nodes);
+    INFO("RE: end: %zu size\n", size);
+    // Report Sylvan statistics (includes info about variable reordering)
+    sylvan_stats_report(stdout);
+}
+
+int should_dyn_reordering_terminate()
+{
+    return terminate_reordering;
+}
+
 int main(int argc, char **argv)
 {
     // Load start time (for the output)
@@ -718,6 +751,13 @@ int main(int argc, char **argv)
     sylvan_init_reorder();
 
     sylvan_set_reorder_threshold(128);
+    sylvan_set_reorder_maxgrowth(1.2f);
+    sylvan_set_reorder_timelimit(10 * 60 * 1000); // 10 minute
+
+    sylvan_re_hook_prere(TASK(dyn_reordering_start));
+    sylvan_re_hook_postre(TASK(dyn_reordering_end));
+    sylvan_re_hook_progre(TASK(dyn_reordering_progress));
+    sylvan_re_hook_termre(should_dyn_reordering_terminate);
 
     // Set hooks for logging garbage collection
     if (verbose) {
@@ -737,7 +777,7 @@ int main(int argc, char **argv)
 
     buf = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     if (buf == MAP_FAILED) Abort("mmap failed\n");
-    sylvan_gc_disable();
+//    sylvan_gc_disable();
     RUN(parse);
 
     // Report Sylvan statistics (if SYLVAN_STATS is set)
