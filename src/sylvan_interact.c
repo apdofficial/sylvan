@@ -12,7 +12,7 @@ char interact_alloc(interact_state_t *state, size_t nvars)
     // Allocate columns for each row
     for (size_t i = 0; i < state->nrows; i++) {
         state->interact[i] = (char *) calloc(state->ncols, sizeof(char *));
-         if (!state->interact[i]) {
+        if (!state->interact[i]) {
             fprintf(stderr, "interact_alloc failed to allocate new memory!");
             return 0;
         }
@@ -94,17 +94,17 @@ VOID_TASK_2(find_support, MTBDD, f, char*, support)
     if (mtbdd_isleaf(f)) return;
     mtbddnode_t node = MTBDD_GETNODE(f);
     if (mtbddnode_getflag(node) == 1) return;
+    // TODO: fix array mutation from the thread local stack
+    support[mtbddnode_getvariable(node)] = 1;
 
     SPAWN(find_support, mtbdd_gethigh(f), support);
     CALL(find_support, mtbdd_getlow(f), support);
     SYNC(find_support);
 
-    // TODO: fix array mutation from the thread local stack
-    support[mtbddnode_getvariable(node)] = 1;
     // local visited node used for calculating support array
     mtbddnode_setflag(node, 1);
     // global visited node used to determining root nodes
-    mtbddnode_setvisited(MTBDD_GETNODE(f), 1);
+    mtbddnode_setvisited(node, 1);
 }
 
 #define clear_flags(f) RUN(clear_flags, f)
@@ -124,7 +124,7 @@ VOID_TASK_1(clear_flags, MTBDD, f)
 #define clear_visited() RUN(clear_visited, 0, nodes->table_size)
 VOID_TASK_2(clear_visited, size_t, first, size_t, count)
 {
-    if (count > COUNT_NODES_BLOCK_SIZE) {
+    if (count > 1024) {
         size_t split = count / 2;
         SPAWN(clear_visited, first, split);
         CALL(clear_visited, first + split, count - split);
@@ -138,7 +138,32 @@ VOID_TASK_2(clear_visited, size_t, first, size_t, count)
     }
 }
 
-VOID_TASK_IMPL_1(interact_init, interact_state_t*, state)
+char **subtables_malloc()
+{
+    char **subtables = calloc(levels->count, sizeof(char));
+    if (!subtables) {
+        fprintf(stderr, "interact_alloc failed to allocate new memory!");
+        return NULL;
+    }
+
+    for (size_t i = 0; i < levels->count; i++) {
+        subtables[i] = calloc(nodes->table_size, sizeof(char));
+        if (!subtables[i]) {
+            fprintf(stderr, "interact_alloc failed to allocate new memory!");
+            return NULL;
+        }
+    }
+    return subtables;
+}
+
+void subtables_free(char **subtables){
+    for (size_t i = 0; i < levels->count; i++) {
+        free(subtables[i]);
+        subtables[i] = NULL;
+    }
+}
+
+VOID_TASK_IMPL_1(interact_init, interact_state_t *, state)
 {
     size_t n = nodes->table_size;
     char *support = calloc(n, sizeof(char));
@@ -146,30 +171,42 @@ VOID_TASK_IMPL_1(interact_init, interact_state_t*, state)
         fprintf(stderr, "interact_init failed to allocate memory!");
         return;
     }
-    for (size_t i = 0; i < n; i++) support[i] = 0;
+    char **subtables = subtables_malloc();
+    sylvan_init_subtables(subtables);
 
-    for (size_t i = 0; i < n; i++) {
-        if (!llmsset_is_marked(nodes, i)) continue; // unused bucket
-        mtbddnode_t f = MTBDD_GETNODE(i);
-        // A node is a root of the DAG if it cannot be reached by nodes above it.
-        // If a node was never reached during the previous depth-first searches,
-        // then it is a root, and we start a new depth-first search from it.
-        if (!mtbddnode_getvisited(f)) {
-            support[mtbddnode_getvariable(f)] = 1;
-            mtbddnode_setvisited(f, 1);
+    for (size_t var = 0; var < levels->count; var++) {
+        char *nodelist = subtables[var];
+        size_t size = nodes->table_size;
+        for (size_t index = 0; index < size; ++index) {
+            if (!nodelist[index]) continue;
+            if (!llmsset_is_marked(nodes, index)) continue; // unused bucket
+            mtbddnode_t f = MTBDD_GETNODE(index);
+            if (mtbddnode_isleaf(f)) continue;
 
-            MTBDD f1 = mtbddnode_gethigh(f);
-            find_support(f1, support);
-            MTBDD f0 = mtbddnode_getlow(f);
-            find_support(f0, support);
+            // A node is a root of the DAG if it cannot be reached by nodes above it.
+            // If a node was never reached during the previous depth-first searches,
+            // then it is a root, and we start a new depth-first search from it.
+            if (!mtbddnode_getvisited(f)) {
+                support[mtbddnode_getvariable(f)] = 1;
+                mtbddnode_setvisited(f, 1);
 
-            clear_flags(f1);
-            clear_flags(f0);
+                MTBDD f1 = mtbddnode_gethigh(f);
+                MTBDD f0 = mtbddnode_getlow(f);
 
-            interact_update(state, support);
+                SPAWN(find_support, f1, support);
+                CALL(find_support, f0, support);
+                SYNC(find_support);
+
+                SPAWN(clear_flags, f1);
+                CALL(clear_flags, f0);
+                SYNC(clear_flags);
+
+                interact_update(state, support);
+            }
         }
     }
 
+    subtables_free(subtables);
     free(support);
     clear_visited();
 }

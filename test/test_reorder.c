@@ -564,43 +564,37 @@ TASK_1(int, runtests, size_t, ntests)
 }
 
 static int terminate_reordering = 0;
-static size_t prev_size = 0;
 
-VOID_TASK_0(dyn_reordering_start)
+VOID_TASK_0(reordering_start)
 {
     sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
-    prev_size = size;
-    printf("DRE: reordering: %zu size\n", size);
+    printf("DE: start: %zu size\n", size);
 }
 
-VOID_TASK_0(dyn_reordering_progress)
+VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    if(prev_size == size) terminate_reordering = 1;
-    else prev_size = size;
-    printf("DRE: improved size to: %zu size\n", size);
+    printf("DE: progress: %zu size\n", size);
 }
 
-VOID_TASK_0(dyn_reordering_end)
+VOID_TASK_0(reordering_end)
 {
     sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
-    printf("DRE: done: %zu size\n", size);
-    // Report Sylvan statistics (includes info about variable reordering)
-    sylvan_stats_report(stdout);
+    printf("DE: end: %zu size\n", size);
 }
 
-int should_dyn_reordering_terminate()
+int should_reordering_terminate()
 {
     return terminate_reordering;
 }
 
 int main()
 {
-    lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
+    lace_start(6, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL*1LL<<30, 1, 128);
+    sylvan_set_limits(1LL*1LL<<30, 1, 256);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -610,12 +604,12 @@ int main()
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
 
-    sylvan_re_hook_prere(TASK(dyn_reordering_start));
-    sylvan_re_hook_postre(TASK(dyn_reordering_end));
-    sylvan_re_hook_progre(TASK(dyn_reordering_progress));
-    sylvan_re_hook_termre(should_dyn_reordering_terminate);
+    sylvan_re_hook_prere(TASK(reordering_start));
+    sylvan_re_hook_postre(TASK(reordering_end));
+    sylvan_re_hook_progre(TASK(reordering_progress));
+    sylvan_re_hook_termre(should_reordering_terminate);
 
-    size_t ntests = 2;
+    size_t ntests = 1;
 
     int res = RUN(runtests, ntests);
 

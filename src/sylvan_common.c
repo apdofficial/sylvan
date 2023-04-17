@@ -266,9 +266,13 @@ VOID_TASK_IMPL_0(sylvan_gc)
 }
 
 /**
+ * The levels table usd with dynamic variable reordering.
+ */
+levels_t levels;
+
+/**
  * The unique table
  */
-
 llmsset_t nodes;
 
 static size_t table_min = 0, table_max = 0, cache_min = 0, cache_max = 0;

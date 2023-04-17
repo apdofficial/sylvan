@@ -24,7 +24,7 @@
 #include <sys/mman.h> // for mmap
 
 #ifndef compiler_barrier
-#define compiler_barrier() { asm volatile("" ::: "memory"); }
+#define compiler_barrier() { asm volatile("dmb ish" ::: "memory"); }
 #endif
 
 #ifndef cas
