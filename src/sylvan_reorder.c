@@ -288,7 +288,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 //    interact_init(&interact_state);
 
     // now count all variable levels (parallel...)
-    size_t level_counts[levels->count];
+    _Atomic(size_t) level_counts[levels->count];
     for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
     sylvan_count_levelnodes(level_counts);
     // mark and sort

@@ -39,7 +39,7 @@ levels_t mtbdd_levels_create();
  */
 void mtbdd_levels_free(levels_t dbs);
 
-VOID_TASK_DECL_3(sylvan_count_levelnodes, size_t*, size_t, size_t);
+VOID_TASK_DECL_3(sylvan_count_levelnodes, _Atomic(size_t)*, size_t, size_t);
 /**
  * @brief Count the number of nodes per real variable level in parallel.
  * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
@@ -126,12 +126,12 @@ void mtbdd_varswap(BDDVAR var);
 /**
  * @brief  Mark each level_count -1 which is below the threshold.
  */
-void mtbdd_mark_threshold(int* level, const size_t* level_counts, uint32_t threshold);
+void mtbdd_mark_threshold(int* level, const _Atomic(size_t)* level_counts, uint32_t threshold);
 
 /**
  * @brief  Sort the levels in descending order according to the number of nodes.
  */
-void gnome_sort(int *levels, const size_t *level_counts);
+void gnome_sort(int *levels, const _Atomic(size_t) *level_counts);
 
 #ifdef __cplusplus
 }

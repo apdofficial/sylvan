@@ -114,7 +114,7 @@ void mtbdd_levels_gc_add_mark_managed_refs(void)
  * @param level
  * @param level_counts
  */
-void gnome_sort(int *levels_arr, const size_t *level_counts)
+void gnome_sort(int *levels_arr, const _Atomic(size_t)* level_counts)
 {
     unsigned int i = 1;
     unsigned int j = 2;
@@ -131,7 +131,7 @@ void gnome_sort(int *levels_arr, const size_t *level_counts)
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_count_levelnodes, size_t*, arr, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_count_levelnodes, _Atomic(size_t)*, arr, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
         SPAWN(sylvan_count_levelnodes, arr, first, count / 2);
@@ -153,7 +153,7 @@ VOID_TASK_IMPL_3(sylvan_count_levelnodes, size_t*, arr, size_t, first, size_t, c
         /* these are atomic operations on a hot location with false sharing inside another
            thread's program stack... can't get much worse! */
         for (i = 0; i < levels->count; i++) {
-            __sync_add_and_fetch(&arr[i], tmp[i]);
+            atomic_fetch_add(&arr[i], tmp[i]);
         }
     }
 }
@@ -180,7 +180,7 @@ TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, coun
 }
 
 // set levels below the threshold to -1
-void mtbdd_mark_threshold(int *level, const size_t *level_counts, uint32_t threshold)
+void mtbdd_mark_threshold(int *level, const _Atomic(size_t) *level_counts, uint32_t threshold)
 {
     for (unsigned int i = 0; i < levels->count; i++) {
         if (level_counts[mtbdd_level_to_var(i)] < threshold) level[i] = -1;
