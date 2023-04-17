@@ -19,7 +19,6 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
-#include "sylvan_interact.h"
 
 /**
  * Block size tunes the granularity of the parallel distribution
@@ -136,7 +135,6 @@ void sylvan_init_reorder()
 
 void sylvan_quit_reorder()
 {
-    mtbdd_resetlevels();
     reorder_initialized = 0;
 }
 
@@ -219,7 +217,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
+TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
     for (; pos < target; pos++) {
         varswap_t res = sylvan_varswap(pos);
@@ -243,7 +241,7 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     int identity = 1;
 
     // check if permutation is identity
-    for (size_t level = 0; level < mtbdd_levelscount(); level++) {
+    for (size_t level = 0; level < levels->count; level++) {
         if (permutation[level] != mtbdd_level_to_var(level)) {
             identity = 0;
             break;
@@ -251,9 +249,9 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     }
     if (identity) return res;
 
-    for (size_t level = 0; level < mtbdd_levelscount(); ++level) {
-        BDDLABEL var = permutation[level];
-        BDDLABEL pos = mtbdd_var_to_level(var);
+    for (size_t level = 0; level < levels->count; ++level) {
+        uint32_t var = permutation[level];
+        uint32_t pos = mtbdd_var_to_level(var);
         res = sylvan_siftpos(pos, level);
         if (!sylvan_varswap_issuccess(res)) break;
     }
@@ -264,14 +262,14 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     return res;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
+TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 {
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
 
     sylvan_gc_disable();
 
-    if (mtbdd_levelscount() < 1) return SYLVAN_VARSWAP_ERROR;
+    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
 
     for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
@@ -282,22 +280,21 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     configs.total_num_var = 0;
 
     // if high == 0, then we sift all variables
-    if (high == 0) high = mtbdd_levelscount() - 1;
+    if (high == 0) high = levels->count - 1;
 
 //    interact_state_t interact_state;
-//    int success = interact_alloc(&interact_state, mtbdd_levelscount());
+//    int success = interact_alloc(&interact_state, levels->count);
 //    if (!success) return SYLVAN_VARSWAP_ERROR;
 //    interact_init(&interact_state);
 
     // now count all variable levels (parallel...)
-    size_t level_counts[mtbdd_levelscount()];
-    for (size_t i = 0; i < mtbdd_levelscount(); i++) level_counts[i] = 0;
-    sylvan_count_nodes(level_counts);
-
+    _Atomic(size_t) level_counts[levels->count];
+    for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
+    sylvan_count_levelnodes(level_counts);
     // mark and sort
-    int levels[mtbdd_levelscount()];
-    mtbdd_mark_threshold(levels, level_counts, configs.threshold);
-    gnome_sort(levels, level_counts);
+    int sorted_levels_counts[levels->count];
+    mtbdd_mark_threshold(sorted_levels_counts, level_counts, configs.threshold);
+    gnome_sort(sorted_levels_counts, level_counts);
 
     varswap_t res;
     sifting_state_t sifting_state;
@@ -306,9 +303,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
     sifting_state.size = llmsset_count_marked(nodes);
     sifting_state.best_size = sifting_state.size;
 
-    for (size_t i = 0; i < mtbdd_levelscount(); i++) {
-        if (levels[i] < 0) break; // marked level, done
-        uint64_t lvl = levels[i];
+
+    for (size_t i = 0; i < levels->count; i++) {
+        if (sorted_levels_counts[i] < 0) break; // marked level, done
+        uint64_t lvl = sorted_levels_counts[i];
 
         sifting_state.pos = mtbdd_level_to_var(lvl);
         if (sifting_state.pos < low || sifting_state.pos > high) continue; // skip, not in range

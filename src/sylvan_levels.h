@@ -14,6 +14,13 @@ extern "C" {
  * Initially, variables are assigned linearly, starting with 0.
  */
 
+typedef struct levels_db {
+    uint64_t *table;                // array holding the 1-node BDD for each level
+    size_t count;                   // number of created levels
+    uint32_t *level_to_var;         // current level wise var permutation (level to variable label)
+    uint32_t *var_to_level;         // current variable wise level permutation (variable label to level)
+} *levels_t;
+
 /**
  * 4096, because that is not very small, and not very large
  * typical kind of parameter that is open to tweaking, though I don't expect it matters so much
@@ -22,7 +29,17 @@ extern "C" {
  */
 #define COUNT_NODES_BLOCK_SIZE 4096
 
-VOID_TASK_DECL_3(sylvan_count_nodes, size_t*, size_t, size_t);
+/**
+ * @brief Create a new levels_t object
+ */
+levels_t mtbdd_levels_create();
+
+/**
+ * @brief Free a levels_t object
+ */
+void mtbdd_levels_free(levels_t dbs);
+
+VOID_TASK_DECL_3(sylvan_count_levelnodes, _Atomic(size_t)*, size_t, size_t);
 /**
  * @brief Count the number of nodes per real variable level in parallel.
  * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
@@ -30,7 +47,21 @@ VOID_TASK_DECL_3(sylvan_count_nodes, size_t*, size_t, size_t);
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define sylvan_count_nodes(level_counts) RUN(sylvan_count_nodes, level_counts, 0, nodes->table_size)
+#define sylvan_count_levelnodes(level_counts) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
+
+TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
+/**
+ * @brief Count the number of nodes for a given variable label.
+ */
+#define sylvan_count_nodes(var) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
+
+VOID_TASK_DECL_3(sylvan_init_subtables, char **, size_t, size_t);
+#define sylvan_init_subtables(subtables) RUN(sylvan_init_subtables, subtables, 0, nodes->table_size)
+
+/**
+ * @brief Get the number of levels
+ */
+size_t mtbdd_levelscount(void);
 
 /**
  * @brief Create the next level and return the BDD representing the variable (ithlevel)
@@ -57,28 +88,23 @@ void mtbdd_resetlevels(void);
  * however, after a swap they can point to a different variable
  * \param level for which the BDD needs to be returned
  */
-MTBDD mtbdd_ithlevel(BDDLEVEL level);
+MTBDD mtbdd_ithlevel(uint32_t level);
 
 /**
  * @brief  Get the level of the given variable
  */
-BDDLEVEL mtbdd_var_to_level(BDDVAR var);
+uint32_t mtbdd_var_to_level(BDDVAR var);
 
 /**
  * @brief  Get the variable of the given level
  */
-BDDVAR mtbdd_level_to_var(BDDLEVEL level);
-
-/**
- * \brief  Get the number of created levels
- */
-size_t mtbdd_levelscount(void);
+BDDVAR mtbdd_level_to_var(uint32_t level);
 
 /**
  * \brief  Return the level of the given internal node.
  * \param node for which the level needs to be returned
  */
-BDDLEVEL mtbdd_node_to_level(MTBDD node);
+uint32_t mtbdd_node_to_level(MTBDD node);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.
@@ -98,14 +124,14 @@ void mtbdd_levels_gc_add_mark_managed_refs(void);
 void mtbdd_varswap(BDDVAR var);
 
 /**
- * @brief  Mark all nodes that are reachable from the given level.
+ * @brief  Mark each level_count -1 which is below the threshold.
  */
-void mtbdd_mark_threshold(int* level, const size_t* level_counts, uint32_t threshold);
+void mtbdd_mark_threshold(int* level, const _Atomic(size_t)* level_counts, uint32_t threshold);
 
 /**
  * @brief  Sort the levels in descending order according to the number of nodes.
  */
-void gnome_sort(int *levels, const size_t *level_counts);
+void gnome_sort(int *levels, const _Atomic(size_t) *level_counts);
 
 #ifdef __cplusplus
 }

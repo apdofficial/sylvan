@@ -271,7 +271,7 @@ VOID_TASK_0(parse)
     if (O != 1) Abort("expecting 1 output\n");
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
-    mtbdd_newlevels(M + 1);
+    sylvan_newlevels(M + 1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", I, L, A);
 
@@ -537,10 +537,9 @@ VOID_TASK_0(parse)
     }
 #endif
 
-    sylvan_stats_report(stdout);
-
     if (dynamic_reorder) sylvan_reorder_all();
 
+    return;
 #if 0
     for (uint64_t g=0; g<A; g++) {
         MTBDD supp = sylvan_support(gates[g]);
@@ -603,7 +602,7 @@ VOID_TASK_0(parse)
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
     if (lookup[outputs[0] / 2] == -1) {
-        Unsafe = mtbdd_ithlevel(level_to_var[outputs[0] / 2]);
+        Unsafe = sylvan_ithlevel(level_to_var[outputs[0] / 2]);
     } else {
         Unsafe = gates[lookup[outputs[0] / 2]];
     }
@@ -715,8 +714,8 @@ VOID_TASK_0(reordering_start)
 VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    if (prev_size == size) terminate_reordering = 1;
-    else prev_size = size;
+    if (size <= 18851L) terminate_reordering = 1;
+//    else prev_size = size;
     INFO("RE: progress: %zu size\n", size);
 }
 
@@ -725,7 +724,7 @@ VOID_TASK_0(reordering_end)
     size_t size = llmsset_count_marked(nodes);
     INFO("RE: end: %zu size\n", size);
     // Report Sylvan statistics (includes info about variable reordering)
-    sylvan_stats_report(stdout);
+    if (verbose) sylvan_stats_report(stdout);
 }
 
 int should_reordering_terminate()
@@ -746,12 +745,12 @@ int main(int argc, char **argv)
 
     // Init Sylvan
     // Give 4 GB memory
-    sylvan_set_limits(4LL * 1LL << 30, 1, 4);
+    sylvan_set_limits(1LL * 1LL << 30, 1, 4);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_threshold(128);
+    sylvan_set_reorder_threshold(16);
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(10 * 60 * 1000); // 10 minute
 

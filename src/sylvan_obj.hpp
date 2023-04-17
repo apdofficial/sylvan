@@ -23,6 +23,8 @@
 
 #include <lace.h>
 #include <sylvan.h>
+#include "sylvan_varswap.h"
+#include "sylvan_reorder.h"
 
 namespace sylvan {
 
