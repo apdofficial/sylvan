@@ -75,19 +75,19 @@ void mtbdd_resetlevels(void)
     }
 }
 
-MTBDD mtbdd_ithlevel(BDDLEVEL level)
+MTBDD mtbdd_ithlevel(uint32_t level)
 {
     if (level < levels->count) return levels->table[levels->level_to_var[level]];
     else return mtbdd_invalid;
 }
 
-BDDLEVEL mtbdd_var_to_level(BDDVAR var)
+uint32_t mtbdd_var_to_level(BDDVAR var)
 {
     if (var < levels->count) return levels->var_to_level[var];
     else return var;
 }
 
-BDDVAR mtbdd_level_to_var(BDDLEVEL level)
+BDDVAR mtbdd_level_to_var(uint32_t level)
 {
     if (level < levels->count) return levels->level_to_var[level];
     else return level;

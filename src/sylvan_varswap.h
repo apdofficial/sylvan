@@ -50,7 +50,7 @@ static inline int sylvan_varswap_issuccess(varswap_t result)
 
 void sylvan_print_varswap_res(varswap_t result);
 
-TASK_DECL_1(varswap_t, sylvan_varswap, BDDLABEL);
+TASK_DECL_1(varswap_t, sylvan_varswap, uint32_t);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *

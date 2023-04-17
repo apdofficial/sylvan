@@ -25,12 +25,12 @@ extern "C" {
 
 typedef struct sifting_state
 {
-    BDDLABEL pos;
+    uint32_t pos;
     size_t size;
-    BDDLABEL best_pos;
+    uint32_t best_pos;
     size_t best_size;
-    BDDLABEL low;
-    BDDLABEL high;
+    uint32_t low;
+    uint32_t high;
 } sifting_state_t;
 
 typedef int (*re_term_cb)();
@@ -134,7 +134,7 @@ TASK_DECL_1(varswap_t, sylvan_siftup, sifting_state_t*);
  */
 #define sylvan_siftup(state) RUN(sylvan_siftup, state)
 
-TASK_DECL_2(varswap_t, sylvan_siftpos, BDDLABEL, BDDLABEL);
+TASK_DECL_2(varswap_t, sylvan_siftpos, uint32_t, uint32_t);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
@@ -142,7 +142,7 @@ TASK_DECL_2(varswap_t, sylvan_siftpos, BDDLABEL, BDDLABEL);
  */
 #define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
 
-TASK_DECL_2(varswap_t, sylvan_reorder, BDDLABEL, BDDLABEL);
+TASK_DECL_2(varswap_t, sylvan_reorder, uint32_t, uint32_t);
 /**
       @brief Reduce the heap size in the entire forest.
 

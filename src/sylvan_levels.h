@@ -88,23 +88,23 @@ void mtbdd_resetlevels(void);
  * however, after a swap they can point to a different variable
  * \param level for which the BDD needs to be returned
  */
-MTBDD mtbdd_ithlevel(BDDLEVEL level);
+MTBDD mtbdd_ithlevel(uint32_t level);
 
 /**
  * @brief  Get the level of the given variable
  */
-BDDLEVEL mtbdd_var_to_level(BDDVAR var);
+uint32_t mtbdd_var_to_level(BDDVAR var);
 
 /**
  * @brief  Get the variable of the given level
  */
-BDDVAR mtbdd_level_to_var(BDDLEVEL level);
+BDDVAR mtbdd_level_to_var(uint32_t level);
 
 /**
  * \brief  Return the level of the given internal node.
  * \param node for which the level needs to be returned
  */
-BDDLEVEL mtbdd_node_to_level(MTBDD node);
+uint32_t mtbdd_node_to_level(MTBDD node);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.
