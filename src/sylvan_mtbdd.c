@@ -391,6 +391,8 @@ mtbdd_quit()
         mtbdd_protected_created = 0;
     }
 
+    mtbdd_levels_free(levels);
+
     mtbdd_initialized = 0;
 }
 
@@ -411,6 +413,8 @@ sylvan_init_mtbdd()
         protect_create(&mtbdd_protected, 4096);
         mtbdd_protected_created = 1;
     }
+
+    levels = mtbdd_levels_create();
 
     RUN(mtbdd_refs_init);
 }
