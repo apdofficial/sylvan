@@ -1,27 +1,27 @@
-#include <argp.h>
-#include <cassert>
-#include <cinttypes>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <sys/mman.h>
+#include <getopt.h>
+#include <inttypes.h>
+#include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <cstdint>
-
-#include <sylvan.h>
-#include <sylvan_obj.hpp>
-
-#include <string>
-
+#include <getrss.h>
+#include <sys/mman.h>
 #include <boost/config.hpp>
 #include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
-#include "sylvan_reorder.h"
-#include "sylvan_common.h"
-#include "sylvan_int.h"
+#include <string>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <cassert>
+#include <cinttypes>
+
+#include <sylvan.h>
+#include <sylvan_int.h>
+#include <sylvan_table.h>
+#include <sylvan_reorder.h>
+
 
 using namespace sylvan;
 
@@ -36,57 +36,80 @@ Use dynamic reordering and/or static orders
 **************************************************/
 
 /* Configuration */
-static int workers = 1; // autodetect
+static int workers = 4;
 static int verbose = 1;
-static char *aag_filename = NULL; // filename of DOT file
+static char *model_filename = NULL; // filename of the aag file
 static int static_reorder = 0;
-static int dynamic_reorder = 0;
+static int dynamic_reorder = 1;
 
 static int sloan_w1 = 1;
 static int sloan_w2 = 8;
 
 static int terminate_reordering = 0;
-static size_t prev_size = 0;
 
-/* argp configuration */
-static struct argp_option options[] =
-        {
-                {"workers",         'w', "<workers>", 0, "Number of workers (default=0: autodetect)", 0},
-                {"verbose",         'v', 0,           0, "Set verbose",                               0},
-                {"static reorder",  's', 0,           0, "Reorder with Sloan",                        0},
-                {"dynamic reorder", 'd', 0,           0, "Dynamic reordering with Sylvan",            0},
-                {0,                 0,   0,           0, 0,                                           0}
-        };
-
-static error_t
-parse_opt(int key, char *arg, struct argp_state *state)
+static void
+print_usage()
 {
-    switch (key) {
-        case 'w':
-            workers = atoi(arg);
-            break;
-        case 's':
-            static_reorder = 1;
-            break;
-        case 'd':
-            dynamic_reorder = 1;
-            break;
-        case 'v':
-            verbose = 1;
-            break;
-        case ARGP_KEY_ARG:
-            if (state->arg_num == 0) aag_filename = arg;
-            if (state->arg_num >= 1) argp_usage(state);
-            break;
-        case ARGP_KEY_END:
-            break;
-        default:
-            return ARGP_ERR_UNKNOWN;
-    }
-    return 0;
+    printf("Usage: aigsynt [-w <workers>] [-d --dynamic-reordering] [-s --static-reordering]\n");
+    printf("               [-v --verbose] [--help] [--usage] <model> [<output-bdd>]\n");
 }
 
-static struct argp argp = {options, parse_opt, "<aag_file>", 0, 0, 0, 0};
+static void
+print_help()
+{
+    printf("Usage: aigsynt [OPTION...] <model> [<output-bdd>]\n\n");
+    printf("                             Strategy for reachability (default=par)\n");
+    printf("  -d,                        Dynamic variable ordering\n");
+    printf("  -w, --workers=<workers>    Number of workers (default=0: autodetect)\n");
+    printf("  -v,                        Dynamic variable ordering\n");
+    printf("  -s,                        Reorder with Sloan\n");
+    printf("  -h, --help                 Give this help list\n");
+    printf("      --usage                Give a short usage message\n");
+}
+
+static void
+parse_args(int argc, char **argv)
+{
+    static const option longopts[] = {
+            {"workers",            required_argument, (int *) 'w', 1},
+            {"dynamic-reordering", no_argument,       nullptr,     'v'},
+            {"static-reordering",  no_argument,       nullptr,     'v'},
+            {"verbose",            no_argument,       nullptr,     'v'},
+            {"help",               no_argument,       nullptr,     'h'},
+            {"usage",              no_argument,       nullptr,     99},
+            {nullptr,              no_argument,       nullptr,     0},
+    };
+    int key = 0;
+    int long_index = 0;
+    while ((key = getopt_long(argc, argv, "w:s:h", longopts, &long_index)) != -1) {
+        switch (key) {
+            case 'w':
+                workers = atoi(optarg);
+                break;
+            case 's':
+                static_reorder = 1;
+                break;
+            case 'd':
+                dynamic_reorder = 1;
+                break;
+            case 'v':
+                verbose = 1;
+                break;
+            case 99:
+                print_usage();
+                exit(0);
+            case 'h':
+                print_help();
+                exit(0);
+        }
+    }
+    if (optind >= argc) {
+        print_usage();
+        exit(0);
+    }
+    model_filename = argv[optind];
+    printf("Model file: %s", model_filename);
+}
 
 /* Obtain current wallclock time */
 static double
@@ -367,10 +390,10 @@ VOID_TASK_0(parse)
             }
         }
 
-        typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS,
-                boost::property<boost::vertex_color_t, boost::default_color_type,
-                        boost::property<boost::vertex_degree_t, int,
-                                boost::property<boost::vertex_priority_t, double>>>> Graph;
+        typedef boost::adjacency_list <boost::setS, boost::vecS, boost::undirectedS,
+        boost::property<boost::vertex_color_t, boost::default_color_type,
+                boost::property < boost::vertex_degree_t, int,
+                boost::property < boost::vertex_priority_t, double>>>> Graph;
 
         typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 
@@ -707,7 +730,6 @@ VOID_TASK_0(reordering_start)
     sylvan_gc_enable();
     sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
-    prev_size = size;
     INFO("RE: start: %zu size\n", size);
 }
 
@@ -715,7 +737,6 @@ VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
     if (size <= 18851L) terminate_reordering = 1;
-//    else prev_size = size;
     INFO("RE: progress: %zu size\n", size);
 }
 
@@ -723,8 +744,6 @@ VOID_TASK_0(reordering_end)
 {
     size_t size = llmsset_count_marked(nodes);
     INFO("RE: end: %zu size\n", size);
-    // Report Sylvan statistics (includes info about variable reordering)
-    if (verbose) sylvan_stats_report(stdout);
 }
 
 int should_reordering_terminate()
@@ -734,14 +753,22 @@ int should_reordering_terminate()
 
 int main(int argc, char **argv)
 {
-    // Load start time (for the output)
+    /**
+     * Parse command line, set locale, set startup time for INFO messages.
+     */
+    parse_args(argc, argv);
+    setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    // Parse arguments
-    argp_parse(&argp, argc, argv, 0, 0, 0);
+    /**
+     * Initialize Lace.
+     *
+     * First: setup with given number of workers (0 for autodetect) and some large size task queue.
+     * Second: start all worker threads with default settings.
+     * Third: setup local variables using the LACE_ME macro.
+     */
+    lace_start(workers, 1000000);
 
-    // Init Lace
-    lace_start(workers, 1000000); // auto-detect number of workers, use a 1,000,000 size task queue
 
     // Init Sylvan
     // Give 4 GB memory
@@ -765,11 +792,11 @@ int main(int argc, char **argv)
         sylvan_gc_hook_postgc(TASK(gc_end));
     }
 
-    if (aag_filename == NULL) {
+    if (model_filename == NULL) {
         Abort("stream not yet supported\n");
     }
 
-    int fd = open(aag_filename, O_RDONLY);
+    int fd = open(model_filename, O_RDONLY);
 
     struct stat filestat;
     if (fstat(fd, &filestat) != 0) Abort("cannot stat file\n");
@@ -777,7 +804,7 @@ int main(int argc, char **argv)
 
     buf = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     if (buf == MAP_FAILED) Abort("mmap failed\n");
-//    sylvan_gc_disable();
+
     RUN(parse);
 
     // Report Sylvan statistics (if SYLVAN_STATS is set)
