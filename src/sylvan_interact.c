@@ -140,7 +140,7 @@ VOID_TASK_2(clear_visited, size_t, first, size_t, count)
 
 char **subtables_malloc()
 {
-    char **subtables = calloc(levels->count, sizeof(char));
+    char **subtables = calloc(levels->count, sizeof(char *));
     if (!subtables) {
         fprintf(stderr, "interact_alloc failed to allocate new memory!");
         return NULL;

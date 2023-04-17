@@ -1,4 +1,4 @@
-#include <argp.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <locale.h>
 #include <stdio.h>
@@ -11,7 +11,7 @@
 #include <sylvan.h>
 #include <sylvan_int.h>
 
-/* Configuration (via argp) */
+/* Configuration */
 static int report_levels = 0; // report states at end of every level
 static int report_table = 0; // report table size at end of every level
 static int report_nodes = 0; // report number of nodes of BDDs
@@ -22,64 +22,97 @@ static int print_transition_matrix = 0; // print transition relation matrix
 static int workers = 0; // autodetect
 static char* model_filename = NULL; // filename of model
 
-/* argp configuration */
-static struct argp_option options[] =
+static void
+print_usage()
 {
-    {"workers", 'w', "<workers>", 0, "Number of workers (default=0: autodetect)", 0},
-    {"strategy", 's', "<bfs|par|sat|chaining>", 0, "Strategy for reachability (default=sat)", 0},
-    {"deadlocks", 3, 0, 0, "Check for deadlocks", 1},
-    {"count-nodes", 5, 0, 0, "Report #nodes for BDDs", 1},
-    {"count-states", 1, 0, 0, "Report #states at each level", 1},
-    {"count-table", 2, 0, 0, "Report table usage at each level", 1},
-    {"merge-relations", 6, 0, 0, "Merge transition relations into one transition relation", 1},
-    {"print-matrix", 4, 0, 0, "Print transition matrix", 1},
-    {0, 0, 0, 0, 0, 0}
-};
-static error_t
-parse_opt(int key, char *arg, struct argp_state *state)
-{
-    switch (key) {
-    case 'w':
-        workers = atoi(arg);
-        break;
-    case 's':
-        if (strcmp(arg, "bfs")==0) strategy = 0;
-        else if (strcmp(arg, "par")==0) strategy = 1;
-        else if (strcmp(arg, "sat")==0) strategy = 2;
-        else if (strcmp(arg, "chaining")==0) strategy = 3;
-        else argp_usage(state);
-        break;
-    case 4:
-        print_transition_matrix = 1;
-        break;
-    case 3:
-        check_deadlocks = 1;
-        break;
-    case 1:
-        report_levels = 1;
-        break;
-    case 2:
-        report_table = 1;
-        break;
-    case 5:
-        report_nodes = 1;
-        break;
-    case 6:
-        merge_relations = 1;
-        break;
-    case ARGP_KEY_ARG:
-        if (state->arg_num >= 1) argp_usage(state);
-        model_filename = arg;
-        break;
-    case ARGP_KEY_END:
-        if (state->arg_num < 1) argp_usage(state);
-        break;
-    default:
-        return ARGP_ERR_UNKNOWN;
-    }
-    return 0;
+    printf("Usage: bddmc [-h] [-s <bfs|par|sat|chaining>] [-w <workers>]\n");
+    printf("        [--strategy=<bfs|par|sat|chaining>] [--workers=<workers>]\n");
+    printf("        [--count-nodes] [--count-states] [--count-table] [--deadlocks]\n");
+    printf("        [--merge-relations] [--print-matrix] [--help] [--usage] <model>\n");
 }
-static struct argp argp = { options, parse_opt, "<model>", 0, 0, 0, 0 };
+
+static void
+print_help()
+{
+    printf("Usage: bddmc [OPTION...] <model>\n\n");
+    printf("  -s, --strategy=<bfs|par|sat|chaining>\n");
+    printf("                             Strategy for reachability (default=sat)\n");
+    printf("  -w, --workers=<workers>    Number of workers (default=0: autodetect)\n");
+    printf("      --count-nodes          Report #nodes for BDDs\n");
+    printf("      --count-states         Report #states at each level\n");
+    printf("      --count-table          Report table usage at each level\n");
+    printf("      --deadlocks            Check for deadlocks\n");
+    printf("      --merge-relations      Merge transition relations into one transition relation\n");
+    printf("      --print-matrix         Print transition matrix\n");
+    printf("  -h, --help                 Give this help list\n");
+    printf("      --usage                Give a short usage message\n");
+}
+
+static void
+parse_args(int argc, char **argv)
+{
+    static const struct option longopts[] = {
+        {.name = "workers", .val = 'w', .has_arg = required_argument},
+        {.name = "strategy", .val = 's', .has_arg = required_argument},
+        {.name = "deadlocks", .val = 3, .has_arg = no_argument},
+        {.name = "count-nodes", .val = 5, .has_arg = no_argument},
+        {.name = "count-states", .val = 1, .has_arg = no_argument},
+        {.name = "count-table", .val = 2, .has_arg = no_argument},
+        {.name = "merge-relations", .val = 6, .has_arg = no_argument},
+        {.name = "print-matrix", .val = 4, .has_arg = no_argument},
+        {.name = "help", .val = 'h', .has_arg = no_argument},
+        {.name = "usage", .val = 99, .has_arg = no_argument},
+        {},
+    };
+    int key = 0;
+    int long_index = 0;
+    while ((key = getopt_long(argc, argv, "w:s:h", longopts, &long_index)) != -1) {
+        switch (key) {
+            case 'w':
+                workers = atoi(optarg);
+                break;
+            case 's':
+                if (strcmp(optarg, "bfs")==0) strategy = 0;
+                else if (strcmp(optarg, "par")==0) strategy = 1;
+                else if (strcmp(optarg, "sat")==0) strategy = 2;
+                else if (strcmp(optarg, "chaining")==0) strategy = 3;
+                else {
+                    print_usage();
+                    exit(0);
+                }
+                break;
+            case 4:
+                print_transition_matrix = 1;
+                break;
+            case 3:
+                check_deadlocks = 1;
+                break;
+            case 1:
+                report_levels = 1;
+                break;
+            case 2:
+                report_table = 1;
+                break;
+            case 5:
+                report_nodes = 1;
+                break;
+            case 6:
+                merge_relations = 1;
+                break;
+            case 99:
+                print_usage();
+                exit(0);
+            case 'h':
+                print_help();
+                exit(0);
+        }
+    }
+    if (optind >= argc) {
+        print_usage();
+        exit(0);
+    }
+    model_filename = argv[optind];
+}
 
 /**
  * Types (set and relation)
@@ -439,7 +472,7 @@ VOID_TASK_1(par, set_t, set)
         next_level = CALL(go_par, cur_level, visited, 0, next_count, check_deadlocks ? &deadlocks : NULL);
 
         if (check_deadlocks && deadlocks != sylvan_false) {
-            INFO("Found %'0.0f deadlock states... ", sylvan_satcount(deadlocks, set->variables));
+            INFO("Found %0.0f deadlock states... ", sylvan_satcount(deadlocks, set->variables));
             if (deadlocks != sylvan_false) {
                 printf("example: ");
                 print_example(deadlocks, set->variables);
@@ -454,17 +487,17 @@ VOID_TASK_1(par, set_t, set)
         if (report_table && report_levels) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, %'0.0f states explored, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, %0.0f states explored, table: %0.1f%% full (%zu nodes)\n",
                 iteration, sylvan_satcount(visited, set->variables),
                 100.0*(double)filled/total, filled);
         } else if (report_table) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, table: %0.1f%% full (%zu nodes)\n",
                 iteration,
                 100.0*(double)filled/total, filled);
         } else if (report_levels) {
-            INFO("Level %d done, %'0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
+            INFO("Level %d done, %0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
         } else {
             INFO("Level %d done\n", iteration);
         }
@@ -555,7 +588,7 @@ VOID_TASK_1(bfs, set_t, set)
         next_level = CALL(go_bfs, cur_level, visited, 0, next_count, check_deadlocks ? &deadlocks : NULL);
 
         if (check_deadlocks && deadlocks != sylvan_false) {
-            INFO("Found %'0.0f deadlock states... ", sylvan_satcount(deadlocks, set->variables));
+            INFO("Found %0.0f deadlock states... ", sylvan_satcount(deadlocks, set->variables));
             if (deadlocks != sylvan_false) {
                 printf("example: ");
                 print_example(deadlocks, set->variables);
@@ -570,17 +603,17 @@ VOID_TASK_1(bfs, set_t, set)
         if (report_table && report_levels) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, %'0.0f states explored, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, %0.0f states explored, table: %0.1f%% full (%zu nodes)\n",
                 iteration, sylvan_satcount(visited, set->variables),
                 100.0*(double)filled/total, filled);
         } else if (report_table) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, table: %0.1f%% full (%zu nodes)\n",
                 iteration,
                 100.0*(double)filled/total, filled);
         } else if (report_levels) {
-            INFO("Level %d done, %'0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
+            INFO("Level %d done, %0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
         } else {
             INFO("Level %d done\n", iteration);
         }
@@ -625,17 +658,17 @@ VOID_TASK_1(chaining, set_t, set)
         if (report_table && report_levels) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, %'0.0f states explored, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, %0.0f states explored, table: %0.1f%% full (%zu nodes)\n",
                 iteration, sylvan_satcount(visited, set->variables),
                 100.0*(double)filled/total, filled);
         } else if (report_table) {
             size_t filled, total;
             sylvan_table_usage(&filled, &total);
-            INFO("Level %d done, table: %0.1f%% full (%'zu nodes)\n",
+            INFO("Level %d done, table: %0.1f%% full (%zu nodes)\n",
                 iteration,
                 100.0*(double)filled/total, filled);
         } else if (report_levels) {
-            INFO("Level %d done, %'0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
+            INFO("Level %d done, %0.0f states explored\n", iteration, sylvan_satcount(visited, set->variables));
         } else {
             INFO("Level %d done\n", iteration);
         }
@@ -744,52 +777,14 @@ print_h(double size)
     printf("%.*f %s", i, size, units[i]);
 }
 
-int
-main(int argc, char **argv)
+VOID_TASK_0(run)
 {
-    /**
-     * Parse command line, set locale, set startup time for INFO messages.
-     */
-    argp_parse(&argp, argc, argv, 0, 0, 0);
-    setlocale(LC_NUMERIC, "en_US.utf-8");
-    t_start = wctime();
-
-    /**
-     * Initialize Lace.
-     *
-     * First: setup with given number of workers (0 for autodetect) and some large size task queue.
-     * Second: start all worker threads with default settings.
-     * Third: setup local variables using the LACE_ME macro.
-     */
-    lace_start(workers, 1000000);
-
-    /**
-     * Initialize Sylvan.
-     *
-     * First: set memory limits
-     * - 2 GB memory, nodes table twice as big as cache, initial size halved 6x
-     *   (that means it takes 6 garbage collections to get to the maximum nodes&cache size)
-     * Second: initialize package and subpackages
-     * Third: add hooks to report garbage collection
-     */
-    size_t max = 16LL<<30;
-    if (max > getMaxMemory()) max = getMaxMemory()/10*9;
-    printf("Setting Sylvan main tables memory to ");
-    print_h(max);
-    printf(" max.\n");
-
-    sylvan_set_limits(max, 1, 6);
-    sylvan_init_package();
-    sylvan_init_bdd();
-    sylvan_gc_hook_pregc(TASK(gc_start));
-    sylvan_gc_hook_postgc(TASK(gc_end));
-
     /**
      * Read the model from file
      */
 
     /* Open the file */
-    FILE *f = fopen(model_filename, "r");
+    FILE *f = fopen(model_filename, "rb");
     if (f == NULL) Abort("Cannot open file '%s'!\n", model_filename);
 
     /* Read domain data */
@@ -910,16 +905,57 @@ main(int argc, char **argv)
     }
 
     // Now we just have states
-    INFO("Final states: %'0.0f states\n", sylvan_satcount(states->bdd, states->variables));
+    INFO("Final states: %0.0f states\n", sylvan_satcount(states->bdd, states->variables));
     if (report_nodes) {
-        INFO("Final states: %'zu BDD nodes\n", sylvan_nodecount(states->bdd));
+        INFO("Final states: %zu BDD nodes\n", sylvan_nodecount(states->bdd));
     }
+}
+
+int
+main(int argc, char **argv)
+{
+    /**
+     * Parse command line, set locale, set startup time for INFO messages.
+     */
+    parse_args(argc, argv);
+    setlocale(LC_NUMERIC, "en_US.utf-8");
+    t_start = wctime();
+
+    /**
+     * Initialize Lace.
+     *
+     * First: setup with given number of workers (0 for autodetect) and some large size task queue.
+     * Second: start all worker threads with default settings.
+     * Third: setup local variables using the LACE_ME macro.
+     */
+    lace_start(workers, 1000000);
+
+    /**
+     * Initialize Sylvan.
+     *
+     * First: set memory limits
+     * - 2 GB memory, nodes table twice as big as cache, initial size halved 6x
+     *   (that means it takes 6 garbage collections to get to the maximum nodes&cache size)
+     * Second: initialize package and subpackages
+     * Third: add hooks to report garbage collection
+     */
+    size_t max = 16LL<<30;
+    if (max > getMaxMemory()) max = getMaxMemory()/10*9;
+    printf("Setting Sylvan main tables memory to ");
+    print_h(max);
+    printf(" max.\n");
+
+    sylvan_set_limits(max, 1, 6);
+    sylvan_init_package();
+    sylvan_init_bdd();
+    sylvan_gc_hook_pregc(TASK(gc_start));
+    sylvan_gc_hook_postgc(TASK(gc_end));
+
+    RUN(run);
 
     print_memory_usage();
 
     sylvan_stats_report(stdout);
 
     lace_stop();
-
-    return 0;
 }

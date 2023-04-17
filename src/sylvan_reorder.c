@@ -217,7 +217,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_siftpos, BDDLABEL, pos, BDDLABEL, target)
+TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
     for (; pos < target; pos++) {
         varswap_t res = sylvan_varswap(pos);
@@ -250,8 +250,8 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     if (identity) return res;
 
     for (size_t level = 0; level < levels->count; ++level) {
-        BDDLABEL var = permutation[level];
-        BDDLABEL pos = mtbdd_var_to_level(var);
+        uint32_t var = permutation[level];
+        uint32_t pos = mtbdd_var_to_level(var);
         res = sylvan_siftpos(pos, level);
         if (!sylvan_varswap_issuccess(res)) break;
     }
@@ -262,7 +262,7 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     return res;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
+TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 {
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
@@ -288,7 +288,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, BDDLABEL, low, BDDLABEL, high)
 //    interact_init(&interact_state);
 
     // now count all variable levels (parallel...)
-    size_t level_counts[levels->count];
+    _Atomic(size_t) level_counts[levels->count];
     for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
     sylvan_count_levelnodes(level_counts);
     // mark and sort
