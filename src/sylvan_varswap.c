@@ -12,7 +12,7 @@
 */
 #define sylvan_varswap_p0() llmsset_clear_hashes(nodes);
 #else
-VOID_TASK_DECL_4(sylvan_varswap_p0, BDDLABEL, uint64_t, uint64_t, volatile varswap_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic(varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
@@ -25,7 +25,7 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, BDDLABEL, uint64_t, uint64_t, volatile varsw
 #define sylvan_varswap_p0(var, first, count, result) CALL(sylvan_varswap_p0, var, first, count, result)
 #endif
 
-TASK_DECL_4(size_t, sylvan_varswap_p1, BDDLABEL, size_t, size_t, volatile varswap_t*);
+TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic(varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 1
    \details Handle all trivial cases where no node is created, mark cases that are not trivial.
@@ -37,7 +37,7 @@ TASK_DECL_4(size_t, sylvan_varswap_p1, BDDLABEL, size_t, size_t, volatile varswa
 */
 #define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
 
-VOID_TASK_DECL_4(sylvan_varswap_p2, BDDLABEL, size_t, size_t, volatile varswap_t*);
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic(varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 2
    \details Handle the not so trivial cases. (creates new nodes)
@@ -143,9 +143,9 @@ MTBDD mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high)
     return index;
 }
 
-TASK_IMPL_1(varswap_t, sylvan_varswap, BDDLABEL, pos)
+TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
 {
-    varswap_t result = SYLVAN_VARSWAP_SUCCESS;
+    _Atomic(varswap_t) result = SYLVAN_VARSWAP_SUCCESS;
 
     // ensure that the cache is cleared
     sylvan_clear_cache();
@@ -220,7 +220,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  uint32_t, var, /** variable label **/
                  uint64_t, first, /** index in the unique table **/
                  uint64_t, count, /** index in the unique table **/
-                 volatile varswap_t*, result)
+                 _Atomic(varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -268,7 +268,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             uint32_t, var, /** variable label **/
             size_t, first,  /** starting node index in the unique table **/
             size_t, count, /** number of nodes to visit form the starting index **/
-            volatile varswap_t*, result)
+            _Atomic(varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -383,10 +383,10 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
 VOID_TASK_IMPL_4(sylvan_varswap_p2,
-                 BDDLABEL, var,
+                 uint32_t, var,
                  size_t, first,
                  size_t, count,
-                 volatile varswap_t*, result)
+                 _Atomic(varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {

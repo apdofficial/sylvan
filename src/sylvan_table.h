@@ -51,22 +51,22 @@ typedef void (*llmsset_destroy_cb)(uint64_t, uint64_t);
 
 typedef struct llmsset
 {
-    uint64_t          *table;       // table with hashes
-    uint8_t           *data;        // table with values
-    uint64_t          *bitmap1;     // ownership bitmap (per 512 buckets)
-    uint64_t          *bitmap2;     // bitmap for "contains data"
-    uint64_t          *bitmapc;     // bitmap for "use custom functions"
-    size_t            max_size;     // maximum size of the hash table (for resizing)
-    size_t            table_size;   // size of the hash table (number of slots) --> power of 2!
+    _Atomic(uint64_t)* table;        // table with hashes
+    uint8_t*           data;         // table with values
+    _Atomic(uint64_t)* bitmap1;      // ownership bitmap (per 512 buckets)
+    _Atomic(uint64_t)* bitmap2;      // bitmap for "contains data"
+    uint64_t*          bitmapc;      // bitmap for "use custom functions"
+    size_t             max_size;     // maximum size of the hash table (for resizing)
+    size_t             table_size;   // size of the hash table (number of slots) --> power of 2!
 #if LLMSSET_MASK
-    size_t            mask;         // size-1
+    size_t             mask;         // size-1
 #endif
-    size_t            f_size;
-    llmsset_hash_cb   hash_cb;      // custom hash function
-    llmsset_equals_cb equals_cb;    // custom equals function
-    llmsset_create_cb create_cb;    // custom create function
-    llmsset_destroy_cb destroy_cb;  // custom destroy function
-    int16_t           threshold;    // number of iterations for insertion until returning error, only used with probing
+    size_t             f_size;
+    llmsset_hash_cb    hash_cb;      // custom hash function
+    llmsset_equals_cb  equals_cb;    // custom equals function
+    llmsset_create_cb  create_cb;    // custom create function
+    llmsset_destroy_cb destroy_cb;   // custom destroy function
+    _Atomic(int16_t)   threshold;    // number of iterations for insertion until returning error
 } *llmsset_t;
 
 /**
@@ -117,24 +117,15 @@ llmsset_get_size(const llmsset_t dbs)
  * Typically called during garbage collection, after clear and before rehash.
  * Returns 0 if dbs->table_size > dbs->max_size!
  */
-/**
- * Set the table size of the set.
- * Typically called during garbage collection, after clear and before rehash.
- * Returns 0 if dbs->table_size > dbs->max_size!
- */
 static inline void
 llmsset_set_size(llmsset_t dbs, size_t size)
 {
     /* check bounds (don't be rediculous) */
     if (size > 128 && size <= dbs->max_size) {
         dbs->table_size = size;
-#if LLMSSET_MASK && SYLVAN_USE_LINEAR_PROBING
+#if LLMSSET_MASK
         /* Warning: if size is not a power of two, you will get interesting behavior */
         dbs->mask = dbs->table_size - 1;
-
-#elif LLMSSET_MASK && !SYLVAN_USE_LINEAR_PROBING
-        /* Warning: if size is not a power of two, you will get interesting behavior */
-        dbs->mask = dbs->table_size/2 - 1;
 #endif
 #if SYLVAN_USE_LINEAR_PROBING
         /* Set threshold: number of cache lines to probe before giving up on node insertion */
@@ -159,9 +150,9 @@ uint64_t llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b
 /**
  * To perform garbage collection, the user is responsible that no lookups are performed during the process.
  *
- * 1) call llmsset_clear
+ * 1) call llmsset_clear 
  * 2) call llmsset_mark for every bucket to rehash
- * 3) call llmsset_rehash
+ * 3) call llmsset_rehash 
  */
 VOID_TASK_DECL_1(llmsset_clear, llmsset_t);
 #define llmsset_clear(dbs) RUN(llmsset_clear, dbs)
@@ -193,6 +184,7 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
 
 /**
  * Rehash a single bucket.
+ * Returns 0 if successful, or 1 if not.
  */
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
@@ -205,7 +197,6 @@ int llmsset_clear_one(const llmsset_t dbs, uint64_t index);
 
 /**
  * Retrieve number of marked buckets.
- * Returns 1 if successful, or 0 if not.
  */
 TASK_DECL_1(size_t, llmsset_count_marked, llmsset_t);
 #define llmsset_count_marked(dbs) RUN(llmsset_count_marked, dbs)

@@ -592,17 +592,17 @@ int should_reordering_terminate()
 
 int main()
 {
-    lace_start(6, 1000000); // 4 workers, use a 1,000,000 size task queue
+    lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL*1LL<<30, 1, 256);
+    sylvan_set_limits(1LL*1LL<<20, 1, 256);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
 
-    sylvan_set_reorder_threshold(1);
+    sylvan_set_reorder_threshold(2);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
+    sylvan_set_reorder_timelimit(30 * 1000); // 10 sec
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));
