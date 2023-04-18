@@ -145,6 +145,8 @@ MTBDD mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high)
 
 TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
 {
+    sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
+
     _Atomic(varswap_t) result = SYLVAN_VARSWAP_SUCCESS;
 
     // ensure that the cache is cleared

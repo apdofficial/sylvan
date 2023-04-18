@@ -121,6 +121,7 @@ struct
 
     {0, 0, "Variable reordering"},
     {1, SYLVAN_RE_COUNT, "RE executions"},
+    {1, SYLVAN_RE_SWAP_COUNT, "RE swaps"},
     {3, SYLVAN_RE, "Total time spent"},
 
     {-1, -1, NULL},

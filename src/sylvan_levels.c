@@ -150,8 +150,6 @@ VOID_TASK_IMPL_3(sylvan_count_levelnodes, _Atomic(size_t)*, arr, size_t, first, 
             if (mtbddnode_isleaf(node)) continue; // a leaf
             tmp[mtbddnode_getvariable(node)]++; // update the variable
         }
-        /* these are atomic operations on a hot location with false sharing inside another
-           thread's program stack... can't get much worse! */
         for (i = 0; i < levels->count; i++) {
             atomic_fetch_add(&arr[i], tmp[i]);
         }

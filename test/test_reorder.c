@@ -594,7 +594,7 @@ int main()
 {
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL*1LL<<20, 1, 256);
+    sylvan_set_limits(1LL<<20, 1, 256);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

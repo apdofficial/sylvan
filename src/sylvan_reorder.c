@@ -187,6 +187,7 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
 
 TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; state->pos < state->high; ++state->pos) {
         varswap_t res = sylvan_varswap(state->pos);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -203,6 +204,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 
 TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; state->pos > state->low; --state->pos) {
         varswap_t res = sylvan_varswap(state->pos - 1);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -219,6 +221,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 
 TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; pos < target; pos++) {
         varswap_t res = sylvan_varswap(pos);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -234,9 +237,7 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 
 TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
-    sylvan_gc();
-    sylvan_gc_disable();
-
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     varswap_t res = SYLVAN_VARSWAP_SUCCESS;
     int identity = 1;
 
@@ -256,18 +257,14 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
         if (!sylvan_varswap_issuccess(res)) break;
     }
 
-    sylvan_gc_enable();
-    sylvan_gc();
-
     return res;
 }
 
 TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
-
-    sylvan_gc_disable();
 
     if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
 
@@ -315,7 +312,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
-        if (lvl > mtbdd_levelscount() / 2) {
+        if (lvl > levels->count / 2) {
             res = sylvan_siftdown(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
             res = sylvan_siftup(&sifting_state);
@@ -342,8 +339,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 
         if (should_terminate_reordering(&configs)) break;
     }
-
-    sylvan_gc_enable();
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
         WRAP(e->cb);
