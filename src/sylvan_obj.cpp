@@ -16,6 +16,7 @@
  */
 
 #include <sylvan_obj.hpp>
+#include <tuple>
 
 using namespace sylvan;
 
@@ -1052,6 +1053,14 @@ void
 Sylvan::quitPackage()
 {
     sylvan_quit();
+}
+
+std::tuple<size_t, size_t>
+Sylvan::getTableUsage()
+{
+    size_t filled, total;
+    sylvan_table_usage(&filled, &total);
+    return std::make_tuple(filled, total);
 }
 
 void Sylvan::initReorder()
