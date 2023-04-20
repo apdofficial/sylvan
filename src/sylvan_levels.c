@@ -13,8 +13,8 @@ levels_t mtbdd_levels_create()
         exit(1);
     }
     dbs->table = NULL;
-    dbs->level_to_var = NULL;
-    dbs->var_to_level = NULL;
+    dbs->level_to_order = NULL;
+    dbs->order_to_level = NULL;
 
     levels_size = 0;
     dbs->count = 0;
@@ -51,8 +51,8 @@ int mtbdd_newlevels(size_t amount)
         levels_size = (levels->count + amount + 63) & (~63LL);
 #endif
         levels->table = (uint64_t *)realloc(levels->table, sizeof(uint64_t[levels_size]));
-        levels->level_to_var = (uint32_t *)realloc(levels->level_to_var, sizeof(uint32_t[levels_size]));
-        levels->var_to_level = (uint32_t *)realloc(levels->var_to_level, sizeof(uint32_t[levels_size]));
+        levels->level_to_order = (uint32_t *)realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
+        levels->order_to_level = (uint32_t *)realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
 
         if (!(levels->table && levels->level_to_order && levels->order_to_level)) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
