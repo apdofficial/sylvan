@@ -204,12 +204,12 @@ void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_init_subtables, char**, subtables, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_init_subtables, subtables, first, split);
-        CALL(sylvan_init_subtables, subtables, first + split, count - split);
+        SPAWN(sylvan_init_subtables, bitmap_t, first, split);
+        CALL(sylvan_init_subtables, bitmap_t, first + split, count - split);
         SYNC(sylvan_init_subtables);
     } else {
         const size_t end = first + count;
@@ -217,7 +217,9 @@ VOID_TASK_IMPL_3(sylvan_init_subtables, char**, subtables, size_t, first, size_t
             if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
             mtbddnode_t node = MTBDD_GETNODE(first);
             BDDVAR var = mtbddnode_getvariable(node);
-            if (var < levels->count) subtables[var][first] = 1;
+            if (var < levels->count) {
+                bitmap_atomic_set(bitmap_t, var * levels->count + first);
+            }
         }
     }
 }

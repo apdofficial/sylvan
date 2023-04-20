@@ -56,7 +56,7 @@ static inline int interact_test(const interact_t *state, BDDVAR x, BDDVAR y)
   @sideeffect Clears support.
 
 */
-void interact_update(interact_t *state, atomic_word_t* bitmap_s);
+void interact_update(interact_t *state, atomic_word_t* bitmap_s, size_t nvars);
 
 void interact_print_state(const interact_t *state, size_t nvars);
 

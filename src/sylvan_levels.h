@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
+#include "sylvan_bitset.h"
 
 /**
  * When using dynamic variable reordering, it is strongly recommended to use
@@ -54,8 +54,8 @@ TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
  */
 #define sylvan_count_nodes(var) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
 
-VOID_TASK_DECL_3(sylvan_init_subtables, char **, size_t, size_t);
-#define sylvan_init_subtables(subtables) RUN(sylvan_init_subtables, subtables, 0, nodes->table_size)
+VOID_TASK_DECL_3(sylvan_init_subtables, atomic_word_t*, size_t, size_t);
+#define sylvan_init_subtables(bitmap_t) RUN(sylvan_init_subtables, bitmap_t, 0, nodes->table_size)
 
 /**
  * @brief Get the number of levels

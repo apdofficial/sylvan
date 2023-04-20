@@ -14,7 +14,6 @@ char interact_malloc(interact_t *matrix, size_t nvars)
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
-    memset(matrix->bitmap, 0, matrix->size);
 
     return 1;
 }
@@ -27,22 +26,19 @@ void interact_free(interact_t *matrix)
     matrix->size = 0;
 }
 
-void interact_update(interact_t *state, atomic_word_t *bitmap_s)
+void interact_update(interact_t *state, atomic_word_t *bitmap_s, size_t nvars)
 {
     size_t i, j;
-    size_t n = nodes->table_size;
-
-    for (i = 0; i < n - 1; i++) {
+    for (i = 0; i < nvars - 1; i++) {
         if (bitmap_atomic_get(bitmap_s, i) == 1) {
             bitmap_atomic_clear(bitmap_s, i);
-            for (j = i + 1; j < n; j++) {
+            for (j = i + 1; j < nvars; j++) {
                 if (bitmap_atomic_get(bitmap_s, j) == 1) {
                     interact_set(state, i, j);
                 }
             }
         }
     }
-    bitmap_atomic_clear(bitmap_s, n - 1);
 }
 
 void interact_print_state(const interact_t *state, size_t nvars)
@@ -159,23 +155,22 @@ void subtables_free(char **subtables)
 
 VOID_TASK_IMPL_1(interact_init, interact_t *, state)
 {
-    size_t n = nodes->table_size;
+    size_t nnodes = nodes->table_size;
+    size_t nvars = levels->count;
 
-    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(n); // support bitmap
+    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars); // support bitmap
+    // TODO: nnodes * nvars is the worst case (all nodes are of the same variable label), think about improvements
+    atomic_word_t *bitmap_t = (atomic_word_t *) alloc_aligned(nnodes * nvars); // subtables bitmap
 
-    if (bitmap_s == 0) {
+    if (bitmap_s == 0 || bitmap_t == 0){
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
-    memset(bitmap_s, 0, n);
-
-    char **subtables = subtables_malloc();
-    sylvan_init_subtables(subtables);
+    sylvan_init_subtables(bitmap_t);
 
     for (size_t var = 0; var < levels->count; var++) {
-        char *nodelist = subtables[var];
-        for (size_t index = 0; index < n; ++index) {
-            if (!nodelist[index]) continue;
+        for (size_t index = 0; index < nnodes; ++index) {
+            if (bitmap_atomic_get(bitmap_t, var * nvars + index) == 0) continue;
             if (!llmsset_is_marked(nodes, index)) continue; // unused bucket
             mtbddnode_t f = MTBDD_GETNODE(index);
             if (mtbddnode_isleaf(f)) continue;
@@ -184,6 +179,7 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
             // If a node was never reached during the previous depth-first searches,
             // then it is a root, and we start a new depth-first search from it.
             if (!mtbddnode_getvisited(f)) {
+                assert(mtbddnode_getvariable(f) < levels->count);
                 bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(f));
                 mtbddnode_setvisited(f, 1);
 
@@ -198,13 +194,13 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
                 CALL(clear_flags, f0);
                 SYNC(clear_flags);
 
-                interact_update(state, bitmap_s);
+                interact_update(state, bitmap_s, nvars);
             }
         }
     }
 
-    subtables_free(subtables);
-    free_aligned(bitmap_s, n);
+    free_aligned(bitmap_s, nnodes);
+    free_aligned(bitmap_t, nnodes * nvars);
     clear_visited();
 }
 
