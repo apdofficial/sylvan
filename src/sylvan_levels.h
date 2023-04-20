@@ -18,9 +18,6 @@ typedef struct levels_db {
     size_t count;                               // number of created levels
     _Atomic(uint32_t)* level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)* order_to_level;          // current variable wise level permutation (variable label to level)
-    size_t             bitmap1_size;             // size of the bitmaps
-    _Atomic(uint64_t)* bitmap1;          // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
-//    _Atomic(uint64_t)* bitmap_p2;             // bitmap for "phase 2 mark" , as many bits as there are buckets in the table, 1 -> marked,  0 -> not marked
 } *levels_t;
 
 /**
@@ -95,12 +92,12 @@ MTBDD mtbdd_ithlevel(uint32_t level);
 /**
  * @brief  Get the level of the given variable
  */
-uint32_t mtbdd_var_to_level(BDDVAR var);
+uint32_t mtbdd_order_to_level(BDDVAR var);
 
 /**
  * @brief  Get the variable of the given level
  */
-BDDVAR mtbdd_level_to_var(uint32_t level);
+BDDVAR mtbdd_level_to_order(uint32_t level);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.

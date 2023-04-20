@@ -18,13 +18,13 @@ levels_t mtbdd_levels_create()
 
     // one data bucket is uint64_t, 8 bytes
     // bitmap_visited_size: 1 bit per bucket results in nodes->max_size / 8
-    dbs->bitmap1_size = nodes->max_size / 8;
-    dbs->bitmap1 = (_Atomic (uint64_t) *) alloc_aligned(dbs->bitmap1_size);
-
-    if (dbs->bitmap1 == 0) {
-        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
-        exit(1);
-    }
+//    dbs->bitmap1_size = nodes->max_size / 8;
+//    dbs->bitmap1 = (_Atomic (uint64_t) *) alloc_aligned(dbs->bitmap1_size);
+//
+//    if (dbs->bitmap1 == 0) {
+//        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
+//        exit(1);
+//    }
 
     levels_size = 0;
     dbs->count = 0;
@@ -99,13 +99,13 @@ MTBDD mtbdd_ithlevel(uint32_t level)
     else return mtbdd_invalid;
 }
 
-uint32_t mtbdd_var_to_level(BDDVAR var)
+uint32_t mtbdd_order_to_level(BDDVAR var)
 {
     if (var < levels->count) return levels->order_to_level[var];
     else return var;
 }
 
-BDDVAR mtbdd_level_to_var(uint32_t level)
+BDDVAR mtbdd_level_to_order(uint32_t level)
 {
     if (level < levels->count) return levels->level_to_order[level];
     else return level;
@@ -137,8 +137,8 @@ void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < levels->count) {
-        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i - 1])];
-        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i])];
+        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i - 1])];
+        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i])];
         if (p < q) {
             int t = levels_arr[i];
             levels_arr[i] = levels_arr[i - 1];
@@ -199,7 +199,7 @@ TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, coun
 void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
 {
     for (unsigned int i = 0; i < levels->count; i++) {
-        if (level_counts[mtbdd_level_to_var(i)] < threshold) level[i] = -1;
+        if (level_counts[mtbdd_level_to_order(i)] < threshold) level[i] = -1;
         else level[i] = i;
     }
 }

@@ -19,6 +19,7 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
+#include "sylvan_interact.h"
 
 /**
  * Block size tunes the granularity of the parallel distribution
@@ -243,7 +244,7 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
     // check if permutation is identity
     for (size_t level = 0; level < levels->count; level++) {
-        if (permutation[level] != mtbdd_level_to_var(level)) {
+        if (permutation[level] != mtbdd_level_to_order(level)) {
             identity = 0;
             break;
         }
@@ -252,7 +253,7 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
     for (size_t level = 0; level < levels->count; ++level) {
         uint32_t var = permutation[level];
-        uint32_t pos = mtbdd_var_to_level(var);
+        uint32_t pos = mtbdd_order_to_level(var);
         res = sylvan_siftpos(pos, level);
         if (!sylvan_varswap_issuccess(res)) break;
     }
@@ -279,10 +280,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    interact_state_t interact_state;
-//    int success = interact_alloc(&interact_state, levels->count);
-//    if (!success) return SYLVAN_VARSWAP_ERROR;
-//    interact_init(&interact_state);
+    interact_t interact_state;
+    int success = interact_malloc(&interact_state, levels->count);
+    if (!success) return SYLVAN_VARSWAP_ERROR;
+    interact_init(&interact_state);
 
     // now count all variable levels (parallel...)
     _Atomic(size_t) level_counts[levels->count];
@@ -300,12 +301,11 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
     sifting_state.size = llmsset_count_marked(nodes);
     sifting_state.best_size = sifting_state.size;
 
-
     for (size_t i = 0; i < levels->count; i++) {
         if (sorted_levels_counts[i] < 0) break; // marked level, done
         uint64_t lvl = sorted_levels_counts[i];
 
-        sifting_state.pos = mtbdd_level_to_var(lvl);
+        sifting_state.pos = mtbdd_level_to_order(lvl);
         if (sifting_state.pos < low || sifting_state.pos > high) continue; // skip, not in range
 
         sifting_state.best_pos = sifting_state.pos;
