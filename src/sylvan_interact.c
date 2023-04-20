@@ -1,58 +1,51 @@
 #include "sylvan_int.h"
 #include "sylvan_interact.h"
+#include <sylvan_align.h>
+#include <errno.h>      // for errno
 
-char interact_alloc(interact_state_t *state, size_t nvars)
+char interact_malloc(interact_t *matrix, size_t nvars)
 {
-    // TODO: reduce the memory usage, we only use 1 bit out of 8 bit char data type
-    state->nrows = nvars;
-    state->ncols = nvars;
+    matrix->size = nvars * 2; // we have a square matrix
+    matrix->nrows = nvars;
 
-    // Allocate rows
-    state->interact = (char **) calloc(state->nrows, sizeof(char *));
-    // Allocate columns for each row
-    for (size_t i = 0; i < state->nrows; i++) {
-        state->interact[i] = (char *) calloc(state->ncols, sizeof(char *));
-        if (!state->interact[i]) {
-            fprintf(stderr, "interact_alloc failed to allocate new memory!");
-            return 0;
-        }
-    }
+    matrix->bitmap = (uint64_t *) alloc_aligned(matrix->size);
 
-    if (!state->interact) {
-        fprintf(stderr, "interact_alloc failed to allocate new memory!");
-        return 0;
+    if (matrix->bitmap == 0) {
+        fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
+        exit(1);
     }
+    memset(matrix->bitmap, 0, matrix->size);
 
     return 1;
 }
 
-void interact_free(interact_state_t *state)
+void interact_free(interact_t *matrix)
 {
-    free(state->interact);
-    state->interact = NULL;
-    state->nrows = 0;
-    state->ncols = 0;
+    free_aligned(matrix->bitmap, matrix->size);
+    matrix->bitmap = NULL;
+    matrix->nrows = 0;
+    matrix->size = 0;
 }
 
-void interact_update(interact_state_t *state, char *support)
+void interact_update(interact_t *state, atomic_word_t *bitmap_s)
 {
     size_t i, j;
     size_t n = nodes->table_size;
 
     for (i = 0; i < n - 1; i++) {
-        if (support[i] == 1) {
-            support[i] = 0;
+        if (bitmap_atomic_get(bitmap_s, i) == 1) {
+            bitmap_atomic_clear(bitmap_s, i);
             for (j = i + 1; j < n; j++) {
-                if (support[j] == 1) {
-                    interact_set(state, i, j, 1);
+                if (bitmap_atomic_get(bitmap_s, j) == 1) {
+                    interact_set(state, i, j);
                 }
             }
         }
     }
-    support[n - 1] = 0;
+    bitmap_atomic_clear(bitmap_s, n - 1);
 }
 
-void print_interact_state(const interact_state_t *state, size_t nvars)
+void interact_print_state(const interact_t *state, size_t nvars)
 {
     printf("Interaction matrix: \n");
     printf("  ");
@@ -89,16 +82,16 @@ void print_interact_state(const interact_state_t *state, size_t nvars)
  *  F00 F01 F10 F11
  */
 #define find_support(f, support) RUN(find_support, f, support)
-VOID_TASK_2(find_support, MTBDD, f, char*, support)
+VOID_TASK_2(find_support, MTBDD, f, _Atomic (word_t)*, bitmap_s)
 {
     if (mtbdd_isleaf(f)) return;
     mtbddnode_t node = MTBDD_GETNODE(f);
     if (mtbddnode_getflag(node) == 1) return;
-    // TODO: fix array mutation from the thread local stack
-    support[mtbddnode_getvariable(node)] = 1;
 
-    SPAWN(find_support, mtbdd_gethigh(f), support);
-    CALL(find_support, mtbdd_getlow(f), support);
+    bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(node));
+
+    SPAWN(find_support, mtbdd_gethigh(f), bitmap_s);
+    CALL(find_support, mtbdd_getlow(f), bitmap_s);
     SYNC(find_support);
 
     // local visited node used for calculating support array
@@ -142,42 +135,46 @@ char **subtables_malloc()
 {
     char **subtables = calloc(levels->count, sizeof(char *));
     if (!subtables) {
-        fprintf(stderr, "interact_alloc failed to allocate new memory!");
+        fprintf(stderr, "interact_malloc failed to allocate new memory!");
         return NULL;
     }
 
     for (size_t i = 0; i < levels->count; i++) {
         subtables[i] = calloc(nodes->table_size, sizeof(char));
         if (!subtables[i]) {
-            fprintf(stderr, "interact_alloc failed to allocate new memory!");
+            fprintf(stderr, "interact_malloc failed to allocate new memory!");
             return NULL;
         }
     }
     return subtables;
 }
 
-void subtables_free(char **subtables){
+void subtables_free(char **subtables)
+{
     for (size_t i = 0; i < levels->count; i++) {
         free(subtables[i]);
         subtables[i] = NULL;
     }
 }
 
-VOID_TASK_IMPL_1(interact_init, interact_state_t *, state)
+VOID_TASK_IMPL_1(interact_init, interact_t *, state)
 {
     size_t n = nodes->table_size;
-    char *support = calloc(n, sizeof(char));
-    if (!support) {
-        fprintf(stderr, "interact_init failed to allocate memory!");
-        return;
+
+    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(n); // support bitmap
+
+    if (bitmap_s == 0) {
+        fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
+        exit(1);
     }
+    memset(bitmap_s, 0, n);
+
     char **subtables = subtables_malloc();
     sylvan_init_subtables(subtables);
 
     for (size_t var = 0; var < levels->count; var++) {
         char *nodelist = subtables[var];
-        size_t size = nodes->table_size;
-        for (size_t index = 0; index < size; ++index) {
+        for (size_t index = 0; index < n; ++index) {
             if (!nodelist[index]) continue;
             if (!llmsset_is_marked(nodes, index)) continue; // unused bucket
             mtbddnode_t f = MTBDD_GETNODE(index);
@@ -187,27 +184,27 @@ VOID_TASK_IMPL_1(interact_init, interact_state_t *, state)
             // If a node was never reached during the previous depth-first searches,
             // then it is a root, and we start a new depth-first search from it.
             if (!mtbddnode_getvisited(f)) {
-                support[mtbddnode_getvariable(f)] = 1;
+                bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(f));
                 mtbddnode_setvisited(f, 1);
 
                 MTBDD f1 = mtbddnode_gethigh(f);
                 MTBDD f0 = mtbddnode_getlow(f);
 
-                SPAWN(find_support, f1, support);
-                CALL(find_support, f0, support);
+                SPAWN(find_support, f1, bitmap_s);
+                CALL(find_support, f0, bitmap_s);
                 SYNC(find_support);
 
                 SPAWN(clear_flags, f1);
                 CALL(clear_flags, f0);
                 SYNC(clear_flags);
 
-                interact_update(state, support);
+                interact_update(state, bitmap_s);
             }
         }
     }
 
     subtables_free(subtables);
-    free(support);
+    free_aligned(bitmap_s, n);
     clear_visited();
 }
 

@@ -1,6 +1,6 @@
 #include <stddef.h>
 
-// With 64 bytes per cache line, there are 8 64-bit values per cache line.
+// use uint64_t to advantage the usual 64 bytes per cache line
 typedef uint64_t word_t;
 typedef _Atomic (word_t) atomic_word_t;
 
