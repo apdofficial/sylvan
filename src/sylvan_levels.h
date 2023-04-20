@@ -103,27 +103,10 @@ uint32_t mtbdd_var_to_level(BDDVAR var);
 BDDVAR mtbdd_level_to_var(uint32_t level);
 
 /**
- * \brief  Return the level of the given internal node.
- * \param node for which the level needs to be returned
- */
-uint32_t mtbdd_node_to_level(MTBDD node);
-
-/**
  * \brief  Add callback to mark managed references during garbage collection.
  * \details This is used for the dynamic variable reordering.
  */
 void mtbdd_levels_gc_add_mark_managed_refs(void);
-
-/**
- * \brief Swap the levels of two variables var and var+1
- * \details This is used for the dynamic variable reordering.
- * <ul>
- * <li>swap the level_to_var of var and var+1
- * <li>swap the var_to_level of level var and level var+1
- * </ul>
- * \param var variable to be swapped with var+1
- */
-void mtbdd_varswap(BDDVAR var);
 
 /**
  * @brief  Mark each level_count -1 which is below the threshold.
