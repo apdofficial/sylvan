@@ -1,17 +1,24 @@
-#include "sylvan_int.h"
-#include "sylvan_mtbdd_int.h"
+#include <sylvan_int.h>
+#include <sylvan_mtbdd_int.h>
+#include <sylvan_align.h>
+#include <errno.h>  // for errno
 
 static size_t levels_size; // size of the arrays in levels_t used to realloc memory
 
 levels_t mtbdd_levels_create()
 {
-    levels_t dbs = NULL;
-    if (posix_memalign((void **) &dbs, LINE_SIZE, sizeof(struct levels_db)) != 0) {
-        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory!\n");
+    levels_t dbs = (struct levels_db *)alloc_aligned(sizeof(struct levels_db));
+    if (dbs == 0) {
+        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
         exit(1);
     }
-    dbs->count = 0;
+    dbs->table = NULL;
+    dbs->level_to_var = NULL;
+    dbs->var_to_level = NULL;
+
     levels_size = 0;
+    dbs->count = 0;
+
     return dbs;
 }
 
@@ -43,9 +50,9 @@ int mtbdd_newlevels(size_t amount)
         // probably better than doubling anyhow...
         levels_size = (levels->count + amount + 63) & (~63LL);
 #endif
-        levels->table = realloc(levels->table, sizeof(MTBDD[levels_size]));
-        levels->level_to_order = realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
-        levels->order_to_level = realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+        levels->table = (uint64_t *)realloc(levels->table, sizeof(uint64_t[levels_size]));
+        levels->level_to_var = (uint32_t *)realloc(levels->level_to_var, sizeof(uint32_t[levels_size]));
+        levels->var_to_level = (uint32_t *)realloc(levels->var_to_level, sizeof(uint32_t[levels_size]));
 
         if (!(levels->table && levels->level_to_order && levels->order_to_level)) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
