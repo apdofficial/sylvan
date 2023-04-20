@@ -13,12 +13,14 @@ extern "C" {
  * Dynamic variable reordering requires that variables are consecutive.
  * Initially, variables are assigned linearly, starting with 0.
  */
-
 typedef struct levels_db {
-    uint64_t *table;                // array holding the 1-node BDD for each level
-    size_t count;                   // number of created levels
-    uint32_t *level_to_order;         // current level wise var permutation (level to variable label)
-    uint32_t *order_to_level;         // current variable wise level permutation (variable label to level)
+    _Atomic(uint32_t)* table;                   // array holding the 1-node BDD for each level
+    size_t count;                               // number of created levels
+    _Atomic(uint32_t)* level_to_order;          // current level wise var permutation (level to variable label)
+    _Atomic(uint32_t)* order_to_level;          // current variable wise level permutation (variable label to level)
+    size_t             bitmap1_size;             // size of the bitmaps
+    _Atomic(uint64_t)* bitmap1;          // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
+//    _Atomic(uint64_t)* bitmap_p2;             // bitmap for "phase 2 mark" , as many bits as there are buckets in the table, 1 -> marked,  0 -> not marked
 } *levels_t;
 
 /**
