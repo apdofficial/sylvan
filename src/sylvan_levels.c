@@ -44,18 +44,18 @@ int mtbdd_newlevels(size_t amount)
         levels_size = (levels->count + amount + 63) & (~63LL);
 #endif
         levels->table = realloc(levels->table, sizeof(MTBDD[levels_size]));
-        levels->level_to_var = realloc(levels->level_to_var, sizeof(uint32_t[levels_size]));
-        levels->var_to_level = realloc(levels->var_to_level, sizeof(uint32_t[levels_size]));
+        levels->level_to_order = realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
+        levels->order_to_level = realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
 
-        if (!(levels->table && levels->level_to_var && levels->var_to_level)) {
+        if (!(levels->table && levels->level_to_order && levels->order_to_level)) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
             return 0;
         }
     }
     for (size_t i = 0; i < amount; i++) {
         levels->table[levels->count] = mtbdd_makenode(levels->count, mtbdd_false, mtbdd_true);
-        levels->level_to_var[levels->count] = levels->count;
-        levels->var_to_level[levels->count] = levels->count;
+        levels->level_to_order[levels->count] = levels->count;
+        levels->order_to_level[levels->count] = levels->count;
         levels->count++;
     }
     return 1;
@@ -66,10 +66,10 @@ void mtbdd_resetlevels(void)
     if (levels_size != 0) {
         free(levels->table);
         levels->table = NULL;
-        free(levels->level_to_var);
-        levels->level_to_var = NULL;
-        free(levels->var_to_level);
-        levels->var_to_level = NULL;
+        free(levels->level_to_order);
+        levels->level_to_order = NULL;
+        free(levels->order_to_level);
+        levels->order_to_level = NULL;
         levels->count = 0;
         levels_size = 0;
     }
@@ -77,19 +77,19 @@ void mtbdd_resetlevels(void)
 
 MTBDD mtbdd_ithlevel(uint32_t level)
 {
-    if (level < levels->count) return levels->table[levels->level_to_var[level]];
+    if (level < levels->count) return levels->table[levels->level_to_order[level]];
     else return mtbdd_invalid;
 }
 
 uint32_t mtbdd_var_to_level(BDDVAR var)
 {
-    if (var < levels->count) return levels->var_to_level[var];
+    if (var < levels->count) return levels->order_to_level[var];
     else return var;
 }
 
 BDDVAR mtbdd_level_to_var(uint32_t level)
 {
-    if (level < levels->count) return levels->level_to_var[level];
+    if (level < levels->count) return levels->level_to_order[level];
     else return level;
 }
 

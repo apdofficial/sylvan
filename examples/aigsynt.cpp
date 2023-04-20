@@ -42,6 +42,10 @@ static int sloan_w2 = 8;
 
 static int terminate_reordering = 0;
 
+static double t_start;
+#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
+#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
+
 static void
 print_usage()
 {
@@ -103,7 +107,9 @@ parse_args(int argc, char **argv)
         exit(0);
     }
     model_filename = argv[optind];
-    printf("Model file: %s\n", model_filename);
+    std::string path = std::string  { model_filename };
+    std::string base_filename = path.substr(path.find_last_of("/\\") + 1);
+    std::cout << "Model file: " << base_filename << std::endl;
 }
 
 /* Obtain current wallclock time */
@@ -115,9 +121,7 @@ wctime()
     return (tv.tv_sec + 1E-6 * tv.tv_usec);
 }
 
-static double t_start;
-#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
-#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
+
 
 /**
  * Global stuff
@@ -780,14 +784,16 @@ int main(int argc, char **argv)
 
     // Init Sylvan
     // Give 4 GB memory
-    sylvan_set_limits(1LL << 30, 1, 64);
+    sylvan_set_limits(1LL << 30, 1, 15);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_threshold(512);
+    sylvan_set_reorder_maxswap(5000);
+    sylvan_set_reorder_maxvar(500);
+    sylvan_set_reorder_threshold(64);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 10 * 1000); // 10 minute
+    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));

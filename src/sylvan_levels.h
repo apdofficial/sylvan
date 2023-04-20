@@ -17,8 +17,8 @@ extern "C" {
 typedef struct levels_db {
     uint64_t *table;                // array holding the 1-node BDD for each level
     size_t count;                   // number of created levels
-    uint32_t *level_to_var;         // current level wise var permutation (level to variable label)
-    uint32_t *var_to_level;         // current variable wise level permutation (variable label to level)
+    uint32_t *level_to_order;         // current level wise var permutation (level to variable label)
+    uint32_t *order_to_level;         // current variable wise level permutation (variable label to level)
 } *levels_t;
 
 /**

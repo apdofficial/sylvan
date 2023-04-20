@@ -25,7 +25,7 @@
  */
 #define BLOCKSIZE 128
 
-#define STATS 0 // useful information w.r.t. dynamic reordering
+#define STATS 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 
@@ -44,8 +44,8 @@ struct sifting_config
 /// reordering configurations
 static struct sifting_config configs = {
         .t_start_sifting = 0,
-        .threshold = 64,
-        .max_growth = 1.1f,
+        .threshold = 32,
+        .max_growth = 1.2f,
         .max_swap = 10000,
         .total_num_swap = 0,
         .max_var = 2000,

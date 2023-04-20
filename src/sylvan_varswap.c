@@ -199,11 +199,11 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
         }
     }
 
-    levels->var_to_level[levels->level_to_var[pos]] = pos + 1;
-    levels->var_to_level[levels->level_to_var[pos + 1]] = pos;
-    uint32_t save = levels->level_to_var[pos];
-    levels->level_to_var[pos] = levels->level_to_var[pos + 1];
-    levels->level_to_var[pos + 1] = save;
+    levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
+    levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
+    uint32_t save = levels->level_to_order[pos];
+    levels->level_to_order[pos] = levels->level_to_order[pos + 1];
+    levels->level_to_order[pos + 1] = save;
 
     sylvan_clear_and_mark();
     sylvan_rehash_all();
