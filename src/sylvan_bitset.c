@@ -47,14 +47,17 @@ size_t bitmap_atomic_first(atomic_word_t *words, size_t size)
 size_t bitmap_atomic_first_from(atomic_word_t *words, size_t word_idx, size_t size)
 {
     size_t nwords = NUMBER_OF_WORDS(size);
-    word_t word = atomic_load_explicit(&words[word_idx], memory_order_relaxed);
+    atomic_word_t* ptr = words + word_idx;
+    word_t word = atomic_load_explicit(ptr, memory_order_relaxed);
     while (word_idx < nwords && word == 0) {
         word_idx++;
-        word = atomic_load_explicit(&words[word_idx], memory_order_relaxed);
+        ptr = words + word_idx;
+        word = atomic_load_explicit(ptr, memory_order_relaxed);
     }
     if (word_idx == nwords) return npos;
     else {
-        word_t word = atomic_load_explicit(&words[word_idx], memory_order_relaxed);
+        ptr = words + word_idx;
+        word_t word = atomic_load_explicit(ptr, memory_order_relaxed);
         return get_first_msb_one_bit_pos(word, word_idx);
     }
 }
@@ -73,7 +76,7 @@ size_t bitmap_next(word_t *words, size_t size, size_t pos)
     pos++;
     // get word for pos++
     size_t word_idx = WORD_OFFSET(pos);
-    uint64_t word = words[word_idx] & ((word_t)0x8000000000000000LL >> BIT_OFFSET(pos));
+    word_t word = words[word_idx] & BIT_MASK(pos);
     if (word) {
          // if there exist any 1 bit in the word then return the pos directly
         return get_first_msb_one_bit_pos(word, word_idx);
@@ -91,13 +94,16 @@ size_t bitmap_atomic_next(atomic_word_t *words, size_t size, size_t pos)
     pos++;
     // get word index for pos
     size_t word_idx = WORD_OFFSET(pos);
+
+    atomic_word_t* ptr = words + word_idx;
     // check whether there are still any 1-bits in the current word
-    uint64_t word = atomic_load_explicit(&words[word_idx], memory_order_relaxed) & ((word_t)0x8000000000000000LL >> BIT_OFFSET(pos));
+    word_t a = atomic_load_explicit(ptr, memory_order_relaxed);
+    word_t mask = BIT_ITER_MASK(pos);
+    word_t word = a & mask;
     if (word) {
         // there exist at least one 1-bit in the current word so return the pos directly
         return get_first_msb_one_bit_pos(word, word_idx);
-    }
-    else {
+    } else {
         // the current word does not contain any successor 1-bits,
         // thus now find the next word that is not 0 and return the first 1-bit pos
         word_idx++;
@@ -129,7 +135,7 @@ size_t bitmap_count(word_t *words, size_t size)
 void bitmap_atomic_set(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
-    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_relaxed);
+    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_acquire);
     uint64_t new_v = old_v | BIT_MASK(pos);
     atomic_compare_exchange_strong(word_ptr, &old_v, new_v);
 }
@@ -137,14 +143,13 @@ void bitmap_atomic_set(atomic_word_t *words, size_t pos)
 void bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
-    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_relaxed);
+    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_acquire);
     uint64_t new_v = old_v & ~BIT_MASK(pos);
     atomic_compare_exchange_strong(word_ptr, &old_v, new_v);
 }
 
 int bitmap_atomic_get(atomic_word_t *words, size_t pos)
 {
-    atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
-    uint64_t word = atomic_load_explicit(word_ptr, memory_order_relaxed);
+    uint64_t word = atomic_load_explicit(words + WORD_OFFSET(pos), memory_order_relaxed);
     return word & BIT_MASK(pos) ? 1 : 0;
 }
