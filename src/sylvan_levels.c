@@ -15,6 +15,8 @@ levels_t mtbdd_levels_create()
     dbs->table = NULL;
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
+    dbs->bitmap_p2 = alloc_aligned(nodes->max_size);
+    dbs->bitmap_p2_size = nodes->max_size;
 
     levels_size = 0;
     dbs->count = 0;
@@ -25,6 +27,7 @@ levels_t mtbdd_levels_create()
 void mtbdd_levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
+    free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
     free_aligned(dbs, sizeof(struct levels_db));
 }
 

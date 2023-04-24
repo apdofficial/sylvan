@@ -19,6 +19,8 @@ typedef struct levels_db {
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
+    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
+    size_t              bitmap_p2_size;          // size of bitmap_p2
 } *levels_t;
 
 /**
@@ -28,6 +30,16 @@ typedef struct levels_db {
  * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
  */
 #define COUNT_NODES_BLOCK_SIZE 4096
+
+/**
+ * Index to first node in phase 2 mark bitmap
+ */
+#define bitmap_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
+
+/**
+ * Index of the next node relative to the provided index in th phase 2 bitmap.
+ */
+#define bitmap_p2_next(index) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, index)
 
 /**
  * @brief Create a new levels_t object
