@@ -558,13 +558,15 @@ TASK_0(int, test_interact)
 
     size_t index = bitmap_atomic_first(nodes->bitmap2, nodes->table_size);
     assert(llmsset_is_marked(nodes, index));
-    printf("bitmap_first: %zu\n", index);
+    printf("%zu ", index);
     while (index != npos) {
-        printf("%zu ", index);
         index = bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index);
-        printf("%zu ", index);
-        assert(llmsset_is_marked(nodes, index));
-        if (index == npos) printf("npos\n");
+        if (index == npos) {
+            printf("npos\n");
+        } else {
+            printf("%zu ", index);
+            assert(llmsset_is_marked(nodes, index));
+        }
     }
 
     return 0;

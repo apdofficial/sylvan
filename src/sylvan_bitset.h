@@ -82,8 +82,6 @@ size_t bitmap_prev(word_t *words, size_t pos);
  */
 size_t bitmap_count(word_t *words, size_t size);
 
-uint64_t bitmap_atomic_load(atomic_word_t *words, size_t pos);
-
 /**
  * Set the bit at position n to 1, if it was 0. (Atomic version)
  */
