@@ -108,17 +108,13 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap
 
-    if (bitmap_s == 0 || bitmap_v == 0) {
+    if (bitmap_s == 0 || bitmap_v == 0 || bitmap_l == 0) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
 
-    size_t bitmap2_size = nodes->table_size;
-    size_t index = bitmap_first((uint64_t *) nodes->bitmap2, bitmap2_size);
-
-    while (index != npos) {
-        if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
-
+    for (size_t index = llmsset_first(); index != llmsset_nindex; index = llmsset_next(index)){
+        if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited root node
         mtbddnode_t f = MTBDD_GETNODE(index);
         // set support bitmap, <var> is on the support of <f>
         bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(f));
@@ -137,36 +133,9 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
         clear_aligned(bitmap_l, nnodes);
         // update interaction matrix
         interact_update(state, bitmap_s, nvars);
-
-        index = bitmap_next((uint64_t *) nodes->bitmap2, bitmap2_size, index);
     }
 
-//    for (size_t index = 2; index < nnodes; ++index) {
-//        if (llmsset_is_marked(nodes, index) == 0) continue; // unused bucket
-//        printf("index: %zu\n", index);
-//        if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
-
-//        mtbddnode_t f = MTBDD_GETNODE(index);
-//        // set support bitmap, <var> is on the support of <f>
-//        bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(f));
-//        // A node is a root of the DAG if it cannot be reached by nodes above it.
-//        // If a node was never reached during the previous depth-first searches,
-//        // then it is a root, and we start a new depth-first search from it.
-//        MTBDD f1 = mtbddnode_gethigh(f);
-//        MTBDD f0 = mtbddnode_getlow(f);
-//
-//        // visit all nodes reachable from <f>
-//        SPAWN(find_support, f1, bitmap_s, bitmap_v, bitmap_l);
-//        CALL(find_support, f0, bitmap_s, bitmap_v, bitmap_l);
-//        SYNC(find_support);
-//
-//        // clear locally visited nodes bitmap
-//        clear_aligned(bitmap_l, nnodes);
-//        // update interaction matrix
-//        interact_update(state, bitmap_s, nvars);
-//    }
-
-    free_aligned(bitmap_s, nnodes);
+    free_aligned(bitmap_s, nvars);
     free_aligned(bitmap_v, nnodes);
     free_aligned(bitmap_l, nnodes);
 }

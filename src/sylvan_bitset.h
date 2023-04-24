@@ -15,7 +15,7 @@ static const size_t npos = (word_t)-1;
 
 #define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b) ((b) % BITS_PER_WORD)
-#define BIT_MASK(b) ((word_t)0x8000000000000000LL >> (b&63)) // sift the most significant bit to the right by b&63 (we only have 64 )
+#define BIT_MASK(b) ((word_t) 0x8000000000000000LL >> (b&63)) // sift the most significant bit to the right by at most b&63 (since we only have 64 bits)
 #define BIT_OFFSET(b) ((b) % BITS_PER_WORD)
 #define NUMBER_OF_WORDS(b) ((b + BITS_PER_WORD-1) / BITS_PER_WORD)
 

@@ -219,6 +219,26 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
 #define llmsset_hash sylvan_tabhash16
 #define llmsset_fnvhash sylvan_fnvhash16
 
+
+/**
+ * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions.
+ */
+
+/**
+ * The terminal index used to stop the iteration.
+ */
+#define llmsset_nindex npos
+
+/**
+ * Index to first node in the hash table.
+ */
+#define llmsset_first() bitmap_atomic_first(nodes->bitmap2, nodes->table_size)
+
+/**
+ * Index ot the next node index relative to the provided node index.
+ */
+#define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
