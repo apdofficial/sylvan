@@ -22,6 +22,7 @@ target_sources(sylvan
             sylvan_interact.c
             sylvan_bitset.c
             libpopcnt.h
+            sylvan_varswap_bitmap.c
         PUBLIC
             sylvan.h
             sylvan_bdd.h
