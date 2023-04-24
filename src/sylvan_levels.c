@@ -18,13 +18,13 @@ levels_t mtbdd_levels_create()
 
     // one data bucket is uint64_t, 8 bytes
     // bitmap_visited_size: 1 bit per bucket results in nodes->max_size / 8
-//    dbs->bitmap1_size = nodes->max_size / 8;
-//    dbs->bitmap1 = (_Atomic (uint64_t) *) alloc_aligned(dbs->bitmap1_size);
-//
-//    if (dbs->bitmap1 == 0) {
-//        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
-//        exit(1);
-//    }
+    dbs->bitmap2_size = nodes->max_size / 8;
+    dbs->bitmap2 = (atomic_word_t *) alloc_aligned(dbs->bitmap2_size);
+
+    if (dbs->bitmap2 == 0) {
+        fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
+        exit(1);
+    }
 
     levels_size = 0;
     dbs->count = 0;
@@ -35,7 +35,7 @@ levels_t mtbdd_levels_create()
 void mtbdd_levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
-    free(dbs);
+    free_aligned(dbs, sizeof(struct levels_db));
 }
 
 size_t mtbdd_levelscount(void)
@@ -82,11 +82,11 @@ int mtbdd_newlevels(size_t amount)
 void mtbdd_resetlevels(void)
 {
     if (levels_size != 0) {
-        free(levels->table);
+        free_aligned(levels->table, sizeof(uint64_t[levels_size]));
         levels->table = NULL;
-        free(levels->level_to_order);
+        free_aligned(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->level_to_order = NULL;
-        free(levels->order_to_level);
+        free_aligned(levels->order_to_level, sizeof(uint32_t[levels_size]));
         levels->order_to_level = NULL;
         levels->count = 0;
         levels_size = 0;

@@ -29,6 +29,14 @@ static double t_start;
 #define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
+void print_bits(unsigned int num)
+{
+   for(size_t bit=0;bit<(sizeof(unsigned int) * 8); bit++)
+   {
+      printf("%i ", num & 0x01);
+      num = num >> 1;
+   }
+}
 
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
@@ -525,8 +533,41 @@ TASK_0(int, test_interact)
     BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
     sylvan_protect(&bdd1);
 
+//    uint64_t pos = BIT_MASK(0);
+
+//    printf("test: %llu\n", 0x8000000000000000LL);
+
+//    for (size_t bit = 0; bit < 5000; bit++) {
+//        printf("%llu ", pos & 0x01);
+//        pos = pos >> 1;
+//    }
+//    printf("\n");
+
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
+
+    printf("\n---\n");
+    for (size_t i = 0; i < nodes->table_size; ++i) {
+        if(llmsset_is_marked(nodes, i) == 0) continue; // unused bucket
+        printf("%zu ", i);
+    }
+    printf("\n---\n");
+
+    assert(bitmap_atomic_get(nodes->bitmap2, 0));
+    assert(bitmap_atomic_get(nodes->bitmap2, 1));
+
+    size_t index = bitmap_atomic_first(nodes->bitmap2, nodes->table_size);
+    assert(llmsset_is_marked(nodes, index));
+    printf("bitmap_first: %zu\n", index);
+    while (index != npos) {
+        printf("%zu ", index);
+        index = bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index);
+        printf("%zu ", index);
+        assert(llmsset_is_marked(nodes, index));
+        if (index == npos) printf("npos\n");
+    }
+
+    return 0;
 
     interact_t state;
     int success = interact_malloc(&state, sylvan_levelscount());
@@ -536,7 +577,7 @@ TASK_0(int, test_interact)
     interact_init(&state);
     INFO("interact_init\n");
 
-    interact_print_state(&state, sylvan_levelscount());
+//    interact_print_state(&state, sylvan_levelscount());
 
     assert(interact_test(&state, 0, 1));
     assert(interact_test(&state, 1, 0));
@@ -557,7 +598,7 @@ TASK_0(int, test_interact)
     interact_free(&state);
 
     sylvan_unprotect(&bdd1);
-    sylvan_unprotect(&bdd2);
+//    sylvan_unprotect(&bdd2);
     return 0;
 }
 
@@ -620,7 +661,7 @@ int main()
 
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL<<34, 1, 2);
+    sylvan_set_limits(1LL<<20, 1, 2);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

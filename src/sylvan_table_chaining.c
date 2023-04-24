@@ -80,8 +80,8 @@ restart:
 static void
 release_data_bucket(const llmsset_t dbs, uint64_t index)
 {
-    _Atomic(uint64_t)* ptr = dbs->bitmap2 + (index/64);
-    uint64_t mask = 0x8000000000000000LL >> (index&63);
+    _Atomic(uint64_t)* ptr = dbs->bitmap2 + (index/64); // get the desired word
+    uint64_t mask = 0x8000000000000000LL >> (index&63); // look only at first 6 least significant bits
     atomic_fetch_and(ptr, ~mask);
 }
 

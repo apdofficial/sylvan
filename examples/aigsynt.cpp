@@ -246,7 +246,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
 #if 1
     size_t used, total;
     sylvan_table_usage(&used, &total);
-    if (did_gc or 2*used > total) {
+    if (used > total * 0.9) {
         sylvan_reorder_all();
         did_gc = 0;
     }
@@ -569,7 +569,7 @@ VOID_TASK_0(parse)
 //    INFO("Reordering to permutation done: %zu/%zu size\n", used, total);
 
 //    if (dynamic_reorder) sylvan_reorder_all();
-    sylvan_stats_report(stdout);
+//    sylvan_stats_report(stdout);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -664,9 +664,9 @@ VOID_TASK_0(parse)
     while (Unsafe != OldUnsafe) {
         OldUnsafe = Unsafe;
         iteration++;
-        if (verbose) {
-            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
-        }
+//        if (verbose) {
+//            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
+//        }
         INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
         INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
         Step = sylvan_compose(Unsafe, CV);
@@ -784,16 +784,16 @@ int main(int argc, char **argv)
 
     // Init Sylvan
     // Give 4 GB memory
-    sylvan_set_limits(1LL << 30, 1, 15);
+    sylvan_set_limits(2LL << 30, 1, 64);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_maxswap(5000);
-    sylvan_set_reorder_maxvar(500);
-    sylvan_set_reorder_threshold(64);
+    sylvan_set_reorder_maxswap(1000);
+    sylvan_set_reorder_maxvar(100);
+    sylvan_set_reorder_threshold(128);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 1 minute
+    sylvan_set_reorder_timelimit(1 * 30 * 1000); // 30 sec
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));
