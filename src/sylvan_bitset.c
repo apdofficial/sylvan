@@ -19,15 +19,6 @@ static inline uint64_t get_first_msb_one_bit_pos(word_t word, size_t word_idx)
 // Returns one plus the index of the least significant 1-bit of x, or
 // if x is zero, returns zero.
 
-// Bit Search Reverse
-static inline int bsr(uint64_t x)
-{
-    // __builtin_clzll:
-    // Returns the number of leading 0-bits in x, starting at the most significant bit position.
-    // If x is 0, the result is undefined.
-    return __builtin_clzll(x) ^ (BITS_PER_WORD-1);
-}
-
 void bitmap_set(word_t *words, size_t pos)
 {
     words[WORD_OFFSET(pos)] |= BIT_MASK(pos);

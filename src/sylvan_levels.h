@@ -15,12 +15,10 @@ extern "C" {
  * Initially, variables are assigned linearly, starting with 0.
  */
 typedef struct levels_db {
-    _Atomic(uint32_t)*  table;                   // array holding the 1-node BDD for each level
+    _Atomic(uint64_t)*  table;                   // array holding the 1-node BDD for each level
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-    atomic_word_t*      bitmap2;                 // bitmap for "contains data" , as many bits as there are buckets in the table, 1 -> corresponding bucket contains bdd node
-    size_t              bitmap2_size;            // size of the bitmap2
 } *levels_t;
 
 /**

@@ -571,24 +571,24 @@ TASK_0(int, test_interact)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-//    printf("test_varswap\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-//    printf("test_varswap_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-//    printf("test_varswap_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-//    printf("test_sift_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-//    printf("test_sift_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-//    printf("test_sift_pos\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-//    printf("test_reorder_perm\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-//    printf("test_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-//    printf("test_map_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_varswap\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    printf("test_varswap_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    printf("test_varswap_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    printf("test_sift_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_sift_pos\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+    printf("test_reorder_perm\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    printf("test_map_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
@@ -628,7 +628,7 @@ int main()
 
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL<<35, 1, 2);
+    sylvan_set_limits(1LL<<20, 1, 2);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -636,7 +636,7 @@ int main()
 
     sylvan_set_reorder_threshold(2);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(30 * 1000); // 10 sec
+    sylvan_set_reorder_timelimit(30 * 1000);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));

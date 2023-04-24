@@ -7,7 +7,7 @@ char interact_malloc(interact_t *matrix, size_t nvars)
 {
     matrix->size = nvars * 2; // we have a square matrix
     matrix->nrows = nvars;
-
+    matrix->bitmap = NULL;
     matrix->bitmap = (uint64_t *) alloc_aligned(matrix->size);
 
     if (matrix->bitmap == 0) {
