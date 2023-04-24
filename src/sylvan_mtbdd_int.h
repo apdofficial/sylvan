@@ -160,26 +160,6 @@ mtbddnode_setflag(mtbddnode_t n, int is_marked)
     else n->a &= ~mtbdd_flag;
 }
 
-/**
- * @brief Set a visited mark on a node.
- * @details This is used used as marker to tell whether a node was reached by
- * at least one DFS. Once the interaction matrix is built, these flags are reset.
- *
- * @note Set the flag to 0 once you are done with it.
- */
-static inline int __attribute__((unused))
-mtbddnode_getvisited(mtbddnode_t n)
-{
-    return n->a & mtbdd_visited ? 1 : 0;
-}
-
-static inline void __attribute__((unused))
-mtbddnode_setvisited(mtbddnode_t n, int is_visited)
-{
-    if (is_visited) n->a |= mtbdd_visited;
-    else n->a &= ~mtbdd_visited;
-}
-
 static inline void __attribute__((unused))
 mtbddnode_makeleaf(mtbddnode_t n, uint32_t type, uint64_t value)
 {

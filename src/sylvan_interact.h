@@ -9,30 +9,32 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#include "sylvan_bitset.h"
+
 typedef struct interact_state
 {
-    char **interact;   // interacting variable matrix
-    size_t ncols;
-    size_t nrows;
-} interact_state_t;
+     size_t           nrows;                  // size of a row
+     size_t           size;                   // size of the bitmaps
+     word_t*          bitmap;                 // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
+} interact_t;
 
 // number of variables can be at most number of nodes
 #define interact_alloc_max(state) interact_alloc(state, nodes->table_size);
-char interact_alloc(interact_state_t *state, size_t len);
+char interact_malloc(interact_t *matrix, size_t nvars);
 
-void interact_free(interact_state_t *state);
+void interact_free(interact_t *state);
 
-static inline void interact_set(interact_state_t *state, size_t row, size_t col, char value)
+static inline void interact_set(interact_t *state, size_t row, size_t col)
 {
-    state->interact[row][col] = value;
+    bitmap_set(state->bitmap, row * state->nrows + col);
 }
 
-static inline int interact_get(const interact_state_t *state, size_t row, size_t col)
+static inline int interact_get(const interact_t *state, size_t row, size_t col)
 {
-    return state->interact[row][col];
+    return bitmap_get(state->bitmap, row * state->nrows + col);
 }
 
-static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR y)
+static inline int interact_test(const interact_t *state, BDDVAR x, BDDVAR y)
 {
     // ensure x < y
     // this is because we only keep the upper triangle of the matrix
@@ -54,11 +56,11 @@ static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR 
   @sideeffect Clears support.
 
 */
-void interact_update(interact_state_t *state, char* support);
+void interact_update(interact_t *state, atomic_word_t* bitmap_s, size_t nvars);
 
-void print_interact_state(const interact_state_t *state, size_t nvars);
+void interact_print_state(const interact_t *state, size_t nvars);
 
-VOID_TASK_DECL_1(interact_init, interact_state_t*)
+VOID_TASK_DECL_1(interact_init, interact_t*)
 /**
   @brief Initialize the variable interaction matrix.
 */

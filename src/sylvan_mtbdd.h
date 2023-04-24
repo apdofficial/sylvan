@@ -62,10 +62,7 @@ typedef MTBDD MTBDDMAP;
  * False is also used in Integer/Real/Fraction MTBDDs for partially defined functions.
  */
 static const MTBDD mtbdd_complement = 0x8000000000000000LL;
-//static const MTBDD mtbdd_notleaf    = 0x4000000000000000LL;
-static const MTBDD mtbdd_flag     = 0x2000000000000000LL;
-//static const MTBDD mtbdd_mapnode    = 0x1000000000000000LL;
-static const MTBDD mtbdd_visited    = 0x0800000000000000LL;
+static const MTBDD mtbdd_flag       = 0x2000000000000000LL;
 static const MTBDD mtbdd_false      = 0;
 static const MTBDD mtbdd_true       = 0x8000000000000000LL;
 static const MTBDD mtbdd_invalid    = 0xffffffffffffffffLL;
@@ -139,8 +136,8 @@ static const MTBDD sylvan_invalid    = 0xffffffffffffffffLL;
 #define sylvan_levelscount      mtbdd_levelscount
 #define sylvan_resetlevels      mtbdd_resetlevels
 #define sylvan_ithlevel         mtbdd_ithlevel
-#define sylvan_level_to_var     mtbdd_level_to_var
-#define sylvan_var_to_level     mtbdd_var_to_level
+#define sylvan_level_to_order   mtbdd_level_to_order
+#define sylvan_order_to_level   mtbdd_order_to_level
 /**
  * Initialize MTBDD functionality.
  * This initializes internal and external referencing datastructures,

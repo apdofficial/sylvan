@@ -1,13 +1,13 @@
 #include <sylvan_int.h>
 #include <sylvan_mtbdd_int.h>
 #include <sylvan_align.h>
-#include <errno.h>  // for errno
+#include <errno.h>      // for errno
 
 static size_t levels_size; // size of the arrays in levels_t used to realloc memory
 
 levels_t mtbdd_levels_create()
 {
-    levels_t dbs = (struct levels_db *)alloc_aligned(sizeof(struct levels_db));
+    levels_t dbs = (struct levels_db *) alloc_aligned(sizeof(struct levels_db));
     if (dbs == 0) {
         fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
         exit(1);
@@ -25,7 +25,7 @@ levels_t mtbdd_levels_create()
 void mtbdd_levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
-    free(dbs);
+    free_aligned(dbs, sizeof(struct levels_db));
 }
 
 size_t mtbdd_levelscount(void)
@@ -50,11 +50,12 @@ int mtbdd_newlevels(size_t amount)
         // probably better than doubling anyhow...
         levels_size = (levels->count + amount + 63) & (~63LL);
 #endif
-        levels->table = (uint64_t *)realloc(levels->table, sizeof(uint64_t[levels_size]));
-        levels->level_to_order = (uint32_t *)realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
-        levels->order_to_level = (uint32_t *)realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
 
-        if (!(levels->table && levels->level_to_order && levels->order_to_level)) {
+        levels->table = (_Atomic (uint64_t) *) realloc(levels->table, sizeof(uint64_t[levels_size]));
+        levels->level_to_order = (_Atomic (uint32_t) *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
+        levels->order_to_level = (_Atomic (uint32_t) *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+
+        if (levels->table == 0 || levels->level_to_order == 0 || levels->order_to_level == 0) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
             return 0;
         }
@@ -88,13 +89,13 @@ MTBDD mtbdd_ithlevel(uint32_t level)
     else return mtbdd_invalid;
 }
 
-uint32_t mtbdd_var_to_level(BDDVAR var)
+uint32_t mtbdd_order_to_level(BDDVAR var)
 {
     if (var < levels->count) return levels->order_to_level[var];
     else return var;
 }
 
-BDDVAR mtbdd_level_to_var(uint32_t level)
+BDDVAR mtbdd_level_to_order(uint32_t level)
 {
     if (level < levels->count) return levels->level_to_order[level];
     else return level;
@@ -121,13 +122,13 @@ void mtbdd_levels_gc_add_mark_managed_refs(void)
  * @param level
  * @param level_counts
  */
-void gnome_sort(int *levels_arr, const _Atomic(size_t)* level_counts)
+void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
 {
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < levels->count) {
-        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i - 1])];
-        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_var(levels_arr[i])];
+        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i - 1])];
+        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i])];
         if (p < q) {
             int t = levels_arr[i];
             levels_arr[i] = levels_arr[i - 1];
@@ -138,7 +139,7 @@ void gnome_sort(int *levels_arr, const _Atomic(size_t)* level_counts)
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_count_levelnodes, _Atomic(size_t)*, arr, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_count_levelnodes, _Atomic (size_t)*, arr, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
         SPAWN(sylvan_count_levelnodes, arr, first, count / 2);
@@ -185,20 +186,20 @@ TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, coun
 }
 
 // set levels below the threshold to -1
-void mtbdd_mark_threshold(int *level, const _Atomic(size_t) *level_counts, uint32_t threshold)
+void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
 {
     for (unsigned int i = 0; i < levels->count; i++) {
-        if (level_counts[mtbdd_level_to_var(i)] < threshold) level[i] = -1;
+        if (level_counts[mtbdd_level_to_order(i)] < threshold) level[i] = -1;
         else level[i] = i;
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_init_subtables, char**, subtables, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_init_subtables, subtables, first, split);
-        CALL(sylvan_init_subtables, subtables, first + split, count - split);
+        SPAWN(sylvan_init_subtables, bitmap_t, first, split);
+        CALL(sylvan_init_subtables, bitmap_t, first + split, count - split);
         SYNC(sylvan_init_subtables);
     } else {
         const size_t end = first + count;
@@ -206,7 +207,9 @@ VOID_TASK_IMPL_3(sylvan_init_subtables, char**, subtables, size_t, first, size_t
             if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
             mtbddnode_t node = MTBDD_GETNODE(first);
             BDDVAR var = mtbddnode_getvariable(node);
-            if (var < levels->count) subtables[var][first] = 1;
+            if (var < levels->count) {
+                bitmap_atomic_set(bitmap_t, var * levels->count + first);
+            }
         }
     }
 }
