@@ -107,7 +107,7 @@ parse_args(int argc, char **argv)
         exit(0);
     }
     model_filename = argv[optind];
-    std::string path = std::string  { model_filename };
+    std::string path = std::string{model_filename};
     std::string base_filename = path.substr(path.find_last_of("/\\") + 1);
     std::cout << "Model file: " << base_filename << std::endl;
 }
@@ -120,7 +120,6 @@ wctime()
     gettimeofday(&tv, NULL);
     return (tv.tv_sec + 1E-6 * tv.tv_usec);
 }
-
 
 
 /**
@@ -213,13 +212,13 @@ int *level_to_var;
 #define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
-#if 1
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    if ((used > total * 0.85) && dynamic_reorder) {
-        sylvan_reorder_all();
+    if (dynamic_reorder) {
+        size_t used, total;
+        sylvan_table_usage(&used, &total);
+        if (used > total * 0.85) {
+            sylvan_reorder_all();
+        }
     }
-#endif
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a] / 2;
     int rgt = gatergt[a] / 2;
@@ -550,7 +549,7 @@ VOID_TASK_0(parse)
     if (verbose) {
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
     }
-    
+
 #if 0
     for (uint64_t g=0; g<A; g++) {
         INFO("gate %d has size %zu\n", (int)g, sylvan_nodecount(gates[g]));
@@ -778,7 +777,7 @@ int main(int argc, char **argv)
     sylvan_set_reorder_maxvar(500);
     sylvan_set_reorder_threshold(64);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 60 * 1000); // 30 sec
+    sylvan_set_reorder_timelimit(1 * 60 * 1000);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));
