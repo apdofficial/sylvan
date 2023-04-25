@@ -2,6 +2,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <locale.h>
+#include <sys/time.h>
+#include <errno.h>
 
 #include "sylvan.h"
 #include "test_assert.h"
@@ -11,6 +14,29 @@
 #include "sylvan_levels.h"
 #include "common.h"
 #include "sylvan_interact.h"
+#include <sylvan_align.h>
+
+/* Obtain current wallclock time */
+static double
+wctime()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (tv.tv_sec + 1E-6 * tv.tv_usec);
+}
+
+static double t_start;
+#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
+#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
+
+void print_bits(unsigned int num)
+{
+   for(size_t bit=0;bit<(sizeof(unsigned int) * 8); bit++)
+   {
+      printf("%i ", num & 0x01);
+      num = num >> 1;
+   }
+}
 
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
@@ -60,10 +86,10 @@ TASK_0(int, test_varswap)
     BDD one = sylvan_ithlevel(6);
     BDD two = sylvan_ithlevel(7);
 
-    test_assert(sylvan_level_to_var(6) == 6);
-    test_assert(sylvan_level_to_var(7) == 7);
-    test_assert(sylvan_var_to_level(6) == 6);
-    test_assert(sylvan_var_to_level(7) == 7);
+    test_assert(sylvan_level_to_order(6) == 6);
+    test_assert(sylvan_level_to_order(7) == 7);
+    test_assert(sylvan_order_to_level(6) == 6);
+    test_assert(sylvan_order_to_level(7) == 7);
     test_assert(one == sylvan_ithvar(6));
     test_assert(two == sylvan_ithvar(7));
     test_assert(mtbdd_getvar(one) == 6);
@@ -71,10 +97,10 @@ TASK_0(int, test_varswap)
 
     test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
 
-    test_assert(sylvan_level_to_var(7) == 6);
-    test_assert(sylvan_level_to_var(6) == 7);
-    test_assert(sylvan_var_to_level(7) == 6);
-    test_assert(sylvan_var_to_level(6) == 7);
+    test_assert(sylvan_level_to_order(7) == 6);
+    test_assert(sylvan_level_to_order(6) == 7);
+    test_assert(sylvan_order_to_level(7) == 6);
+    test_assert(sylvan_order_to_level(6) == 7);
     test_assert(mtbdd_getvar(one) == 7);
     test_assert(mtbdd_getvar(two) == 6);
     test_assert(one == sylvan_ithvar(7));
@@ -97,15 +123,15 @@ TASK_0(int, test_varswap_down)
     MTBDD three = sylvan_ithlevel(3);
 
     /* swap down manually var 0 to level 3 */
-    test_assert(sylvan_level_to_var(0) == 0);
-    test_assert(sylvan_level_to_var(1) == 1);
-    test_assert(sylvan_level_to_var(2) == 2);
-    test_assert(sylvan_level_to_var(3) == 3);
+    test_assert(sylvan_level_to_order(0) == 0);
+    test_assert(sylvan_level_to_order(1) == 1);
+    test_assert(sylvan_level_to_order(2) == 2);
+    test_assert(sylvan_level_to_order(3) == 3);
 
-    test_assert(sylvan_var_to_level(0) == 0);
-    test_assert(sylvan_var_to_level(1) == 1);
-    test_assert(sylvan_var_to_level(2) == 2);
-    test_assert(sylvan_var_to_level(3) == 3);
+    test_assert(sylvan_order_to_level(0) == 0);
+    test_assert(sylvan_order_to_level(1) == 1);
+    test_assert(sylvan_order_to_level(2) == 2);
+    test_assert(sylvan_order_to_level(3) == 3);
 
     test_assert(zero == sylvan_ithvar(0));
     test_assert(one == sylvan_ithvar(1));
@@ -123,15 +149,15 @@ TASK_0(int, test_varswap_down)
     test_assert(sylvan_varswap(2) == SYLVAN_VARSWAP_SUCCESS);
     // 1, 2, 3, 0
 
-    test_assert(sylvan_level_to_var(0) == 1);
-    test_assert(sylvan_level_to_var(1) == 2);
-    test_assert(sylvan_level_to_var(2) == 3);
-    test_assert(sylvan_level_to_var(3) == 0);
+    test_assert(sylvan_level_to_order(0) == 1);
+    test_assert(sylvan_level_to_order(1) == 2);
+    test_assert(sylvan_level_to_order(2) == 3);
+    test_assert(sylvan_level_to_order(3) == 0);
 
-    test_assert(sylvan_var_to_level(1) == 0);
-    test_assert(sylvan_var_to_level(2) == 1);
-    test_assert(sylvan_var_to_level(3) == 2);
-    test_assert(sylvan_var_to_level(0) == 3);
+    test_assert(sylvan_order_to_level(1) == 0);
+    test_assert(sylvan_order_to_level(2) == 1);
+    test_assert(sylvan_order_to_level(3) == 2);
+    test_assert(sylvan_order_to_level(0) == 3);
 
     test_assert(zero == sylvan_ithvar(3));
     test_assert(one == sylvan_ithvar(0));
@@ -176,15 +202,15 @@ TASK_0(int, test_varswap_up)
     test_assert(sylvan_varswap(0) == SYLVAN_VARSWAP_SUCCESS);
     // 3, 0, 1, 2
 
-    test_assert(sylvan_level_to_var(0) == 3);
-    test_assert(sylvan_level_to_var(1) == 0);
-    test_assert(sylvan_level_to_var(2) == 1);
-    test_assert(sylvan_level_to_var(3) == 2);
+    test_assert(sylvan_level_to_order(0) == 3);
+    test_assert(sylvan_level_to_order(1) == 0);
+    test_assert(sylvan_level_to_order(2) == 1);
+    test_assert(sylvan_level_to_order(3) == 2);
 
-    test_assert(sylvan_var_to_level(3) == 0);
-    test_assert(sylvan_var_to_level(0) == 1);
-    test_assert(sylvan_var_to_level(1) == 2);
-    test_assert(sylvan_var_to_level(2) == 3);
+    test_assert(sylvan_order_to_level(3) == 0);
+    test_assert(sylvan_order_to_level(0) == 1);
+    test_assert(sylvan_order_to_level(1) == 2);
+    test_assert(sylvan_order_to_level(2) == 3);
 
     test_assert(zero == sylvan_ithvar(1));
     test_assert(one == sylvan_ithvar(2));
@@ -213,15 +239,15 @@ TASK_0(int, test_sift_down)
     MTBDD three = sylvan_ithlevel(3);
 
     /* swap down manually var 0 to level 3 */
-    test_assert(sylvan_level_to_var(0) == 0);
-    test_assert(sylvan_level_to_var(1) == 1);
-    test_assert(sylvan_level_to_var(2) == 2);
-    test_assert(sylvan_level_to_var(3) == 3);
+    test_assert(sylvan_level_to_order(0) == 0);
+    test_assert(sylvan_level_to_order(1) == 1);
+    test_assert(sylvan_level_to_order(2) == 2);
+    test_assert(sylvan_level_to_order(3) == 3);
 
-    test_assert(sylvan_var_to_level(0) == 0);
-    test_assert(sylvan_var_to_level(1) == 1);
-    test_assert(sylvan_var_to_level(2) == 2);
-    test_assert(sylvan_var_to_level(3) == 3);
+    test_assert(sylvan_order_to_level(0) == 0);
+    test_assert(sylvan_order_to_level(1) == 1);
+    test_assert(sylvan_order_to_level(2) == 2);
+    test_assert(sylvan_order_to_level(3) == 3);
 
     test_assert(zero == sylvan_ithvar(0));
     test_assert(one == sylvan_ithvar(1));
@@ -245,15 +271,15 @@ TASK_0(int, test_sift_down)
     test_assert(sylvan_siftdown(&state) == SYLVAN_VARSWAP_SUCCESS);
     // 1, 2, 3, 0
 
-    test_assert(sylvan_level_to_var(0) == 1);
-    test_assert(sylvan_level_to_var(1) == 2);
-    test_assert(sylvan_level_to_var(2) == 3);
-    test_assert(sylvan_level_to_var(3) == 0);
+    test_assert(sylvan_level_to_order(0) == 1);
+    test_assert(sylvan_level_to_order(1) == 2);
+    test_assert(sylvan_level_to_order(2) == 3);
+    test_assert(sylvan_level_to_order(3) == 0);
 
-    test_assert(sylvan_var_to_level(1) == 0);
-    test_assert(sylvan_var_to_level(2) == 1);
-    test_assert(sylvan_var_to_level(3) == 2);
-    test_assert(sylvan_var_to_level(0) == 3);
+    test_assert(sylvan_order_to_level(1) == 0);
+    test_assert(sylvan_order_to_level(2) == 1);
+    test_assert(sylvan_order_to_level(3) == 2);
+    test_assert(sylvan_order_to_level(0) == 3);
 
     test_assert(zero == sylvan_ithvar(3));
     test_assert(one == sylvan_ithvar(0));
@@ -304,15 +330,15 @@ TASK_0(int, test_sift_up)
     test_assert(sylvan_siftup(&state) == SYLVAN_VARSWAP_SUCCESS);
     // 3, 0, 1, 2
 
-    test_assert(sylvan_level_to_var(0) == 3);
-    test_assert(sylvan_level_to_var(1) == 0);
-    test_assert(sylvan_level_to_var(2) == 1);
-    test_assert(sylvan_level_to_var(3) == 2);
+    test_assert(sylvan_level_to_order(0) == 3);
+    test_assert(sylvan_level_to_order(1) == 0);
+    test_assert(sylvan_level_to_order(2) == 1);
+    test_assert(sylvan_level_to_order(3) == 2);
 
-    test_assert(sylvan_var_to_level(3) == 0);
-    test_assert(sylvan_var_to_level(0) == 1);
-    test_assert(sylvan_var_to_level(1) == 2);
-    test_assert(sylvan_var_to_level(2) == 3);
+    test_assert(sylvan_order_to_level(3) == 0);
+    test_assert(sylvan_order_to_level(0) == 1);
+    test_assert(sylvan_order_to_level(1) == 2);
+    test_assert(sylvan_order_to_level(2) == 3);
 
     test_assert(zero == sylvan_ithvar(1));
     test_assert(one == sylvan_ithvar(2));
@@ -354,15 +380,15 @@ TASK_0(int, test_sift_pos)
     test_assert(sylvan_siftpos(3, 0) == SYLVAN_VARSWAP_SUCCESS);
     // 3, 0, 1, 2
 
-    test_assert(sylvan_level_to_var(0) == 3);
-    test_assert(sylvan_level_to_var(1) == 0);
-    test_assert(sylvan_level_to_var(2) == 1);
-    test_assert(sylvan_level_to_var(3) == 2);
+    test_assert(sylvan_level_to_order(0) == 3);
+    test_assert(sylvan_level_to_order(1) == 0);
+    test_assert(sylvan_level_to_order(2) == 1);
+    test_assert(sylvan_level_to_order(3) == 2);
 
-    test_assert(sylvan_var_to_level(3) == 0);
-    test_assert(sylvan_var_to_level(0) == 1);
-    test_assert(sylvan_var_to_level(1) == 2);
-    test_assert(sylvan_var_to_level(2) == 3);
+    test_assert(sylvan_order_to_level(3) == 0);
+    test_assert(sylvan_order_to_level(0) == 1);
+    test_assert(sylvan_order_to_level(1) == 2);
+    test_assert(sylvan_order_to_level(2) == 3);
 
     test_assert(zero == sylvan_ithvar(1));
     test_assert(one == sylvan_ithvar(2));
@@ -419,15 +445,15 @@ TASK_0(int, test_reorder_perm)
 
     test_assert(sylvan_reorder_perm(perm) == SYLVAN_VARSWAP_SUCCESS);
 
-    test_assert(sylvan_level_to_var(0) == perm[0]);
-    test_assert(sylvan_level_to_var(1) == perm[1]);
-    test_assert(sylvan_level_to_var(2) == perm[2]);
-    test_assert(sylvan_level_to_var(3) == perm[3]);
+    test_assert(sylvan_level_to_order(0) == perm[0]);
+    test_assert(sylvan_level_to_order(1) == perm[1]);
+    test_assert(sylvan_level_to_order(2) == perm[2]);
+    test_assert(sylvan_level_to_order(3) == perm[3]);
 
-    test_assert(sylvan_var_to_level(perm[0]) == 0);
-    test_assert(sylvan_var_to_level(perm[1]) == 1);
-    test_assert(sylvan_var_to_level(perm[2]) == 2);
-    test_assert(sylvan_var_to_level(perm[3]) == 3);
+    test_assert(sylvan_order_to_level(perm[0]) == 0);
+    test_assert(sylvan_order_to_level(perm[1]) == 1);
+    test_assert(sylvan_order_to_level(perm[2]) == 2);
+    test_assert(sylvan_order_to_level(perm[3]) == 3);
 
     test_assert(zero == sylvan_ithvar(1));
     test_assert(one == sylvan_ithvar(3));
@@ -462,7 +488,7 @@ TASK_0(int, test_reorder)
     int identity = 1;
     // check if the new order is identity with the old order
     for (size_t i = 0; i < sylvan_levelscount(); i++) {
-        if (sylvan_var_to_level(i) != perm[i]) {
+        if (sylvan_order_to_level(i) != perm[i]) {
             identity = 0;
             break;
         }
@@ -476,7 +502,7 @@ TASK_0(int, test_reorder)
     test_assert(not_optimal_order_size == not_optimal_size_again);
 
     for (size_t i = 0; i < sylvan_levelscount(); i++) {
-        test_assert(sylvan_var_to_level(i) == perm[i]);
+        test_assert(sylvan_order_to_level(i) == perm[i]);
     }
 
     sylvan_unprotect(&bdd);
@@ -510,10 +536,15 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    interact_state_t state;
-    int success = interact_alloc(&state, sylvan_levelscount());
+    interact_t state;
+    int success = interact_malloc(&state, sylvan_levelscount());
     assert(success);
+
+    t_start = wctime();
     interact_init(&state);
+    INFO("interact_init\n");
+
+    interact_print_state(&state, sylvan_levelscount());
 
     assert(interact_test(&state, 0, 1));
     assert(interact_test(&state, 1, 0));
@@ -592,9 +623,12 @@ int should_reordering_terminate()
 
 int main()
 {
+    setlocale(LC_NUMERIC, "en_US.utf-8");
+    t_start = wctime();
+
     lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL*1LL<<20, 1, 256);
+    sylvan_set_limits(1LL<<20, 1, 2);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -602,7 +636,7 @@ int main()
 
     sylvan_set_reorder_threshold(2);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(30 * 1000); // 10 sec
+    sylvan_set_reorder_timelimit(30 * 1000);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));

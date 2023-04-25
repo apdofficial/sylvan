@@ -453,13 +453,13 @@ Bdd::resetLevels()
 Bdd
 Bdd::bddLevel(uint32_t index)
 {
-    return sylvan_level_to_var(index);
+    return sylvan_level_to_order(index);
 }
 
 uint32_t
 bddVarToLevel(uint32_t index)
 {
-    return sylvan_var_to_level(index);
+    return sylvan_order_to_level(index);
 }
 
 Bdd
@@ -633,13 +633,13 @@ Mtbdd::resetLevels()
 Mtbdd
 Mtbdd::mtbddLevel(uint32_t index)
 {
-    return sylvan_level_to_var(index);
+    return sylvan_level_to_order(index);
 }
 
 uint32_t
 Mtbdd::bddVarToLevel(uint32_t index)
 {
-    return sylvan_var_to_level(index);
+    return sylvan_order_to_level(index);
 }
 
 Mtbdd

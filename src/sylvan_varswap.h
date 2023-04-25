@@ -8,7 +8,7 @@ extern "C" {
 /**
  * Block size tunes the granularity of the parallel distribution
  */
-#define BLOCKSIZE 128
+#define BLOCKSIZE 4096
 
 typedef enum varswap {
     /// the operation was aborted and rolled back
@@ -29,6 +29,8 @@ typedef enum varswap {
     SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
     /// the operation was aborted and rolled back
     SYLVAN_VARSWAP_ERROR = -7,
+    /// the operation failed fast because the varswap was not initialised
+    SYLVAN_VARSWAP_NOT_INITIALISED = -8,
 } varswap_t;
 
 /**
