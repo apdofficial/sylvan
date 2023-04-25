@@ -216,7 +216,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
 #if 1
     size_t used, total;
     sylvan_table_usage(&used, &total);
-    if ((used > total * 0.75) && dynamic_reorder) {
+    if ((used > total * 0.85) && dynamic_reorder) {
         sylvan_reorder_all();
     }
 #endif
@@ -550,7 +550,7 @@ VOID_TASK_0(parse)
     if (verbose) {
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
     }
-
+    
 #if 0
     for (uint64_t g=0; g<A; g++) {
         INFO("gate %d has size %zu\n", (int)g, sylvan_nodecount(gates[g]));
@@ -768,8 +768,8 @@ int main(int argc, char **argv)
 
 
     // Init Sylvan
-    // Give 4 GB memory
-    sylvan_set_limits(4LL << 30, 1, 64);
+    // Give 1 GB memory
+    sylvan_set_limits(1LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

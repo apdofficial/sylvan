@@ -205,7 +205,7 @@ VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first,
         SYNC(sylvan_init_subtables);
     } else {
         const size_t end = first + count;
-        for (; first < end; first++) {
+        for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
             if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
             mtbddnode_t node = MTBDD_GETNODE(first);
             BDDVAR var = mtbddnode_getvariable(node);

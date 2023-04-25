@@ -276,10 +276,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-    interact_t interact_state;
-    int success = interact_malloc(&interact_state, levels->count);
-    if (!success) return SYLVAN_VARSWAP_ERROR;
-    interact_init(&interact_state);
+//    interact_t interact_state;
+//    int success = interact_malloc(&interact_state, levels->count);
+//    if (!success) return SYLVAN_VARSWAP_ERROR;
+//    interact_init(&interact_state);
 
     // now count all variable levels (parallel...)
     _Atomic(size_t) level_counts[levels->count];
