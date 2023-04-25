@@ -135,7 +135,7 @@ size_t bitmap_count(word_t *words, size_t size)
 void bitmap_atomic_set(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
-    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_acquire);
+    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_relaxed);
     uint64_t new_v = old_v | BIT_MASK(pos);
     atomic_compare_exchange_strong(word_ptr, &old_v, new_v);
 }
@@ -143,7 +143,7 @@ void bitmap_atomic_set(atomic_word_t *words, size_t pos)
 void bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
-    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_acquire);
+    uint64_t old_v = atomic_load_explicit(word_ptr, memory_order_relaxed);
     uint64_t new_v = old_v & ~BIT_MASK(pos);
     atomic_compare_exchange_strong(word_ptr, &old_v, new_v);
 }

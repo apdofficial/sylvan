@@ -8,7 +8,7 @@ extern "C" {
 /**
  * Block size tunes the granularity of the parallel distribution
  */
-#define BLOCKSIZE 128
+#define BLOCKSIZE 4096
 
 typedef enum varswap {
     /// the operation was aborted and rolled back

@@ -178,8 +178,7 @@ TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, coun
     } else {
         size_t var_count = 0;
         const size_t end = first + count;
-        for (; first < end; first++) {
-            if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
+        for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
             mtbddnode_t node = MTBDD_GETNODE(first);
             if (mtbddnode_getvariable(node) != var) continue; // not the right variable
             var_count++;
