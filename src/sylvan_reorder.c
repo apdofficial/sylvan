@@ -21,10 +21,6 @@
 #include "sylvan_reorder.h"
 #include "sylvan_interact.h"
 
-/**
- * Block size tunes the granularity of the parallel distribution
- */
-#define BLOCKSIZE 128
 
 #define STATS 1 // useful information w.r.t. dynamic reordering
 
