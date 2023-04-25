@@ -142,7 +142,7 @@ TASK_DECL_2(varswap_t, sylvan_siftpos, uint32_t, uint32_t);
  */
 #define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
 
-TASK_DECL_2(varswap_t, sylvan_reorder, uint32_t, uint32_t);
+TASK_DECL_2(varswap_t, sylvan_reorder_impl, uint32_t, uint32_t);
 /**
       @brief Reduce the heap size in the entire forest.
 
@@ -159,7 +159,15 @@ TASK_DECL_2(varswap_t, sylvan_reorder, uint32_t, uint32_t);
       @param low - the lowest position to sift
       @param high - the highest position to sift
 */
-#define sylvan_reorder(low, high)  RUN(sylvan_reorder, low, high)
+#define sylvan_reorder_impl(low, high)  RUN(sylvan_reorder_impl, low, high)
+
+
+VOID_TASK_DECL_0(sylvan_reduce_heap);
+/**
+ * @brief Trigger blocking dynamic variable reordering.
+ * @details This function performs stop-the-world operation similar to garbage collection.
+ */
+#define sylvan_reduce_heap() (RUN(sylvan_reduce_heap))
 
 /**
       @brief Reduce the heap size in the entire forest.
@@ -174,7 +182,7 @@ TASK_DECL_2(varswap_t, sylvan_reorder, uint32_t, uint32_t);
         <li> Repeat 2 and 3 for all variables in given range.
         </ol>
 */
-#define sylvan_reorder_all()  sylvan_reorder(0, 0)
+#define sylvan_reorder_all()  sylvan_reorder_impl(0, 0)
 
 TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
 /**

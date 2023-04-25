@@ -31,6 +31,8 @@ typedef enum varswap {
     SYLVAN_VARSWAP_ERROR = -7,
     /// the operation failed fast because the varswap was not initialised
     SYLVAN_VARSWAP_NOT_INITIALISED = -8,
+    /// the operation failed fast because the varswap was already running
+    SYLVAN_VARSWAP_ALREADY_RUNNING = -9,
 } varswap_t;
 
 /**

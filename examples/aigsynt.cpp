@@ -216,7 +216,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
         size_t used, total;
         sylvan_table_usage(&used, &total);
         if (used > total * 0.85) {
-            sylvan_reorder_all();
+            sylvan_reduce_heap();
         }
     }
     if (gates[a] != sylvan_invalid) return;

@@ -25,6 +25,12 @@
 #define STATS 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
+static int reorder_is_running = 0;
+
+/**
+ * This variable is used for a cas flag so only one gc runs at one time
+ */
+static _Atomic(int) re;
 
 struct sifting_config
 {
@@ -257,9 +263,28 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     return res;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
+VOID_TASK_IMPL_0(sylvan_reduce_heap)
+{
+    if (!reorder_initialized) return;
+    if (reorder_is_running) return;
+
+    int zero = 0;
+    if (atomic_compare_exchange_strong(&re, &zero, 1)) {
+        NEWFRAME(sylvan_reorder_impl, 0, 0);
+        re = 0;
+    } else {
+        /* wait for new frame to appear */
+        while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}
+        lace_yield(__lace_worker, __lace_dq_head);
+    }
+}
+
+TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
+    if (reorder_is_running) return SYLVAN_VARSWAP_ALREADY_RUNNING;
+    reorder_is_running = 1;
+
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
 
@@ -342,6 +367,8 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
 
     sylvan_timer_stop(SYLVAN_RE);
     configs.t_start_sifting = 0;
+
+    reorder_is_running = 0;
 
     return res;
 }
