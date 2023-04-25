@@ -13,11 +13,12 @@ typedef _Atomic (word_t) atomic_word_t;
 
 static const size_t npos = (word_t)-1;
 
-#define WORD_OFFSET(b) ((b) / BITS_PER_WORD)
-#define BIT_OFFSET(b) ((b) % BITS_PER_WORD)
-#define BIT_MASK(b) ((word_t) 0x8000000000000000LL >> (b&63)) // sift the most significant bit to the right by at most b&63 (since we only have 64 bits)
-#define BIT_OFFSET(b) ((b) % BITS_PER_WORD)
-#define NUMBER_OF_WORDS(b) ((b + BITS_PER_WORD-1) / BITS_PER_WORD)
+#define WORD_OFFSET(b)          ((b) / BITS_PER_WORD)
+#define BIT_OFFSET(b)           ((b) % BITS_PER_WORD)
+#define BIT_MASK(b)             ((word_t) 0x8000000000000000LL >> b) // sift the most significant bit to the right by at most b&63 (since we only have 64 bits)
+#define BIT_ITER_MASK(b)        (~((word_t) 0x0) >> b) // sift the most significant bit to the right by at most b&63 (since we only have 64 bits)
+
+#define NUMBER_OF_WORDS(b)      ((b + BITS_PER_WORD-1) / BITS_PER_WORD)
 
 /**
  * Set the bit at position n to 1, if it was 0.

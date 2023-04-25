@@ -35,7 +35,7 @@ static int workers = 4;
 static int verbose = 1;
 static char *model_filename = NULL; // filename of the aag file
 static int static_reorder = 0;
-static int dynamic_reorder = 0;
+static int dynamic_reorder = 1;
 
 static int sloan_w1 = 1;
 static int sloan_w2 = 8;
@@ -107,7 +107,7 @@ parse_args(int argc, char **argv)
         exit(0);
     }
     model_filename = argv[optind];
-    std::string path = std::string  { model_filename };
+    std::string path = std::string{model_filename};
     std::string base_filename = path.substr(path.find_last_of("/\\") + 1);
     std::cout << "Model file: " << base_filename << std::endl;
 }
@@ -122,12 +122,9 @@ wctime()
 }
 
 
-
 /**
  * Global stuff
  */
-
-int did_gc = 0;
 
 uint8_t *buf;
 size_t pos, size;
@@ -215,6 +212,13 @@ int *level_to_var;
 #define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
+    if (dynamic_reorder) {
+        size_t used, total;
+        sylvan_table_usage(&used, &total);
+        if (used > total * 0.85) {
+            sylvan_reorder_all();
+        }
+    }
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a] / 2;
     int rgt = gatergt[a] / 2;
@@ -242,15 +246,6 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
     if (gatergt[a] & 1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
-
-#if 1
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    if (used > total * 0.9) {
-        sylvan_reorder_all();
-        did_gc = 0;
-    }
-#endif
 }
 
 VOID_TASK_0(parse)
@@ -412,10 +407,10 @@ VOID_TASK_0(parse)
         for (unsigned int i = 0; i <= M; i++) level_to_var[i] = -1;
 
         int r = 0;
-        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
-            int j = index_map[*i];
-            printf("%d %d\n", r++, j);
-        }
+//        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
+//            int j = index_map[*i];
+//            printf("%d %d\n", r++, j);
+//        }
 
         r = 0;
         for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
@@ -561,16 +556,6 @@ VOID_TASK_0(parse)
     }
 #endif
 
-    // reorder according to sloan
-//    sylvan_reorder_perm((const uint32_t*)perm);
-//    sylvan_stats_report(stdout);
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("Reordering to permutation done: %zu/%zu size\n", used, total);
-
-//    if (dynamic_reorder) sylvan_reorder_all();
-//    sylvan_stats_report(stdout);
-
 #if 0
     for (uint64_t g=0; g<A; g++) {
         MTBDD supp = sylvan_support(gates[g]);
@@ -587,7 +572,7 @@ VOID_TASK_0(parse)
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
         if (lookup[l_next[l]/2] == -1) {
-            nxt = sylvan_ithvar(l_next[l]&1);
+            nxt = sylvan_ithlevel(l_next[l]&1);
         } else {
             nxt = gates[lookup[l_next[l]]];
         }
@@ -668,7 +653,7 @@ VOID_TASK_0(parse)
 //            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
 //        }
         INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
-        INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
+//        INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
         Step = sylvan_compose(Unsafe, CV);
 //         INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
         Step = sylvan_forall(Step, Xc);
@@ -721,17 +706,16 @@ VOID_TASK_0(gc_mark)
 
 VOID_TASK_0(gc_start)
 {
-    did_gc = 1;
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("GC: str: %zu/%zu size\n", used, total);
+//    size_t used, total;
+//    sylvan_table_usage(&used, &total);
+//    INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
 VOID_TASK_0(gc_end)
 {
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("GC: end: %zu/%zu size\n", used, total);
+//    size_t used, total;
+//    sylvan_table_usage(&used, &total);
+//    INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
 static size_t prev_size = 0;
@@ -783,17 +767,17 @@ int main(int argc, char **argv)
 
 
     // Init Sylvan
-    // Give 4 GB memory
-    sylvan_set_limits(2LL << 30, 1, 64);
+    // Give 1 GB memory
+    sylvan_set_limits(1LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_maxswap(1000);
-    sylvan_set_reorder_maxvar(100);
-    sylvan_set_reorder_threshold(128);
+    sylvan_set_reorder_maxswap(10000);
+    sylvan_set_reorder_maxvar(500);
+    sylvan_set_reorder_threshold(64);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 30 * 1000); // 30 sec
+    sylvan_set_reorder_timelimit(1 * 60 * 1000);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));

@@ -1,7 +1,7 @@
 #include <sylvan_int.h>
-#include <sys/time.h>
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
+#include "sylvan_align.h"
 
 #define STATS 0 // useful information w.r.t. dynamic reordering
 
@@ -12,41 +12,29 @@
 */
 #define sylvan_varswap_p0() llmsset_clear_hashes(nodes);
 #else
-VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic(varswap_t) *);
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
-   \param var variable label to be swapped
-   \param first starting index in the unique table
-   \param count ending index number of nodes to consider in the unique table
-   \param result pointer to sylvan_var_swap_res_t
 */
-#define sylvan_varswap_p0(var, first, count, result) CALL(sylvan_varswap_p0, var, first, count, result)
+#define sylvan_varswap_p0(var, result) CALL(sylvan_varswap_p0, var, 2, nodes->table_size, result)
 #endif
 
-TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic(varswap_t) *);
+TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 1
    \details Handle all trivial cases where no node is created, mark cases that are not trivial.
-   \param var variable label to be swapped
-   \param first starting index in the unique table
-   \param count ending index number of nodes to consider in the unique table
-   \param result pointer to sylvan_var_swap_res_t
    \return number of nodes that were marked
 */
 #define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
 
-VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic(varswap_t) *);
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (varswap_t) *);
 /*!
    \brief Adjacent variable swap phase 2
    \details Handle the not so trivial cases. (creates new nodes)
-   \param var variable label to be swapped
-   \param first starting index in the unique table
-   \param count ending index number of nodes to consider in the unique table
-   \param result pointer to sylvan_var_swap_res_tw
 */
-#define sylvan_varswap_p2(var, first, count, result) CALL(sylvan_varswap_p2, var, first, count, result)
+#define sylvan_varswap_p2(var, result) CALL(sylvan_varswap_p2, var, 0, nodes->table_size, result)
 
 void sylvan_varswap_resdescription(varswap_t result, char *buf, size_t buf_len)
 {
@@ -147,7 +135,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
 {
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
 
-    _Atomic(varswap_t) result = SYLVAN_VARSWAP_SUCCESS;
+    _Atomic (varswap_t) result = SYLVAN_VARSWAP_SUCCESS;
 
     // ensure that the cache is cleared
     sylvan_clear_cache();
@@ -157,15 +145,15 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
     sylvan_varswap_p0();
 #else
     // first clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
+    sylvan_varswap_p0(pos, &result);
 #endif
-
+    clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
     // handle all trivial cases, mark cases that are not trivial
     uint64_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(pos, 0, nodes->table_size, &result);
+        sylvan_varswap_p2(pos, &result);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) {
 #if STATS
@@ -176,14 +164,14 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
             sylvan_varswap_p0();
 #else
             // first clear hashes of nodes with <var> and <var+1>
-            sylvan_varswap_p0(pos, 0, nodes->table_size, &result);
+            sylvan_varswap_p0(pos, &result);
 #endif
             // handle all trivial cases, mark cases that are not trivial
             marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
 
             if (marked_count > 0 && result == SYLVAN_VARSWAP_SUCCESS) {
                 // do the not so trivial cases (but won't create new nodes this time)
-                sylvan_varswap_p2(pos, 0, nodes->table_size, &result);
+                sylvan_varswap_p2(pos, &result);
                 if (result != SYLVAN_VARSWAP_SUCCESS) {
                     // actually, we should not see this!
                     fprintf(stderr, "sylvan: recovery varswap failed!\n");
@@ -198,6 +186,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
             return SYLVAN_VARSWAP_ROLLBACK;
         }
     }
+
 
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
     levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
@@ -222,7 +211,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
                  uint32_t, var, /** variable label **/
                  uint64_t, first, /** index in the unique table **/
                  uint64_t, count, /** index in the unique table **/
-                 _Atomic(varswap_t)*, result)
+                 _Atomic (varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -240,15 +229,12 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
 
     const size_t end = first + count;
 
-    for (; first < end; first++) {
-        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
-        mtbddnode_t node = MTBDD_GETNODE(first);
+    for (size_t i = llmsset_next(first-1); i < end; i = llmsset_next(i)) {
+        mtbddnode_t node = MTBDD_GETNODE(i);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            if (!llmsset_clear_one(nodes, first)) {
-                fprintf(stderr, "sylvan_varswap_p0: llmsset_clear_one(%u) failed!\n", nvar);
-            }
+            llmsset_clear_one(nodes, i);
         }
     }
 }
@@ -270,7 +256,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             uint32_t, var, /** variable label **/
             size_t, first,  /** starting node index in the unique table **/
             size_t, count, /** number of nodes to visit form the starting index **/
-            _Atomic(varswap_t)*, result)
+            _Atomic (varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -291,8 +277,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
     const size_t end = first + count;
 
-    for (; first < end; first++) {
-        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
+    for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
@@ -310,16 +295,17 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
         }
 
         // nvar == <var>
-        if (mtbddnode_getflag(node)) {
-            // marked node, remove mark and rehash (we are apparently recovering)
-            mtbddnode_setflag(node, 0);
-            llmsset_rehash_bucket(nodes, first);
-            if (llmsset_rehash_bucket(nodes, first) != 1) {
-                fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
-                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
-            }
-            continue;
-        }
+//        if (mtbddnode_getflag(node)) {
+//            fprintf(stderr, "\n------\nRecovery!\n------\n");
+//            // marked node, remove mark and rehash (we are apparently recovering)
+//            mtbddnode_setflag(node, 0);
+//            llmsset_rehash_bucket(nodes, first);
+//            if (llmsset_rehash_bucket(nodes, first) != 1) {
+//                fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
+//                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+//            }
+//            continue;
+//        }
 
         if (mtbddnode_ismapnode(node)) {
             MTBDD f0 = mtbddnode_getlow(node);
@@ -338,6 +324,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                         *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                     }
                 } else {
+//                    bitmap_atomic_set(levels->bitmap_p2, first);
                     // mark for phase 2
                     mtbddnode_setflag(node, 1);
                     marked++;
@@ -358,6 +345,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                 }
             }
             if (p2) {
+//                bitmap_atomic_set(levels->bitmap_p2, first);
                 // mark for phase 2
                 mtbddnode_setflag(node, 1);
                 marked++;
@@ -388,7 +376,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  uint32_t, var,
                  size_t, first,
                  size_t, count,
-                 _Atomic(varswap_t)*, result)
+                 _Atomic (varswap_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -407,9 +395,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     // first, find all nodes that need to be replaced
     const size_t end = first + count;
 
-    for (; first < end; first++) {
+    for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
         if (*result != SYLVAN_VARSWAP_SUCCESS) return; // the table is full
-        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
 
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
