@@ -550,6 +550,7 @@ VOID_TASK_0(parse)
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
     }
 
+//    return;
 #if 0
     for (uint64_t g=0; g<A; g++) {
         INFO("gate %d has size %zu\n", (int)g, sylvan_nodecount(gates[g]));
