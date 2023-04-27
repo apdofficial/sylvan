@@ -731,7 +731,8 @@ VOID_TASK_0(reordering_start)
 VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    if (prev_size <= size) terminate_reordering = 1;
+    // we allow growth of at most 5%
+    if (size >= prev_size * 1.05) terminate_reordering = 1;
     else prev_size = size;
     INFO("RE: prg: %zu size\n", size);
 }
