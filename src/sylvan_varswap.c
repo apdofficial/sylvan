@@ -5,6 +5,10 @@
 
 #define STATS 0 // useful information w.r.t. dynamic reordering
 
+void swap_node(size_t index);
+void swap_mapnode(size_t index);
+int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
+
 #if SYLVAN_USE_LINEAR_PROBING
 /*!
    \brief Adjacent variable swap phase 0 (Linear probing compatible)
@@ -147,7 +151,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result);
 #endif
-    clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+
     // handle all trivial cases, mark cases that are not trivial
     uint64_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
 
@@ -324,28 +328,13 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                         *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
                     }
                 } else {
-//                    bitmap_atomic_set(levels->bitmap_p2, first);
                     // mark for phase 2
                     mtbddnode_setflag(node, 1);
                     marked++;
                 }
             }
         } else {
-            int p2 = 0;
-            MTBDD f0 = mtbddnode_getlow(node);
-            if (!mtbdd_isleaf(f0)) {
-                uint32_t vf0 = mtbdd_getvar(f0);
-                if (vf0 == var || vf0 == var + 1) p2 = 1;
-            }
-            if (!p2) {
-                MTBDD f1 = mtbddnode_gethigh(node);
-                if (!mtbdd_isleaf(f1)) {
-                    uint32_t vf1 = mtbdd_getvar(f1);
-                    if (vf1 == var || vf1 == var + 1) p2 = 1;
-                }
-            }
-            if (p2) {
-//                bitmap_atomic_set(levels->bitmap_p2, first);
+            if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
                 mtbddnode_setflag(node, 1);
                 marked++;
@@ -359,6 +348,21 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
         }
     }
     return marked;
+}
+
+int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
+{
+    MTBDD f0 = mtbddnode_getlow(node);
+    if (!mtbdd_isleaf(f0)) {
+        uint32_t vf0 = mtbdd_getvar(f0);
+        if (vf0 == var || vf0 == var + 1) return 1;
+    }
+    MTBDD f1 = mtbddnode_gethigh(node);
+    if (!mtbdd_isleaf(f1)) {
+        uint32_t vf1 = mtbdd_getvar(f1);
+        if (vf1 == var || vf1 == var + 1) return 1;
+    }
+    return 0;
 }
 
 /**
@@ -403,54 +407,88 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
 
         if (mtbddnode_ismapnode(node)) {
-            // it is a map node, swap places with next in chain
-            MTBDD f0 = mtbddnode_getlow(node);
-            MTBDD f1 = mtbddnode_gethigh(node);
-            mtbddnode_t n0 = MTBDD_GETNODE(f0);
-            MTBDD f00 = node_getlow(f0, n0);
-            MTBDD f01 = node_gethigh(f0, n0);
-            f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
-            if (f0 == mtbdd_invalid) {
-                fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
-                *result = SYLVAN_VARSWAP_P2_CREATE_FAIL;
-                return;
-            } else {
-                mtbddnode_makemapnode(node, var, f0, f01);
-                llmsset_rehash_bucket(nodes, first);
-            }
+            swap_mapnode(first);
         } else {
-            // obtain cofactors
-            MTBDD f0 = mtbddnode_getlow(node);
-            MTBDD f1 = mtbddnode_gethigh(node);
-            MTBDD f00, f01, f10, f11;
-            f00 = f01 = f0;
-            if (!mtbdd_isleaf(f0)) {
-                mtbddnode_t n0 = MTBDD_GETNODE(f0);
-                if (mtbddnode_getvariable(n0) == var) {
-                    f00 = node_getlow(f0, n0);
-                    f01 = node_gethigh(f0, n0);
-                }
-            }
-            f10 = f11 = f1;
-            if (!mtbdd_isleaf(f1)) {
-                mtbddnode_t n1 = MTBDD_GETNODE(f1);
-                if (mtbddnode_getvariable(n1) == var) {
-                    f10 = node_getlow(f1, n1);
-                    f11 = node_gethigh(f1, n1);
-                }
-            }
-            // compute new f0 and f1
-            f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
-            f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
-            if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
-                *result = SYLVAN_VARSWAP_P2_CREATE_FAIL;
-                fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
-                return;
-            } else {
-                // update node, which also removes the mark
-                mtbddnode_makenode(node, var, f0, f1);
-                llmsset_rehash_bucket(nodes, first);
-            }
+            swap_node(first);
         }
+    }
+}
+
+/**
+ *
+ * Swap a node <var> with its successor nodes <var+1>.
+ *
+ * @preconditions:
+ *  - node is marked
+ *  - node is not a leaf
+ *  - node is <var>
+ *  - node childrens are <var+1>
+ */
+void swap_node(size_t index)
+{
+    mtbddnode_t node = MTBDD_GETNODE(index);
+    BDDVAR var = mtbddnode_getvariable(node);
+    // obtain cofactors
+    MTBDD f0 = mtbddnode_getlow(node);
+    MTBDD f1 = mtbddnode_gethigh(node);
+    MTBDD f00, f01, f10, f11;
+    f00 = f01 = f0;
+    if (!mtbdd_isleaf(f0)) {
+        mtbddnode_t n0 = MTBDD_GETNODE(f0);
+        if (mtbddnode_getvariable(n0) == var) {
+            f00 = node_getlow(f0, n0);
+            f01 = node_gethigh(f0, n0);
+        }
+    }
+    f10 = f11 = f1;
+    if (!mtbdd_isleaf(f1)) {
+        mtbddnode_t n1 = MTBDD_GETNODE(f1);
+        if (mtbddnode_getvariable(n1) == var) {
+            f10 = node_getlow(f1, n1);
+            f11 = node_gethigh(f1, n1);
+        }
+    }
+    // compute new f0 and f1
+    f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+    f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
+    if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
+        fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
+        return;
+    } else {
+        // update node, which also removes the mark
+        mtbddnode_makenode(node, var, f0, f1);
+        llmsset_rehash_bucket(nodes, index);
+    }
+}
+
+/**
+ *
+ * Swap a map node <var> with its successor nodes <var+1>.
+ *
+ * @preconditions:
+ *  - node is a map node
+ *  - node is marked
+ *  - node is not a leaf
+ *  - node is <var>
+ *  - node childrens are <var+1>
+ */
+void swap_mapnode(size_t index)
+{
+    mtbddnode_t node = MTBDD_GETNODE(index);
+    BDDVAR var = mtbddnode_getvariable(node);
+
+    // it is a map node, swap places with next in chain
+    MTBDD f0 = mtbddnode_getlow(node);
+    MTBDD f1 = mtbddnode_gethigh(node);
+    mtbddnode_t n0 = MTBDD_GETNODE(f0);
+    MTBDD f00 = node_getlow(f0, n0);
+    MTBDD f01 = node_gethigh(f0, n0);
+    f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
+    if (f0 == mtbdd_invalid) {
+        fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
+        return;
+    } else {
+        mtbddnode_makemapnode(node, var, f0, f01);
+        llmsset_rehash_bucket(nodes, var);
     }
 }
