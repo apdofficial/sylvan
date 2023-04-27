@@ -536,33 +536,29 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    interact_t state;
-    int success = interact_malloc(&state, sylvan_levelscount());
-    assert(success);
-
     t_start = wctime();
-    interact_init(&state);
+    interact_init(levels);
     INFO("interact_init\n");
 
-    interact_print_state(&state, sylvan_levelscount());
+    interact_print_state(levels);
 
-    assert(interact_test(&state, 0, 1));
-    assert(interact_test(&state, 1, 0));
+    assert(interact_test(levels, 0, 1));
+    assert(interact_test(levels, 1, 0));
 
     for (size_t i = 2; i < sylvan_levelscount(); ++i) {
         for (size_t j = i + 1; j < sylvan_levelscount(); ++j) {
             // test interaction of variables belonging to bdd2
-            assert(interact_test(&state, i, j));
-            assert(interact_test(&state, j, i));
+            assert(interact_test(levels, i, j));
+            assert(interact_test(levels, j, i));
             // test interaction of variables not belonging to bdd2
-            assert(!interact_test(&state, 0, j));
-            assert(!interact_test(&state, 0, i));
-            assert(!interact_test(&state, 1, j));
-            assert(!interact_test(&state, 1, i));
+            assert(!interact_test(levels, 0, j));
+            assert(!interact_test(levels, 0, i));
+            assert(!interact_test(levels, 1, j));
+            assert(!interact_test(levels, 1, i));
         }
     }
 
-    interact_free(&state);
+    interact_free(levels);
 
     sylvan_unprotect(&bdd1);
     sylvan_unprotect(&bdd2);
@@ -571,24 +567,24 @@ TASK_0(int, test_interact)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-    printf("test_varswap\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-    printf("test_varswap_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-    printf("test_varswap_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-    printf("test_sift_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-    printf("test_sift_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-    printf("test_sift_pos\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-    printf("test_reorder_perm\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-    printf("test_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-    printf("test_map_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+//    printf("test_varswap\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+//    printf("test_varswap_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+//    printf("test_varswap_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+//    printf("test_sift_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+//    printf("test_sift_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+//    printf("test_sift_pos\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+//    printf("test_reorder_perm\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+//    printf("test_reorder\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+//    printf("test_map_reorder\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;

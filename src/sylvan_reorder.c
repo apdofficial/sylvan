@@ -28,9 +28,9 @@ static int reorder_initialized = 0;
 static int reorder_is_running = 0;
 
 /**
- * This variable is used for a cas flag so only one gc runs at one time
+ * This variable is used for a cas flag so only one reordering runs at one time
  */
-static _Atomic(int) re;
+static _Atomic (int) re;
 
 struct sifting_config
 {
@@ -47,11 +47,11 @@ struct sifting_config
 /// reordering configurations
 static struct sifting_config configs = {
         .t_start_sifting = 0,
-        .threshold = 32,
+        .threshold = 128,
         .max_growth = 1.2f,
         .max_swap = 10000,
         .total_num_swap = 0,
-        .max_var = 2000,
+        .max_var = 250,
         .total_num_var = 0,
         .time_limit_ms = 1 * 60 * 1000 // 1 minute
 };
@@ -266,7 +266,10 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 VOID_TASK_IMPL_0(sylvan_reduce_heap)
 {
     if (!reorder_initialized) return;
-    if (reorder_is_running) return;
+    if (reorder_is_running) {
+        while (reorder_is_running) {}
+        return;
+    }
 
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
@@ -283,12 +286,12 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     if (reorder_is_running) return SYLVAN_VARSWAP_ALREADY_RUNNING;
+    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
+
     reorder_is_running = 1;
 
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
-
-    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
 
     for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
@@ -301,13 +304,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    interact_t interact_state;
-//    int success = interact_malloc(&interact_state, levels->count);
-//    if (!success) return SYLVAN_VARSWAP_ERROR;
-//    interact_init(&interact_state);
+//    interact_init(levels);
 
     // now count all variable levels (parallel...)
-    _Atomic(size_t) level_counts[levels->count];
+    _Atomic (size_t) level_counts[levels->count];
     for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
     sylvan_count_levelnodes(level_counts);
     // mark and sort

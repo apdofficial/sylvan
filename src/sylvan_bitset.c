@@ -150,6 +150,7 @@ void bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 
 int bitmap_atomic_get(atomic_word_t *words, size_t pos)
 {
-    uint64_t word = atomic_load_explicit(words + WORD_OFFSET(pos), memory_order_relaxed);
+    atomic_word_t *word_ptr = &words[WORD_OFFSET(pos)];
+    uint64_t word = atomic_load_explicit(word_ptr, memory_order_relaxed);
     return word & BIT_MASK(pos) ? 1 : 0;
 }

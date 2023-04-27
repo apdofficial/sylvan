@@ -19,8 +19,11 @@ typedef struct levels_db {
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
-    size_t              bitmap_p2_size;          // size of bitmap_p2
+//    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
+//    size_t              bitmap_p2_size;          // size of bitmap_p2
+    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
+    size_t              bitmap_i_nrows;          // size of a row
+    size_t              bitmap_i_size;           // size of the bitmaps
 } *levels_t;
 
 /**

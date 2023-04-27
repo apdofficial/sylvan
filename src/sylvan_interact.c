@@ -3,14 +3,21 @@
 #include <sylvan_align.h>
 #include <errno.h>      // for errno
 
-char interact_malloc(interact_t *matrix, size_t nvars)
+char interact_malloc(levels_t dbs)
 {
-    matrix->size = nvars * 2; // we have a square matrix
-    matrix->nrows = nvars;
-    matrix->bitmap = NULL;
-    matrix->bitmap = (uint64_t *) alloc_aligned(matrix->size);
+    if (dbs->bitmap_i_size == dbs->count) {
+        clear_aligned(dbs->bitmap_i, dbs->bitmap_i_size);
+        return 1;
+    } else if (dbs->bitmap_i_size != 0) {
+        interact_free(dbs);
+    }
 
-    if (matrix->bitmap == 0) {
+    dbs->bitmap_i_size = dbs->count * dbs->count; // we have a square matrix, # of vars * # of vars
+    dbs->bitmap_i_nrows = dbs->count;
+    dbs->bitmap_i = NULL;
+    dbs->bitmap_i = (atomic_word_t*) alloc_aligned(dbs->bitmap_i_size);
+
+    if (dbs->bitmap_i == 0) {
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
@@ -18,41 +25,43 @@ char interact_malloc(interact_t *matrix, size_t nvars)
     return 1;
 }
 
-void interact_free(interact_t *matrix)
+void interact_free(levels_t dbs)
 {
-    free_aligned(matrix->bitmap, matrix->size);
-    matrix->bitmap = NULL;
-    matrix->nrows = 0;
-    matrix->size = 0;
+    if (dbs->bitmap_i_size == 0) return;
+
+    free_aligned(dbs->bitmap_i, dbs->bitmap_i_size);
+    dbs->bitmap_i = NULL;
+    dbs->bitmap_i_nrows = 0;
+    dbs->bitmap_i_size = 0;
 }
 
-void interact_update(interact_t *state, atomic_word_t *bitmap_s, size_t nvars)
+void interact_update(levels_t dbs, atomic_word_t *bitmap_s)
 {
     size_t i, j;
-    for (i = 0; i < nvars - 1; i++) {
+    for (i = 0; i < dbs->bitmap_i_nrows - 1; i++) {
         if (bitmap_atomic_get(bitmap_s, i) == 1) {
             bitmap_atomic_clear(bitmap_s, i);
-            for (j = i + 1; j < nvars; j++) {
+            for (j = i + 1; j < dbs->bitmap_i_nrows; j++) {
                 if (bitmap_atomic_get(bitmap_s, j) == 1) {
-                    interact_set(state, i, j);
+                    interact_set(dbs, i, j);
                 }
             }
         }
     }
-    bitmap_atomic_clear(bitmap_s, nvars - 1);
+    bitmap_atomic_clear(bitmap_s, dbs->bitmap_i_nrows - 1);
 }
 
-void interact_print_state(const interact_t *state, size_t nvars)
+void interact_print_state(const levels_t dbs)
 {
     printf("Interaction matrix: \n");
     printf("  ");
-    for (size_t i = 0; i < nvars; ++i) printf("%zu ", i);
+    for (size_t i = 0; i < dbs->bitmap_i_nrows; ++i) printf("%zu ", i);
     printf("\n");
 
-    for (size_t i = 0; i < nvars; ++i) {
+    for (size_t i = 0; i < dbs->bitmap_i_nrows; ++i) {
         printf("%zu ", i);
-        for (size_t j = 0; j < nvars; ++j) {
-            printf("%d ", interact_get(state, i, j));
+        for (size_t j = 0; j < dbs->bitmap_i_nrows; ++j) {
+            printf("%d ", interact_get(dbs, i, j));
         }
         printf("\n");
     }
@@ -99,10 +108,11 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     bitmap_atomic_set(bitmap_v, index);
 }
 
-VOID_TASK_IMPL_1(interact_init, interact_t *, state)
+VOID_TASK_IMPL_1(interact_init, levels_t, dbs)
 {
+    interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
-    size_t nvars = levels->count;
+    size_t nvars = dbs->count;
 
     atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars); // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
@@ -113,7 +123,7 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
         exit(1);
     }
 
-    for (size_t index = llmsset_first(); index != llmsset_nindex; index = llmsset_next(index)){
+    for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited root node
         mtbddnode_t f = MTBDD_GETNODE(index);
         // set support bitmap, <var> is on the support of <f>
@@ -132,7 +142,7 @@ VOID_TASK_IMPL_1(interact_init, interact_t *, state)
         // clear locally visited nodes bitmap,
         clear_aligned(bitmap_l, nnodes);
         // update interaction matrix
-        interact_update(state, bitmap_s, nvars);
+        interact_update(dbs, bitmap_s);
     }
 
     free_aligned(bitmap_s, nvars);
