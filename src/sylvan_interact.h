@@ -38,7 +38,6 @@ static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
     // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
     if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
-    if (x >= dbs->count || y >= dbs->count) return 1;
 
     // ensure x < y
     // this is because we only keep the upper triangle of the matrix

@@ -732,8 +732,9 @@ VOID_TASK_0(reordering_start)
 VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    if (prev_size <= size) terminate_reordering = 1;
-    else prev_size = size;
+    // we need at least 4% reduction in size to continue
+//    if (size >= prev_size * 0.99) terminate_reordering = 1;
+//    else prev_size = size;
     INFO("RE: prg: %zu size\n", size);
 }
 
@@ -774,9 +775,9 @@ int main(int argc, char **argv)
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_maxswap(10000);
+    sylvan_set_reorder_maxswap(50000);
     sylvan_set_reorder_maxvar(500);
-    sylvan_set_reorder_threshold(64);
+    sylvan_set_reorder_threshold(128);
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 60 * 1000);
 
