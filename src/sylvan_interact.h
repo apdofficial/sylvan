@@ -9,7 +9,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include "sylvan_bitset.h"
+#include "sylvan_bitmap.h"
 
 typedef struct interact_state
 {

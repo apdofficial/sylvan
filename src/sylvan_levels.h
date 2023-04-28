@@ -1,7 +1,7 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
-#include "sylvan_bitset.h"
+#include "sylvan_bitmap.h"
 
 #ifdef __cplusplus
 extern "C" {

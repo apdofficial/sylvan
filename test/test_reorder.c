@@ -567,24 +567,24 @@ TASK_0(int, test_interact)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-//    printf("test_varswap\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-//    printf("test_varswap_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-//    printf("test_varswap_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-//    printf("test_sift_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-//    printf("test_sift_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-//    printf("test_sift_pos\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-//    printf("test_reorder_perm\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-//    printf("test_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-//    printf("test_map_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_varswap\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    printf("test_varswap_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    printf("test_varswap_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    printf("test_sift_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_sift_pos\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+    printf("test_reorder_perm\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    printf("test_map_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     return 0;
