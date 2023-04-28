@@ -298,18 +298,16 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             continue; // not <var> or <var+1>
         }
 
-        // nvar == <var>
-//        if (mtbddnode_getflag(node)) {
-//            fprintf(stderr, "\n------\nRecovery!\n------\n");
-//            // marked node, remove mark and rehash (we are apparently recovering)
-//            mtbddnode_setflag(node, 0);
-//            llmsset_rehash_bucket(nodes, first);
-//            if (llmsset_rehash_bucket(nodes, first) != 1) {
-//                fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
-//                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
-//            }
-//            continue;
-//        }
+        if (mtbddnode_getflag(node)) {
+            // marked node, remove mark and rehash (we are apparently recovering)
+            mtbddnode_setflag(node, 0);
+            llmsset_rehash_bucket(nodes, first);
+            if (llmsset_rehash_bucket(nodes, first) != 1) {
+                fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
+                *result = SYLVAN_VARSWAP_P1_REHASH_FAIL;
+            }
+            continue;
+        }
 
         if (mtbddnode_ismapnode(node)) {
             MTBDD f0 = mtbddnode_getlow(node);
@@ -389,28 +387,21 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         SYNC(sylvan_varswap_p2);
         return;
     }
-
-    /* skip buckets 0 and 1 */
+    // skip buckets 0 and 1
     if (first < 2) {
         count = count + first - 2;
         first = 2;
     }
-
-    // first, find all nodes that need to be replaced
     const size_t end = first + count;
 
     for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
         if (*result != SYLVAN_VARSWAP_SUCCESS) return; // the table is full
-
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
 
-        if (mtbddnode_ismapnode(node)) {
-            swap_mapnode(first);
-        } else {
-            swap_node(first);
-        }
+        if (mtbddnode_ismapnode(node)) swap_mapnode(first);
+        else swap_node(first);
     }
 }
 
@@ -448,6 +439,7 @@ void swap_node(size_t index)
             f11 = node_gethigh(f1, n1);
         }
     }
+
     // compute new f0 and f1
     f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
     f1 = mtbdd_varswap_makenode(var + 1, f01, f11);

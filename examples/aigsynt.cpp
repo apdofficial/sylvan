@@ -769,14 +769,14 @@ int main(int argc, char **argv)
 
     // Init Sylvan
     // Give 1 GB memory
-    sylvan_set_limits(1LL << 30, 1, 8);
+    sylvan_set_limits(2LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
     sylvan_set_reorder_maxswap(10000);
     sylvan_set_reorder_maxvar(500);
-    sylvan_set_reorder_threshold(64);
+    sylvan_set_reorder_threshold(128);
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 60 * 1000);
 
