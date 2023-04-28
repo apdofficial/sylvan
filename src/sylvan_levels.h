@@ -1,7 +1,7 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
-#include "sylvan_bitset.h"
+#include "sylvan_bitmap.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +22,7 @@ typedef struct levels_db {
 //    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
 //    size_t              bitmap_p2_size;          // size of bitmap_p2
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
-    size_t              bitmap_i_nrows;          // size of a row
+    size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
 } *levels_t;
 

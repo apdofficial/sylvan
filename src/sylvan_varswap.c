@@ -344,19 +344,15 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         SYNC(sylvan_varswap_p2);
         return;
     }
-
-    /* skip buckets 0 and 1 */
+    // skip buckets 0 and 1
     if (first < 2) {
         count = count + first - 2;
         first = 2;
     }
-
-    // first, find all nodes that need to be replaced
     const size_t end = first + count;
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         if (*result != SYLVAN_VARSWAP_SUCCESS) return; // the table is full
-
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
@@ -366,6 +362,26 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         } else {
             swap_node(first);
         }
+    }
+    f10 = f11 = f1;
+    if (!mtbdd_isleaf(f1)) {
+        mtbddnode_t n1 = MTBDD_GETNODE(f1);
+        if (mtbddnode_getvariable(n1) == var) {
+            f10 = node_getlow(f1, n1);
+            f11 = node_gethigh(f1, n1);
+        }
+    }
+
+    // compute new f0 and f1
+    f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+    f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
+    if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
+        fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
+        return;
+    } else {
+        // update node, which also removes the mark
+        mtbddnode_makenode(node, var, f0, f1);
+        llmsset_rehash_bucket(nodes, index);
     }
 }
 
