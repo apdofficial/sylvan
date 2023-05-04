@@ -90,13 +90,19 @@ void interact_print_state(const levels_t dbs)
 #define find_support(f, bitmap_s, bitmap_v, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_v, bitmap_l)
 VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, bitmap_v, atomic_word_t *, bitmap_l)
 {
-    if (mtbdd_isleaf(f)) return;
     // The low 40 bits are an index into the unique table.
     uint64_t index = f & 0x000000ffffffffff;
-    if (bitmap_atomic_get(bitmap_l, index) == 1) return;
+    atomic_incr_ref_count(levels, index);
+
     mtbddnode_t node = MTBDD_GETNODE(f);
+    BDDVAR var = mtbddnode_getvariable(node);
+    atomic_incr_var_count(levels, var);
+
+    if (mtbdd_isleaf(f)) return;
+    if (bitmap_atomic_get(bitmap_l, index) == 1) return;
+
     // set support bitmap, <var> is on the support of <f>
-    bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(node));
+    bitmap_atomic_set(bitmap_s, var);
 
     SPAWN(find_support, mtbdd_gethigh(f), bitmap_s, bitmap_v, bitmap_l);
     CALL(find_support, mtbdd_getlow(f), bitmap_s, bitmap_v, bitmap_l);
@@ -108,7 +114,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     bitmap_atomic_set(bitmap_v, index);
 }
 
-VOID_TASK_IMPL_1(interact_init, levels_t, dbs)
+VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 {
     interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
@@ -126,8 +132,12 @@ VOID_TASK_IMPL_1(interact_init, levels_t, dbs)
     for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited root node
         mtbddnode_t f = MTBDD_GETNODE(index);
+
+        BDDVAR var = mtbddnode_getvariable(f);
+        atomic_incr_var_count(levels, var);
+
         // set support bitmap, <var> is on the support of <f>
-        bitmap_atomic_set(bitmap_s, mtbddnode_getvariable(f));
+        bitmap_atomic_set(bitmap_s, var);
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous depth-first searches,
         // then it is a root, and we start a new depth-first search from it.

@@ -1,10 +1,6 @@
 #include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <locale.h>
 #include <sys/time.h>
-#include <errno.h>
 
 #include "sylvan.h"
 #include "test_assert.h"
@@ -14,7 +10,6 @@
 #include "sylvan_levels.h"
 #include "common.h"
 #include "sylvan_interact.h"
-#include <sylvan_align.h>
 
 /* Obtain current wallclock time */
 static double
@@ -536,9 +531,7 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    t_start = wctime();
-    interact_init(levels);
-    INFO("interact_init\n");
+    interact_var_ref_init(levels);
 
     interact_print_state(levels);
 
@@ -555,6 +548,57 @@ TASK_0(int, test_interact)
             assert(!interact_test(levels, 0, i));
             assert(!interact_test(levels, 1, j));
             assert(!interact_test(levels, 1, i));
+        }
+    }
+
+    interact_free(levels);
+
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
+    return 0;
+}
+
+TASK_0(int, test_var_count)
+{
+    sylvan_gc();
+    sylvan_resetlevels();
+
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
+
+    interact_var_ref_init(levels);
+
+    for (size_t i = 0; i < levels->count; ++i) {
+        printf("var %zu has %u nodes\n", i, atomic_load_var_count(levels, i));
+    }
+
+    interact_free(levels);
+
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
+    return 0;
+}
+
+TASK_0(int, test_ref_count)
+{
+    sylvan_gc();
+    sylvan_resetlevels();
+
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
+
+    interact_var_ref_init(levels);
+
+    for (size_t i = 2; i < nodes->table_size; ++i) {
+        size_t ref_count = atomic_load_ref_count(levels, i);
+        if (ref_count > 0) {
+            printf("node %zu has %zu references\n", i, ref_count);
         }
     }
 
@@ -587,6 +631,10 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
+    printf("test_var_count\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_var_count)) return 1;
+    printf("test_ref_count\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_ref_count)) return 1;
     return 0;
 }
 

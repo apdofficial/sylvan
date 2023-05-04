@@ -8,6 +8,15 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
+ * 4096, because that is not very small, and not very large
+ * typical kind of parameter that is open to tweaking, though I don't expect it matters so much
+ * too small is bad for the atomic operations, too large is bad for work-stealing
+ * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
+ */
+#define COUNT_NODES_BLOCK_SIZE 4096
+
+
+/**
  * When using dynamic variable reordering, it is strongly recommended to use
  * "levels" instead of working directly with the internal variables.
  *
@@ -19,20 +28,20 @@ typedef struct levels_db {
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-//    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
-//    size_t              bitmap_p2_size;          // size of bitmap_p2
+    _Atomic(uint32_t)*  var_count;               // number of nodes per variable
+    _Atomic(size_t)*    ref_count;               // number of internal references per node
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
 } *levels_t;
 
-/**
- * 4096, because that is not very small, and not very large
- * typical kind of parameter that is open to tweaking, though I don't expect it matters so much
- * too small is bad for the atomic operations, too large is bad for work-stealing
- * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
- */
-#define COUNT_NODES_BLOCK_SIZE 4096
+#define atomic_load_var_count(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)
+#define atomic_incr_var_count(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
+#define atomic_decr_var_count(lvl, var) atomic_fetch_add(&lvl->var_count[var], -1)
+
+#define atomic_load_ref_count(lvl, index) atomic_load_explicit(&lvl->ref_count[index], memory_order_relaxed)
+#define atomic_incr_ref_count(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
+#define atomic_decr_ref_count(lvl, index) atomic_fetch_add(&lvl->ref_count[index], -1)
 
 /**
  * Index to first node in phase 2 mark bitmap

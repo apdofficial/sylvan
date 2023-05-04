@@ -61,11 +61,11 @@ void interact_update(levels_t dbs, atomic_word_t* bitmap_s);
 
 void interact_print_state(const levels_t dbs);
 
-VOID_TASK_DECL_1(interact_init, levels_t)
+VOID_TASK_DECL_1(interact_var_ref_init, levels_t)
 /**
   @brief Initialize the variable interaction matrix.
 */
-#define interact_init(levels) RUN(interact_init, levels)
+#define interact_var_ref_init(levels) RUN(interact_var_ref_init, levels)
 
 #ifdef __cplusplus
 }

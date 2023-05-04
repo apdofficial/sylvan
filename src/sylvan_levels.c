@@ -12,12 +12,12 @@ levels_t mtbdd_levels_create()
         fprintf(stderr, "mtbdd_levels_create: Unable to allocate memory: %s!\n", strerror(errno));
         exit(1);
     }
+
     dbs->table = NULL;
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
-
-//    dbs->bitmap_p2 = alloc_aligned(nodes->max_size);
-//    dbs->bitmap_p2_size = nodes->max_size;
+    dbs->var_count = NULL;
+    dbs->ref_count = NULL;
 
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
@@ -32,7 +32,6 @@ levels_t mtbdd_levels_create()
 void mtbdd_levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
-//    free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
     free_aligned(dbs, sizeof(struct levels_db));
 }
 
@@ -62,8 +61,13 @@ int mtbdd_newlevels(size_t amount)
         levels->table = (_Atomic (uint64_t) *) realloc(levels->table, sizeof(uint64_t[levels_size]));
         levels->level_to_order = (_Atomic (uint32_t) *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->order_to_level = (_Atomic (uint32_t) *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+        levels->var_count = (_Atomic (uint32_t) *) realloc(levels->var_count, sizeof(uint32_t[levels_size]));
+        levels->ref_count = (_Atomic (size_t) *) realloc(levels->ref_count, sizeof(size_t[nodes->table_size]));
 
-        if (levels->table == 0 || levels->level_to_order == 0 || levels->order_to_level == 0) {
+        if (levels->table == 0 ||
+            levels->level_to_order == 0 ||
+            levels->order_to_level == 0 ||
+            levels->var_count == 0 ) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
             return 0;
         }
@@ -80,12 +84,22 @@ int mtbdd_newlevels(size_t amount)
 void mtbdd_resetlevels(void)
 {
     if (levels_size != 0) {
+
         free(levels->table);
         levels->table = NULL;
+
         free(levels->level_to_order);
         levels->level_to_order = NULL;
-        free(levels->order_to_level);
-        levels->order_to_level = NULL;
+
+        free(levels->level_to_order);
+        levels->level_to_order = NULL;
+
+        free(levels->var_count);
+        levels->var_count = NULL;
+
+        free(levels->ref_count);
+        levels->ref_count = NULL;
+
         levels->count = 0;
         levels_size = 0;
     }
