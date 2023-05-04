@@ -192,6 +192,14 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
 TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
+
+    bounds_state_t bounds_state = {
+        .bound = 0,
+        .limit = 0,
+        .isolated = 0,
+    };
+    init_upper_bound(levels, state->pos, state->low, &bounds_state);
+
     for (; state->pos < state->high; ++state->pos) {
         varswap_t res = sylvan_varswap(state->pos);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -202,6 +210,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
             break;
         }
         if (should_terminate_reordering(&configs)) break;
+        update_upper_bound(levels, state->pos, state->low, &bounds_state);
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }
@@ -209,7 +218,15 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
-    for (; state->pos > state->low; --state->pos) {
+
+    bounds_state_t bounds_state = {
+        .bound = 0,
+        .limit = 0,
+        .isolated = 0,
+    };
+    init_lower_bound(levels, state->pos, state->low, &bounds_state);
+
+    for (; state->pos > state->low && bounds_state.bound < bounds_state.limit; --state->pos) {
         varswap_t res = sylvan_varswap(state->pos - 1);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
@@ -219,6 +236,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
             break;
         }
         if (should_terminate_reordering(&configs)) break;
+        update_lower_bound(levels, state->pos, state->low, &bounds_state);
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }

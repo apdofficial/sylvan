@@ -22,6 +22,7 @@ levels_t mtbdd_levels_create()
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
     dbs->bitmap_i_nrows = 0;
+    dbs->isolated_count = 0;
 
     levels_size = 0;
     dbs->count = 0;
@@ -62,7 +63,7 @@ int mtbdd_newlevels(size_t amount)
         levels->level_to_order = (_Atomic (uint32_t) *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->order_to_level = (_Atomic (uint32_t) *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
         levels->var_count = (_Atomic (uint32_t) *) realloc(levels->var_count, sizeof(uint32_t[levels_size]));
-        levels->ref_count = (_Atomic (size_t) *) realloc(levels->ref_count, sizeof(size_t[nodes->table_size]));
+        levels->ref_count = (_Atomic (uint32_t) *) realloc(levels->ref_count, sizeof(uint32_t[nodes->table_size]));
 
         if (levels->table == 0 ||
             levels->level_to_order == 0 ||
@@ -102,6 +103,7 @@ void mtbdd_resetlevels(void)
 
         levels->count = 0;
         levels_size = 0;
+        levels->isolated_count = 0;
     }
 }
 

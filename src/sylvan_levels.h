@@ -29,11 +29,19 @@ typedef struct levels_db {
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
     _Atomic(uint32_t)*  var_count;               // number of nodes per variable
-    _Atomic(size_t)*    ref_count;               // number of internal references per node
+    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable
+    _Atomic(size_t)     isolated_count;          // number of isolated projection functions
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
 } *levels_t;
+
+typedef struct bounds_state
+{
+    size_t isolated;
+    size_t bound;
+    size_t limit;
+} bounds_state_t;
 
 #define atomic_load_var_count(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)
 #define atomic_incr_var_count(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)

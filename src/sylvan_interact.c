@@ -119,10 +119,12 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
+    levels->isolated_count = 0;
 
     atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars); // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap
+    clear_aligned(levels->ref_count, nodes->table_size);
 
     if (bitmap_s == 0 || bitmap_v == 0 || bitmap_l == 0) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
@@ -135,6 +137,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 
         BDDVAR var = mtbddnode_getvariable(f);
         atomic_incr_var_count(levels, var);
+        atomic_incr_ref_count(levels, index);
 
         // set support bitmap, <var> is on the support of <f>
         bitmap_atomic_set(bitmap_s, var);
@@ -155,9 +158,31 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         interact_update(dbs, bitmap_s);
     }
 
+    for (size_t i = 0; i < nodes->table_size; i++) {
+        if (atomic_load_ref_count(levels, i) == 1) levels->isolated_count++;
+    }
+
     free_aligned(bitmap_s, nvars);
     free_aligned(bitmap_v, nnodes);
     free_aligned(bitmap_l, nnodes);
 }
 
+VOID_TASK_IMPL_4(init_lower_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low, bounds_state_t*, bounds_state)
+{
 
+}
+
+VOID_TASK_IMPL_4(update_lower_bound, levels_t, dbs, BDDVAR, x, BDDVAR, y, bounds_state_t*, bounds_state)
+{
+
+}
+
+VOID_TASK_IMPL_4(init_upper_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low,bounds_state_t*, bounds_state)
+{
+
+}
+
+VOID_TASK_IMPL_4(update_upper_bound, levels_t, dbs, BDDVAR, x, BDDVAR, y, bounds_state_t*, bounds_state)
+{
+
+}

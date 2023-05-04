@@ -67,6 +67,18 @@ VOID_TASK_DECL_1(interact_var_ref_init, levels_t)
 */
 #define interact_var_ref_init(levels) RUN(interact_var_ref_init, levels)
 
+VOID_TASK_DECL_4(init_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
+#define init_lower_bound(dbs, var, low, bounds_state) RUN(init_lower_bound, dbs, var, low, bounds_state)
+
+VOID_TASK_DECL_4(update_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
+#define update_lower_bound(dbs, x, y, bounds_state) RUN(init_lower_bound, dbs, x, y, bounds_state)
+
+VOID_TASK_DECL_4(init_upper_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
+#define init_upper_bound(dbs, var, low, bounds_state) RUN(init_upper_bound, dbs, var, low, bounds_state)
+
+VOID_TASK_DECL_4(update_upper_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
+#define update_upper_bound(dbs, x, y, bounds_state) RUN(init_upper_bound, dbs, x, y, bounds_state)
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
