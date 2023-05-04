@@ -28,7 +28,8 @@ static int reorder_initialized = 0;
 static int reorder_is_running = 0;
 
 /**
- * This variable is used for a cas flag so only one reordering runs at one time
+ * This variable is used for a cas flag so only
+ * one reordering runs at one time
  */
 static _Atomic (int) re;
 
@@ -267,6 +268,11 @@ VOID_TASK_IMPL_0(sylvan_reduce_heap)
 {
     if (!reorder_initialized) return;
     if (reorder_is_running) {
+        // avoid running multiple threads
+        // if we are running RE and this function is invoked nevertheless
+        // we must be in a different thread
+        // since no operations are allowed while reordering
+        // hang here until reordering is done and then exit
         while (reorder_is_running) {}
         return;
     }
