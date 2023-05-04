@@ -9,39 +9,42 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#include "sylvan_bitmap.h"
+
 typedef struct interact_state
 {
-    char **interact;   // interacting variable matrix
-    size_t ncols;
-    size_t nrows;
-} interact_state_t;
+     size_t           nrows;                  // size of a row
+     size_t           size;                   // size of the bitmaps
+     word_t*          bitmap;                 // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
+} interact_t;
 
 // number of variables can be at most number of nodes
-#define interact_alloc_max(state) interact_alloc(state, nodes->table_size);
-char interact_alloc(interact_state_t *state, size_t len);
+#define interact_alloc_max(dbs) interact_alloc(dbs, nodes->table_size);
+char interact_malloc(levels_t dbs);
 
-void interact_free(interact_state_t *state);
+void interact_free(levels_t dbs);
 
-static inline void interact_set(interact_state_t *state, size_t row, size_t col, char value)
+static inline void interact_set(levels_t dbs, size_t row, size_t col)
 {
-    state->interact[row][col] = value;
+    bitmap_atomic_set(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
 }
 
-static inline int interact_get(const interact_state_t *state, size_t row, size_t col)
+static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 {
-    return state->interact[row][col];
+    return bitmap_atomic_get(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
 }
 
-static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR y)
+static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
+    if (dbs->bitmap_i == NULL) return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction
+    // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
+    if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
+    if (x >= dbs->count || y >= dbs->count) return 1;
+
     // ensure x < y
     // this is because we only keep the upper triangle of the matrix
-    if (x > y) {
-        BDDVAR tmp = x;
-        x = y;
-        y = tmp;
-    }
-    return interact_get(state, x, y);
+    if (x > y) return interact_get(dbs, y, x);
+    else return interact_get(dbs, x, y);
 }
 
 /**
@@ -54,15 +57,15 @@ static inline int interact_test(const interact_state_t *state, BDDVAR x, BDDVAR 
   @sideeffect Clears support.
 
 */
-void interact_update(interact_state_t *state, char* support);
+void interact_update(levels_t dbs, atomic_word_t* bitmap_s);
 
-void print_interact_state(const interact_state_t *state, size_t nvars);
+void interact_print_state(const levels_t dbs);
 
-VOID_TASK_DECL_1(interact_init, interact_state_t*)
+VOID_TASK_DECL_1(interact_init, levels_t)
 /**
   @brief Initialize the variable interaction matrix.
 */
-#define interact_init(state) RUN(interact_init, state)
+#define interact_init(levels) RUN(interact_init, levels)
 
 #ifdef __cplusplus
 }

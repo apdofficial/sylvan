@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#define _GNU_SOURCE
+
 #include <sylvan_int.h>
 
 #include <inttypes.h>
@@ -974,6 +976,24 @@ TASK_2(MTBDD, mtbdd_uop_pow_uint, MTBDD, a, size_t, k)
     return mtbdd_invalid;
 }
 
+/*Only for doulbe type for now. Used for logsumexp abstraction*/
+TASK_2(MTBDD, mtbdd_uop_add_uint, MTBDD, a, size_t, k)
+{
+    if (a == mtbdd_false) return mtbdd_double(k); //false is 0.0
+    if (a == mtbdd_true) assert(0); //true node is only for binary. shouldn't reach true node for double type mtbdds.
+
+    // a != constant
+    mtbddnode_t na = MTBDD_GETNODE(a);
+
+    if (mtbddnode_isleaf(na)) {
+        assert(mtbddnode_gettype(na) == 1); //double type
+        double d = mtbdd_getdouble(a);
+        return mtbdd_double(d+log10(k));
+    }
+
+    return mtbdd_invalid;
+}
+
 TASK_IMPL_3(MTBDD, mtbdd_abstract_op_plus, MTBDD, a, MTBDD, b, int, k)
 {
     if (k==0) {
@@ -981,6 +1001,17 @@ TASK_IMPL_3(MTBDD, mtbdd_abstract_op_plus, MTBDD, a, MTBDD, b, int, k)
     } else {
         uint64_t factor = 1ULL<<k; // skip 1,2,3,4: times 2,4,8,16
         return mtbdd_uapply(a, TASK(mtbdd_uop_times_uint), factor);
+    }
+}
+
+TASK_IMPL_3(MTBDD, mtbdd_abstract_op_logsumexp, MTBDD, a, MTBDD, b, int, k)
+{
+    if (k==0) {
+        return mtbdd_apply(a, b, TASK(mtbdd_op_logsumexp));
+    } else {
+        uint64_t factor = 1ULL<<k; // skip 1,2,3,4: times 2,4,8,16
+        //since we're dealing with logs, add log10 k
+        return mtbdd_uapply(a, TASK(mtbdd_uop_add_uint), factor);
     }
 }
 
@@ -1146,6 +1177,44 @@ TASK_IMPL_2(MTBDD, mtbdd_op_plus, MTBDD*, pa, MTBDD*, pb)
         } else {
             assert(0); // failure
         }
+    }
+
+    if (a < b) {
+        *pa = b;
+        *pb = a;
+    }
+
+    return mtbdd_invalid;
+}
+
+/**
+ * Binary operation LogSumExp (for MTBDDs of Double type)
+ */
+TASK_IMPL_2(MTBDD, mtbdd_op_logsumexp, MTBDD*, pa, MTBDD*, pb)
+{
+    MTBDD a = *pa, b = *pb;
+
+    mtbddnode_t na = MTBDD_GETNODE(a);
+    mtbddnode_t nb = MTBDD_GETNODE(b);
+
+    if (mtbddnode_isleaf(na) && mtbddnode_isleaf(nb)) {
+        assert(mtbddnode_gettype(na) == 1 && mtbddnode_gettype(nb) == 1); //double type
+        uint64_t val_a = mtbddnode_getvalue(na);
+        uint64_t val_b = mtbddnode_getvalue(nb);
+        double f = *(double*)(&val_a);
+        double g =  *(double*)(&val_b);
+        if (f == -INFINITY){
+            return b;
+        }
+        if (g == -INFINITY){
+            return a;
+        }
+        double m = fmax(f, g);
+#if __APPLE__
+        return mtbdd_double(log10(pow(10, f - m) + pow(10, g - m)) + m);
+#else
+        return mtbdd_double(log10(exp10(f - m) + exp10(g - m)) + m);
+#endif
     }
 
     if (a < b) {
@@ -1382,6 +1451,23 @@ TASK_IMPL_2(MTBDD, mtbdd_op_max, MTBDD*, pa, MTBDD*, pb)
     }
 
     return mtbdd_invalid;
+}
+
+TASK_IMPL_2(MTBDD, mtbdd_op_log, MTBDD, a, size_t, k)
+{
+    if (a == mtbdd_false) return mtbdd_double(-INFINITY); //false is 0.0
+    if (a == mtbdd_true) return mtbdd_double(0); //log of 1 is 0
+
+    // a != constant
+    mtbddnode_t na = MTBDD_GETNODE(a);
+
+    if (mtbddnode_isleaf(na)) {
+        assert(mtbddnode_gettype(na) == 1); //double type
+        double d = mtbdd_getdouble(a);
+        return mtbdd_double(log10(d));
+    }
+    return mtbdd_invalid;
+    (void)k; //unused variable
 }
 
 TASK_IMPL_2(MTBDD, mtbdd_op_cmpl, MTBDD, a, size_t, k)

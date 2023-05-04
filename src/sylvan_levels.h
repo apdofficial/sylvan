@@ -1,10 +1,11 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
+#include "sylvan_bitmap.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
 
 /**
  * When using dynamic variable reordering, it is strongly recommended to use
@@ -13,12 +14,16 @@ extern "C" {
  * Dynamic variable reordering requires that variables are consecutive.
  * Initially, variables are assigned linearly, starting with 0.
  */
-
 typedef struct levels_db {
-    uint64_t *table;                // array holding the 1-node BDD for each level
-    size_t count;                   // number of created levels
-    uint32_t *level_to_var;         // current level wise var permutation (level to variable label)
-    uint32_t *var_to_level;         // current variable wise level permutation (variable label to level)
+    _Atomic(uint64_t)*  table;                   // array holding the 1-node BDD for each level
+    size_t              count;                   // number of created levels
+    _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
+    _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
+//    atomic_word_t*      bitmap_p2;               // bitmap used to track phase two nodes (used in dynamic variable reordering)
+//    size_t              bitmap_p2_size;          // size of bitmap_p2
+    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
+    size_t              bitmap_i_nrows;          // number of rows and columns
+    size_t              bitmap_i_size;           // size of the bitmaps
 } *levels_t;
 
 /**
@@ -28,6 +33,16 @@ typedef struct levels_db {
  * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
  */
 #define COUNT_NODES_BLOCK_SIZE 4096
+
+/**
+ * Index to first node in phase 2 mark bitmap
+ */
+#define bitmap_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
+
+/**
+ * Index of the next node relative to the provided index in th phase 2 bitmap.
+ */
+#define bitmap_p2_next(index) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, index)
 
 /**
  * @brief Create a new levels_t object
@@ -55,8 +70,8 @@ TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
  */
 #define sylvan_count_nodes(var) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
 
-VOID_TASK_DECL_3(sylvan_init_subtables, char **, size_t, size_t);
-#define sylvan_init_subtables(subtables) RUN(sylvan_init_subtables, subtables, 0, nodes->table_size)
+VOID_TASK_DECL_3(sylvan_init_subtables, atomic_word_t*, size_t, size_t);
+#define sylvan_init_subtables(bitmap_t) RUN(sylvan_init_subtables, bitmap_t, 0, nodes->table_size)
 
 /**
  * @brief Get the number of levels
@@ -93,35 +108,18 @@ MTBDD mtbdd_ithlevel(uint32_t level);
 /**
  * @brief  Get the level of the given variable
  */
-uint32_t mtbdd_var_to_level(BDDVAR var);
+uint32_t mtbdd_order_to_level(BDDVAR var);
 
 /**
  * @brief  Get the variable of the given level
  */
-BDDVAR mtbdd_level_to_var(uint32_t level);
-
-/**
- * \brief  Return the level of the given internal node.
- * \param node for which the level needs to be returned
- */
-uint32_t mtbdd_node_to_level(MTBDD node);
+BDDVAR mtbdd_level_to_order(uint32_t level);
 
 /**
  * \brief  Add callback to mark managed references during garbage collection.
  * \details This is used for the dynamic variable reordering.
  */
 void mtbdd_levels_gc_add_mark_managed_refs(void);
-
-/**
- * \brief Swap the levels of two variables var and var+1
- * \details This is used for the dynamic variable reordering.
- * <ul>
- * <li>swap the level_to_var of var and var+1
- * <li>swap the var_to_level of level var and level var+1
- * </ul>
- * \param var variable to be swapped with var+1
- */
-void mtbdd_varswap(BDDVAR var);
 
 /**
  * @brief  Mark each level_count -1 which is below the threshold.

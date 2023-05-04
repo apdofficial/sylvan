@@ -19,15 +19,19 @@
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
+#include "sylvan_interact.h"
 
-/**
- * Block size tunes the granularity of the parallel distribution
- */
-#define BLOCKSIZE 128
 
-#define STATS 0 // useful information w.r.t. dynamic reordering
+#define STATS 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
+static int reorder_is_running = 0;
+
+/**
+ * This variable is used for a cas flag so only
+ * one reordering runs at one time
+ */
+static _Atomic (int) re;
 
 struct sifting_config
 {
@@ -44,11 +48,11 @@ struct sifting_config
 /// reordering configurations
 static struct sifting_config configs = {
         .t_start_sifting = 0,
-        .threshold = 64,
-        .max_growth = 1.1f,
+        .threshold = 128,
+        .max_growth = 1.2f,
         .max_swap = 10000,
         .total_num_swap = 0,
-        .max_var = 2000,
+        .max_var = 250,
         .total_num_var = 0,
         .time_limit_ms = 1 * 60 * 1000 // 1 minute
 };
@@ -187,6 +191,7 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
 
 TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; state->pos < state->high; ++state->pos) {
         varswap_t res = sylvan_varswap(state->pos);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -203,6 +208,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
 
 TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; state->pos > state->low; --state->pos) {
         varswap_t res = sylvan_varswap(state->pos - 1);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -219,6 +225,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
 
 TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     for (; pos < target; pos++) {
         varswap_t res = sylvan_varswap(pos);
         if (!sylvan_varswap_issuccess(res)) return res;
@@ -234,15 +241,13 @@ TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 
 TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
-    sylvan_gc();
-    sylvan_gc_disable();
-
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
     varswap_t res = SYLVAN_VARSWAP_SUCCESS;
     int identity = 1;
 
     // check if permutation is identity
     for (size_t level = 0; level < levels->count; level++) {
-        if (permutation[level] != mtbdd_level_to_var(level)) {
+        if (permutation[level] != mtbdd_level_to_order(level)) {
             identity = 0;
             break;
         }
@@ -251,25 +256,48 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
     for (size_t level = 0; level < levels->count; ++level) {
         uint32_t var = permutation[level];
-        uint32_t pos = mtbdd_var_to_level(var);
+        uint32_t pos = mtbdd_order_to_level(var);
         res = sylvan_siftpos(pos, level);
         if (!sylvan_varswap_issuccess(res)) break;
     }
 
-    sylvan_gc_enable();
-    sylvan_gc();
-
     return res;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
+VOID_TASK_IMPL_0(sylvan_reduce_heap)
 {
+    if (!reorder_initialized) return;
+    if (reorder_is_running) {
+        // avoid running multiple threads
+        // if we are running RE and this function is invoked nevertheless
+        // we must be in a different thread
+        // since no operations are allowed while reordering
+        // hang here until reordering is done and then exit
+        while (reorder_is_running) {}
+        return;
+    }
+
+    int zero = 0;
+    if (atomic_compare_exchange_strong(&re, &zero, 1)) {
+        NEWFRAME(sylvan_reorder_impl, 0, 0);
+        re = 0;
+    } else {
+        /* wait for new frame to appear */
+        while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}
+        lace_yield(__lace_worker, __lace_dq_head);
+    }
+}
+
+TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
+{
+    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
+    if (reorder_is_running) return SYLVAN_VARSWAP_ALREADY_RUNNING;
+    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
+
+    reorder_is_running = 1;
+
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
-
-    sylvan_gc_disable();
-
-    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
 
     for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
@@ -282,13 +310,10 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    interact_state_t interact_state;
-//    int success = interact_alloc(&interact_state, levels->count);
-//    if (!success) return SYLVAN_VARSWAP_ERROR;
-//    interact_init(&interact_state);
+//    interact_init(levels);
 
     // now count all variable levels (parallel...)
-    _Atomic(size_t) level_counts[levels->count];
+    _Atomic (size_t) level_counts[levels->count];
     for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
     sylvan_count_levelnodes(level_counts);
     // mark and sort
@@ -303,19 +328,18 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
     sifting_state.size = llmsset_count_marked(nodes);
     sifting_state.best_size = sifting_state.size;
 
-
     for (size_t i = 0; i < levels->count; i++) {
         if (sorted_levels_counts[i] < 0) break; // marked level, done
         uint64_t lvl = sorted_levels_counts[i];
 
-        sifting_state.pos = mtbdd_level_to_var(lvl);
+        sifting_state.pos = mtbdd_level_to_order(lvl);
         if (sifting_state.pos < low || sifting_state.pos > high) continue; // skip, not in range
 
         sifting_state.best_pos = sifting_state.pos;
 
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
-        if (lvl > mtbdd_levelscount() / 2) {
+        if (lvl > levels->count / 2) {
             res = sylvan_siftdown(&sifting_state);
             if (!sylvan_varswap_issuccess(res)) break;
             res = sylvan_siftup(&sifting_state);
@@ -343,14 +367,14 @@ TASK_IMPL_2(varswap_t, sylvan_reorder, uint32_t, low, uint32_t, high)
         if (should_terminate_reordering(&configs)) break;
     }
 
-    sylvan_gc_enable();
-
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
 
     sylvan_timer_stop(SYLVAN_RE);
     configs.t_start_sifting = 0;
+
+    reorder_is_running = 0;
 
     return res;
 }

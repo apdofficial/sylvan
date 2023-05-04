@@ -62,10 +62,7 @@ typedef MTBDD MTBDDMAP;
  * False is also used in Integer/Real/Fraction MTBDDs for partially defined functions.
  */
 static const MTBDD mtbdd_complement = 0x8000000000000000LL;
-//static const MTBDD mtbdd_notleaf    = 0x4000000000000000LL;
-static const MTBDD mtbdd_flag     = 0x2000000000000000LL;
-//static const MTBDD mtbdd_mapnode    = 0x1000000000000000LL;
-static const MTBDD mtbdd_visited    = 0x0800000000000000LL;
+static const MTBDD mtbdd_flag       = 0x2000000000000000LL;
 static const MTBDD mtbdd_false      = 0;
 static const MTBDD mtbdd_true       = 0x8000000000000000LL;
 static const MTBDD mtbdd_invalid    = 0xffffffffffffffffLL;
@@ -139,8 +136,8 @@ static const MTBDD sylvan_invalid    = 0xffffffffffffffffLL;
 #define sylvan_levelscount      mtbdd_levelscount
 #define sylvan_resetlevels      mtbdd_resetlevels
 #define sylvan_ithlevel         mtbdd_ithlevel
-#define sylvan_level_to_var     mtbdd_level_to_var
-#define sylvan_var_to_level     mtbdd_var_to_level
+#define sylvan_level_to_order   mtbdd_level_to_order
+#define sylvan_order_to_level   mtbdd_order_to_level
 /**
  * Initialize MTBDD functionality.
  * This initializes internal and external referencing datastructures,
@@ -446,6 +443,12 @@ TASK_DECL_3(MTBDD, mtbdd_abstract, MTBDD, MTBDD, mtbdd_abstract_op);
 #define mtbdd_abstract(a, v, op) RUN(mtbdd_abstract, a, v, op)
 
 /**
+ * Unary operation Log.
+ * Supported domains: Real
+ */
+TASK_DECL_2(MTBDD, mtbdd_op_log, MTBDD, size_t);
+
+/**
  * Unary operation Negate.
  * Supported domains: Integer, Real, Fraction
  */
@@ -464,6 +467,12 @@ TASK_DECL_2(MTBDD, mtbdd_op_cmpl, MTBDD, size_t);
  */
 TASK_DECL_2(MTBDD, mtbdd_op_plus, MTBDD*, MTBDD*);
 TASK_DECL_3(MTBDD, mtbdd_abstract_op_plus, MTBDD, MTBDD, int);
+
+/**
+ * Binary operation LogSumExp (for MTBDDs of Double type)
+ */
+TASK_DECL_2(MTBDD, mtbdd_op_logsumexp, MTBDD*, MTBDD*);
+TASK_DECL_3(MTBDD, mtbdd_abstract_op_logsumexp, MTBDD, MTBDD, int);
 
 /**
  * Binary operation Minus (for MTBDDs of same type)
@@ -503,6 +512,12 @@ TASK_DECL_3(MTBDD, mtbdd_abstract_op_max, MTBDD, MTBDD, int);
  * Compute -a
  * (negation, where 0 stays 0, and x into -x)
  */
+#define mtbdd_log(a) mtbdd_uapply(a, TASK(mtbdd_op_log), 0)
+
+/**
+ * Compute -a
+ * (negation, where 0 stays 0, and x into -x)
+ */
 #define mtbdd_negate(a) mtbdd_uapply(a, TASK(mtbdd_op_negate), 0)
 
 /**
@@ -516,6 +531,11 @@ TASK_DECL_3(MTBDD, mtbdd_abstract_op_max, MTBDD, MTBDD, int);
  * Compute a + b
  */
 #define mtbdd_plus(a, b) mtbdd_apply(a, b, TASK(mtbdd_op_plus))
+
+/**
+ * Compute log(exp(a) + exp(b))  avoiding under/over flow
+ */
+#define mtbdd_logsumexp(a, b) mtbdd_apply(a, b, TASK(mtbdd_op_logsumexp))
 
 /**
  * Compute a - b
@@ -541,6 +561,11 @@ TASK_DECL_3(MTBDD, mtbdd_abstract_op_max, MTBDD, MTBDD, int);
  * Abstract the variables in <v> from <a> by taking the sum of all values
  */
 #define mtbdd_abstract_plus(dd, v) mtbdd_abstract(dd, v, TASK(mtbdd_abstract_op_plus))
+
+/**
+ * Abstract the variables in <v> from <a> by taking the logsumexp of all values
+ */
+#define mtbdd_abstract_logsumexp(dd, v) mtbdd_abstract(dd, v, TASK(mtbdd_abstract_op_logsumexp))
 
 /**
  * Abstract the variables in <v> from <a> by taking the product of all values

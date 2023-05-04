@@ -16,6 +16,7 @@
  */
 
 #include <sylvan_obj.hpp>
+#include <tuple>
 
 using namespace sylvan;
 
@@ -452,13 +453,13 @@ Bdd::resetLevels()
 Bdd
 Bdd::bddLevel(uint32_t index)
 {
-    return sylvan_level_to_var(index);
+    return sylvan_level_to_order(index);
 }
 
 uint32_t
 bddVarToLevel(uint32_t index)
 {
-    return sylvan_var_to_level(index);
+    return sylvan_order_to_level(index);
 }
 
 Bdd
@@ -632,13 +633,13 @@ Mtbdd::resetLevels()
 Mtbdd
 Mtbdd::mtbddLevel(uint32_t index)
 {
-    return sylvan_level_to_var(index);
+    return sylvan_level_to_order(index);
 }
 
 uint32_t
 Mtbdd::bddVarToLevel(uint32_t index)
 {
-    return sylvan_var_to_level(index);
+    return sylvan_order_to_level(index);
 }
 
 Mtbdd
@@ -709,9 +710,21 @@ Mtbdd::Else() const
 }
 
 Mtbdd
+Mtbdd::Log() const
+{
+    return mtbdd_log(mtbdd);
+}
+
+Mtbdd
 Mtbdd::Negate() const
 {
     return mtbdd_negate(mtbdd);
+}
+
+Mtbdd
+Mtbdd::AbstractLogSumExp(const BddSet &variables) const
+{
+    return mtbdd_abstract_logsumexp(mtbdd, variables.set.bdd);
 }
 
 Mtbdd
@@ -742,6 +755,13 @@ Mtbdd
 Mtbdd::Plus(const Mtbdd &other) const
 {
     return mtbdd_plus(mtbdd, other.mtbdd);
+}
+
+
+Mtbdd
+Mtbdd::LogSumExp(const Mtbdd &other) const
+{
+    return mtbdd_logsumexp(mtbdd, other.mtbdd);
 }
 
 Mtbdd
@@ -1035,6 +1055,14 @@ Sylvan::quitPackage()
     sylvan_quit();
 }
 
+std::tuple<size_t, size_t>
+Sylvan::getTableUsage()
+{
+    size_t filled, total;
+    sylvan_table_usage(&filled, &total);
+    return std::make_tuple(filled, total);
+}
+
 void Sylvan::initReorder()
 {
     sylvan_init_reorder();
@@ -1065,9 +1093,9 @@ void Sylvan::setReorderTimeLimit(double time_limit)
     sylvan_set_reorder_timelimit(time_limit);
 }
 
-varswap_t Sylvan::reorderAll()
+void Sylvan::reduceHeap()
 {
-    return sylvan_reorder_all();
+    return sylvan_reduce_heap();
 }
 
 varswap_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)

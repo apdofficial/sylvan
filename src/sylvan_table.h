@@ -54,8 +54,8 @@ typedef struct llmsset
     _Atomic(uint64_t)* table;        // table with hashes
     uint8_t*           data;         // table with values
     _Atomic(uint64_t)* bitmap1;      // ownership bitmap (per 512 buckets)
-    _Atomic(uint64_t)* bitmap2;      // bitmap for "contains data"
-    uint64_t*          bitmapc;      // bitmap for "use custom functions"
+    _Atomic(uint64_t)* bitmap2;      // bitmap for "contains data" , as many bits as there are buckets in the table, 1 -> corresponding bucket contains bdd node
+    uint64_t*          bitmapc;      // bitmap for "use custom functions", 1 -> if contains terminal (custom terminal)
     size_t             max_size;     // maximum size of the hash table (for resizing)
     size_t             table_size;   // size of the hash table (number of slots) --> power of 2!
 #if LLMSSET_MASK
@@ -218,6 +218,26 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
  */
 #define llmsset_hash sylvan_tabhash16
 #define llmsset_fnvhash sylvan_fnvhash16
+
+
+/**
+ * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions.
+ */
+
+/**
+ * The terminal index used to stop the iteration.
+ */
+#define llmsset_nindex npos
+
+/**
+ * Index to first node in the hash table.
+ */
+#define llmsset_first() bitmap_atomic_first(nodes->bitmap2, nodes->table_size)
+
+/**
+ * Index ot the next node index relative to the provided node index.
+ */
+#define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
 
 #ifdef __cplusplus
 }
