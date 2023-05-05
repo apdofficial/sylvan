@@ -572,7 +572,7 @@ TASK_0(int, test_var_count)
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
-        printf("var %zu has %u nodes\n", i, atomic_load_var_count(levels, i));
+        printf("var %zu has %u nodes\n", i, levels_var_count_load(levels, i));
     }
 
     interact_free(levels);
@@ -596,7 +596,7 @@ TASK_0(int, test_ref_count)
     interact_var_ref_init(levels);
 
     for (size_t i = 2; i < nodes->table_size; ++i) {
-        size_t ref_count = atomic_load_ref_count(levels, i);
+        size_t ref_count = levels_ref_count_load(levels, i);
         if (ref_count > 0) {
             printf("node %zu has %zu references\n", i, ref_count);
         }

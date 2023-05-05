@@ -175,7 +175,6 @@ void sylvan_set_reorder_timelimit(double time_limit)
 
 static inline void update_best_pos(sifting_state_t *state)
 {
-    state->size = llmsset_count_marked(nodes);
     // update even if the size is the same
     // because this becomes the best closest position to our current position
     if (state->size <= state->best_size) {
@@ -189,54 +188,68 @@ static inline int is_max_growth_reached(const sifting_state_t *state)
     return ((float) (state->size) >= configs.max_growth * (float) (state->best_size));
 }
 
-TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
+TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, sifting_state)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
 
-    bounds_state_t bounds_state = {
-        .bound = 0,
-        .limit = 0,
-        .isolated = 0,
+    bounds_state_t upper_bound = {
+            .bound = 0,
+            .limit = 0,
+            .isolated = 0,
     };
-    init_upper_bound(levels, state->pos, state->low, &bounds_state);
+    init_upper_bound(levels, sifting_state->pos, sifting_state->low, &upper_bound, sifting_state);
 
-    for (; state->pos < state->high; ++state->pos) {
-        varswap_t res = sylvan_varswap(state->pos);
+    for (; sifting_state->pos < sifting_state->high &&
+           sifting_state->size - upper_bound.bound < upper_bound.limit; ++sifting_state->pos) {
+
+        // Update the upper bound on node decrease
+        if (interact_test(levels, sifting_state->pos, sifting_state->pos + 1)) {
+            update_upper_bound(levels, sifting_state->pos, &upper_bound);
+        }
+
+        varswap_t res = sylvan_varswap(sifting_state->pos);
+        sifting_state->size = llmsset_count_marked(nodes);
+
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
-        update_best_pos(state);
-        if (is_max_growth_reached(state)) {
-            ++state->pos;
+        update_best_pos(sifting_state);
+        if (is_max_growth_reached(sifting_state)) {
+            ++sifting_state->pos;
             break;
         }
         if (should_terminate_reordering(&configs)) break;
-        update_upper_bound(levels, state->pos, state->low, &bounds_state);
+        if (sifting_state->size < upper_bound.limit) upper_bound.limit = sifting_state->size;
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }
 
-TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
+TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, sifting_state)
 {
     if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
 
-    bounds_state_t bounds_state = {
-        .bound = 0,
-        .limit = 0,
-        .isolated = 0,
+    bounds_state_t lower_bound = {
+            .bound = 0,
+            .limit = 0,
+            .isolated = 0,
     };
-    init_lower_bound(levels, state->pos, state->low, &bounds_state);
+    init_lower_bound(levels, sifting_state->pos, sifting_state->low, &lower_bound, sifting_state);
 
-    for (; state->pos > state->low && bounds_state.bound < bounds_state.limit; --state->pos) {
-        varswap_t res = sylvan_varswap(state->pos - 1);
+    for (; sifting_state->pos > sifting_state->low && lower_bound.bound < lower_bound.limit; --sifting_state->pos) {
+
+        varswap_t res = sylvan_varswap(sifting_state->pos - 1);
+        sifting_state->size = llmsset_count_marked(nodes);
+
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
-        update_best_pos(state);
-        if (is_max_growth_reached(state)) {
-            --state->pos;
+        update_best_pos(sifting_state);
+        if (is_max_growth_reached(sifting_state)) {
+            --sifting_state->pos;
             break;
         }
         if (should_terminate_reordering(&configs)) break;
-        update_lower_bound(levels, state->pos, state->low, &bounds_state);
+
+        update_lower_bound(levels, sifting_state->pos, &lower_bound);
+        if (sifting_state->size < lower_bound.limit) lower_bound.limit = sifting_state->size;
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }

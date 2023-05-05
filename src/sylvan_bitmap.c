@@ -142,7 +142,7 @@ size_t bitmap_atomic_next(atomic_word_t *words, size_t size, size_t pos)
     // get word index for pos
     size_t word_idx = WORD_OFFSET(pos);
     atomic_word_t *ptr = &words[word_idx];
-    // check whether there are still any 1-bits in the current word
+    // check whether there are still any successor 1-bits in the current word
     word_t word = atomic_load_explicit(ptr, memory_order_relaxed) & BIT_FWD_ITER_MASK(pos);
     if (word) {
         // there exist some successor 1 bit in the word, thus return the pos directly

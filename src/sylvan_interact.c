@@ -92,11 +92,11 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 {
     // The low 40 bits are an index into the unique table.
     uint64_t index = f & 0x000000ffffffffff;
-    atomic_incr_ref_count(levels, index);
+    levels_ref_count_incr(levels, index);
 
     mtbddnode_t node = MTBDD_GETNODE(f);
     BDDVAR var = mtbddnode_getvariable(node);
-    atomic_incr_var_count(levels, var);
+    levels_var_count_incr(levels, var);
 
     if (mtbdd_isleaf(f)) return;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
@@ -136,8 +136,8 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         mtbddnode_t f = MTBDD_GETNODE(index);
 
         BDDVAR var = mtbddnode_getvariable(f);
-        atomic_incr_var_count(levels, var);
-        atomic_incr_ref_count(levels, index);
+        levels_var_count_incr(levels, var);
+        levels_ref_count_incr(levels, index);
 
         // set support bitmap, <var> is on the support of <f>
         bitmap_atomic_set(bitmap_s, var);
@@ -159,7 +159,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < nodes->table_size; i++) {
-        if (atomic_load_ref_count(levels, i) == 1) levels->isolated_count++;
+        if (levels_ref_count_load(levels, i) == 1) levels->isolated_count++;
     }
 
     free_aligned(bitmap_s, nvars);
@@ -167,22 +167,54 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     free_aligned(bitmap_l, nnodes);
 }
 
-VOID_TASK_IMPL_4(init_lower_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low, bounds_state_t*, bounds_state)
+VOID_TASK_IMPL_5(init_lower_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low, bounds_state_t*, bounds_state, sifting_state_t*, sifting_state)
 {
+    /* Initialize the lower bound.
+    ** The part of the DD below <y> will not change.
+    ** The part of the DD above <y> that does not interact with <y> will not
+    ** change. The rest may vanish in the best case, except for
+    ** the nodes at level <low>, which will not vanish, regardless.
+    */
+    bounds_state->limit = sifting_state->size - levels_isolated_count_load(dbs);
+    bounds_state->bound = 0;
+    bounds_state->isolated = 0;
 
+    for (BDDVAR x = low + 1; x < var; ++x) {
+        if (interact_test(dbs, x, var)){
+            bounds_state->isolated = levels_is_isolated(dbs, x);
+            bounds_state->bound -= levels_var_count_load(dbs, x) - bounds_state->isolated;
+        }
+    }
+
+    bounds_state->isolated = levels_is_isolated(dbs, var);
+    bounds_state->bound -= levels_var_count_load(dbs, var) - bounds_state->isolated;
 }
 
-VOID_TASK_IMPL_4(update_lower_bound, levels_t, dbs, BDDVAR, x, BDDVAR, y, bounds_state_t*, bounds_state)
+VOID_TASK_IMPL_3(update_lower_bound, levels_t, dbs, BDDVAR, x,  bounds_state_t*, bounds_state)
 {
-
+    bounds_state->isolated = levels_is_isolated(dbs, x);
+    bounds_state->bound += levels_var_count_load(dbs, x) - bounds_state->isolated;
 }
 
-VOID_TASK_IMPL_4(init_upper_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low,bounds_state_t*, bounds_state)
+VOID_TASK_IMPL_5(init_upper_bound, levels_t, dbs, BDDVAR, var, BDDVAR, high, bounds_state_t*, bounds_state, sifting_state_t*, sifting_state)
 {
+    bounds_state->limit = sifting_state->size - levels_isolated_count_load(dbs);
+    bounds_state->bound = 0;
+    bounds_state->isolated = 0;
 
+    for (BDDVAR y = high; y > var; --y) {
+        if (interact_test(dbs, y, var)){
+            bounds_state->isolated = levels_is_isolated(dbs, y);
+            bounds_state->bound += levels_var_count_load(dbs, y) - bounds_state->isolated;
+        }
+    }
+
+    bounds_state->isolated = levels_is_isolated(dbs, var);
+    bounds_state->bound += levels_var_count_load(dbs, var) - bounds_state->isolated;
 }
 
-VOID_TASK_IMPL_4(update_upper_bound, levels_t, dbs, BDDVAR, x, BDDVAR, y, bounds_state_t*, bounds_state)
+VOID_TASK_IMPL_3(update_upper_bound, levels_t, dbs, BDDVAR, y, bounds_state_t*, bounds_state)
 {
-
+    bounds_state->isolated = levels_is_isolated(dbs, y);
+    bounds_state->bound = levels_var_count_load(dbs, y) - bounds_state->isolated;
 }

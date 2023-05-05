@@ -38,18 +38,28 @@ typedef struct levels_db {
 
 typedef struct bounds_state
 {
-    size_t isolated;
-    size_t bound;
-    size_t limit;
+    size_t              isolated;               // flag to indicate if the current <var> is isolated projection function
+    size_t              bound;                  // lower/ upper bound on the number of nodes
+    size_t              limit;                  // limit on the number of nodes
 } bounds_state_t;
 
-#define atomic_load_var_count(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)
-#define atomic_incr_var_count(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
-#define atomic_decr_var_count(lvl, var) atomic_fetch_add(&lvl->var_count[var], -1)
+/**
+ * @brief Check if a variable is isolated. ( isolated => var.ref_count <= 1)
+ */
+#define levels_is_isolated(lvl, var) (levels_ref_count_load(lvl, var) <= 1)
+#define levels_isolated_count_load(lvl) atomic_load_explicit(&lvl->isolated_count, memory_order_relaxed)
+#define levels_isolated_count_add(lvl, val) atomic_fetch_add(&lvl->isolated_count, val)
 
-#define atomic_load_ref_count(lvl, index) atomic_load_explicit(&lvl->ref_count[index], memory_order_relaxed)
-#define atomic_incr_ref_count(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
-#define atomic_decr_ref_count(lvl, index) atomic_fetch_add(&lvl->ref_count[index], -1)
+#define levels_var_count_add(lvl, val) atomic_fetch_add(&lvl->var_count[var], val)
+#define levels_var_count_load(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)
+#define levels_var_count_incr(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
+#define levels_var_count_decr(lvl, var) atomic_fetch_add(&lvl->var_count[var], -1)
+
+#define levels_ref_count_add(lvl, val) atomic_fetch_add(&lvl->ref_count[index], val)
+#define levels_ref_count_load(lvl, index) atomic_load_explicit(&lvl->ref_count[index], memory_order_relaxed)
+#define levels_ref_count_incr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
+#define levels_ref_count_decr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], -1)
+
 
 /**
  * Index to first node in phase 2 mark bitmap

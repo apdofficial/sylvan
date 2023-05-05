@@ -141,6 +141,14 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (varswap_t) result = SYLVAN_VARSWAP_SUCCESS;
 
+    /* Check whether the two projection functions involved in this
+    ** swap are isolated. At the end, we'll be able to tell how many
+    ** isolated projection functions are there by checking only these
+    ** two functions again. This is done to eliminate the isolated
+    ** projection functions from the node count.
+    */
+    size_t isolated = -( levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1) );
+
     // ensure that the cache is cleared
     sylvan_clear_cache();
 
@@ -152,12 +160,15 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
     sylvan_varswap_p0(pos, &result);
 #endif
 
-    // handle all trivial cases, mark cases that are not trivial
+    // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     uint64_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
         sylvan_varswap_p2(pos, &result);
+
+        isolated += levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1);
+        levels_isolated_count_add(levels, isolated);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) {
 #if STATS

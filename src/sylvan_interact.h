@@ -10,6 +10,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include "sylvan_bitmap.h"
+#include "sylvan_reorder.h"
 
 typedef struct interact_state
 {
@@ -36,7 +37,7 @@ static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 
 static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
-    if (dbs->bitmap_i == NULL) return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction
+    if (dbs->bitmap_i == NULL) return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
     // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
     if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
     if (x >= dbs->count || y >= dbs->count) return 1;
@@ -63,21 +64,21 @@ void interact_print_state(const levels_t dbs);
 
 VOID_TASK_DECL_1(interact_var_ref_init, levels_t)
 /**
-  @brief Initialize the variable interaction matrix.
+  @brief Initialize the variable interaction matrix, nodes count for each variable, and internal reference count for each variable.
 */
 #define interact_var_ref_init(levels) RUN(interact_var_ref_init, levels)
 
-VOID_TASK_DECL_4(init_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
-#define init_lower_bound(dbs, var, low, bounds_state) RUN(init_lower_bound, dbs, var, low, bounds_state)
+VOID_TASK_DECL_5(init_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*, sifting_state_t*)
+#define init_lower_bound(dbs, var, low, bounds_state, sifting_state) RUN(init_lower_bound, dbs, var, low, bounds_state, sifting_state)
 
-VOID_TASK_DECL_4(update_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
-#define update_lower_bound(dbs, x, y, bounds_state) RUN(init_lower_bound, dbs, x, y, bounds_state)
+VOID_TASK_DECL_3(update_lower_bound, levels_t, BDDVAR, bounds_state_t*)
+#define update_lower_bound(dbs, x, bounds_state) RUN(update_lower_bound, dbs, x, bounds_state)
 
-VOID_TASK_DECL_4(init_upper_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
-#define init_upper_bound(dbs, var, low, bounds_state) RUN(init_upper_bound, dbs, var, low, bounds_state)
+VOID_TASK_DECL_5(init_upper_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*, sifting_state_t*)
+#define init_upper_bound(dbs, var, low, bounds_state, sifting_state) RUN(init_upper_bound, dbs, var, low, bounds_state, sifting_state)
 
-VOID_TASK_DECL_4(update_upper_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*)
-#define update_upper_bound(dbs, x, y, bounds_state) RUN(init_upper_bound, dbs, x, y, bounds_state)
+VOID_TASK_DECL_3(update_upper_bound, levels_t, BDDVAR, bounds_state_t*)
+#define update_upper_bound(dbs, y, bounds_state) RUN(update_upper_bound, dbs, y, bounds_state)
 
 #ifdef __cplusplus
 }
