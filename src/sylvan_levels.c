@@ -77,6 +77,19 @@ int mtbdd_newlevels(size_t amount)
     return 1;
 }
 
+int mtbdd_levels_makenode(uint32_t level, MTBDD low, MTBDD high)
+{
+    if (level >= levels->count) {
+        fprintf(stderr, "mtbdd_levels_makenode failed. Out of bounds level.");
+        return 0;
+    }
+
+    BDDVAR order = levels->level_to_order[level];
+    levels->table[order] = mtbdd_makenode(order, low, high);
+
+    return 1;
+}
+
 void mtbdd_resetlevels(void)
 {
     if (levels_size != 0) {

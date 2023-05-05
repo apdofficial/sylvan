@@ -93,6 +93,11 @@ MTBDD mtbdd_newlevel(void);
 int mtbdd_newlevels(size_t amount);
 
 /**
+ * @brief Insert a node at given level with given low and high nodes
+ */
+int mtbdd_levels_makenode(uint32_t level, MTBDD low, MTBDD high);
+
+/**
  * \brief  Reset all levels.
  */
 void mtbdd_resetlevels(void);

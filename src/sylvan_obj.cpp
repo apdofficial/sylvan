@@ -633,7 +633,7 @@ Mtbdd::resetLevels()
 Mtbdd
 Mtbdd::mtbddLevel(uint32_t index)
 {
-    return sylvan_level_to_order(index);
+    return sylvan_ithlevel(index);
 }
 
 uint32_t
