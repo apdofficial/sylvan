@@ -159,7 +159,7 @@ TASK_DECL_2(varswap_t, sylvan_reorder_impl, uint32_t, uint32_t);
       @param low - the lowest position to sift
       @param high - the highest position to sift
 */
-#define sylvan_reorder_impl(low, high)  RUN(sylvan_reorder_impl, low, high)
+#define sylvan_reorder_impl(low, high)  RUNEX(sylvan_reorder_impl, low, high)
 
 
 VOID_TASK_DECL_0(sylvan_reduce_heap);
@@ -193,7 +193,7 @@ TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
   of the array should be equal or greater to the number of variables
   currently in use.
  */
-#define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
+#define sylvan_reorder_perm(permutation)  RUNEX(sylvan_reorder_perm, permutation)
 
 #ifdef __cplusplus
 }

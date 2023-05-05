@@ -297,16 +297,6 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
 VOID_TASK_IMPL_0(sylvan_reduce_heap)
 {
     if (!reorder_initialized) return;
-    if (reorder_is_running) {
-        // avoid running multiple threads
-        // if we are running RE and this function is invoked nevertheless
-        // we must be in a different thread
-        // since no operations are allowed while reordering
-        // hang here until reordering is done and then exit
-        while (reorder_is_running) {}
-        return;
-    }
-
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
         NEWFRAME(sylvan_reorder_impl, 0, 0);
