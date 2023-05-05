@@ -79,7 +79,7 @@ void interact_print_state(const levels_t dbs)
  * Therefore, it is not moved or changed by the swap. If this is the case
  * for all the nodes of variable <x>, we say that variables <x> and <y> do not interact.
  *
- * Performs a DFS on the BDD to accumulate the support array of the variables on which f depends.
+ * Performs a tree search on the BDD to accumulate the support array of the variables on which f depends.
  *
  *        (x)F
  *       /   \
@@ -92,14 +92,16 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 {
     // The low 40 bits are an index into the unique table.
     uint64_t index = f & 0x000000ffffffffff;
-    levels_ref_count_incr(levels, index);
-
     mtbddnode_t node = MTBDD_GETNODE(f);
     BDDVAR var = mtbddnode_getvariable(node);
-    levels_var_count_incr(levels, var);
+
+    if (bitmap_atomic_get(bitmap_v, index) == 0) {
+        levels_ref_count_incr(levels, var);
+    }
 
     if (mtbdd_isleaf(f)) return;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
+
 
     // set support bitmap, <var> is on the support of <f>
     bitmap_atomic_set(bitmap_s, var);
@@ -119,11 +121,12 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
-    levels->isolated_count = 0;
+    levels_isolated_count_set(levels, 0);
 
     atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars); // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap
+
     clear_aligned(levels->ref_count, nodes->table_size);
 
     if (bitmap_s == 0 || bitmap_v == 0 || bitmap_l == 0) {
@@ -132,12 +135,11 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
-        if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited root node
         mtbddnode_t f = MTBDD_GETNODE(index);
-
         BDDVAR var = mtbddnode_getvariable(f);
         levels_var_count_incr(levels, var);
-        levels_ref_count_incr(levels, index);
+
+        if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>
         bitmap_atomic_set(bitmap_s, var);
@@ -159,7 +161,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < nodes->table_size; i++) {
-        if (levels_ref_count_load(levels, i) == 1) levels->isolated_count++;
+        if (levels_is_isolated(levels, i)) levels_isolated_count_incr(levels);
     }
 
     free_aligned(bitmap_s, nvars);
@@ -175,8 +177,8 @@ VOID_TASK_IMPL_5(init_lower_bound, levels_t, dbs, BDDVAR, var, BDDVAR, low, boun
     ** change. The rest may vanish in the best case, except for
     ** the nodes at level <low>, which will not vanish, regardless.
     */
-    bounds_state->limit = sifting_state->size - levels_isolated_count_load(dbs);
-    bounds_state->bound = 0;
+    bounds_state->limit = (int) (sifting_state->size - levels_isolated_count_load(dbs));
+    bounds_state->bound = bounds_state->limit;
     bounds_state->isolated = 0;
 
     for (BDDVAR x = low + 1; x < var; ++x) {
@@ -216,5 +218,5 @@ VOID_TASK_IMPL_5(init_upper_bound, levels_t, dbs, BDDVAR, var, BDDVAR, high, bou
 VOID_TASK_IMPL_3(update_upper_bound, levels_t, dbs, BDDVAR, y, bounds_state_t*, bounds_state)
 {
     bounds_state->isolated = levels_is_isolated(dbs, y);
-    bounds_state->bound = levels_var_count_load(dbs, y) - bounds_state->isolated;
+    bounds_state->bound -= levels_var_count_load(dbs, y) - bounds_state->isolated;
 }

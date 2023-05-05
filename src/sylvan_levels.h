@@ -38,9 +38,9 @@ typedef struct levels_db {
 
 typedef struct bounds_state
 {
-    size_t              isolated;               // flag to indicate if the current <var> is isolated projection function
-    size_t              bound;                  // lower/ upper bound on the number of nodes
-    size_t              limit;                  // limit on the number of nodes
+    int                 isolated;               // flag to indicate if the current <var> is isolated projection function
+    int                 bound;                  // lower/ upper bound on the number of nodes
+    int                 limit;                  // limit on the number of nodes
 } bounds_state_t;
 
 /**
@@ -48,7 +48,10 @@ typedef struct bounds_state
  */
 #define levels_is_isolated(lvl, var) (levels_ref_count_load(lvl, var) <= 1)
 #define levels_isolated_count_load(lvl) atomic_load_explicit(&lvl->isolated_count, memory_order_relaxed)
+#define levels_isolated_count_incr(lvl) atomic_fetch_add(&lvl->isolated_count, 1)
 #define levels_isolated_count_add(lvl, val) atomic_fetch_add(&lvl->isolated_count, val)
+#define levels_isolated_count_set(lvl, new_v) size_t old_v__ = levels_isolated_count_load(lvl); \
+                                                atomic_compare_exchange_strong(&lvl->isolated_count, &old_v__, new_v)
 
 #define levels_var_count_add(lvl, val) atomic_fetch_add(&lvl->var_count[var], val)
 #define levels_var_count_load(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)

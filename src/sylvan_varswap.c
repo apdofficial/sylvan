@@ -434,7 +434,8 @@ void swap_node(size_t index)
     MTBDD f0 = mtbddnode_getlow(node);
     MTBDD f1 = mtbddnode_gethigh(node);
     MTBDD f00, f01, f10, f11;
-    f00 = f01 = f0;
+
+    f01 = f00 = f0;
     if (!mtbdd_isleaf(f0)) {
         mtbddnode_t n0 = MTBDD_GETNODE(f0);
         if (mtbddnode_getvariable(n0) == var) {
@@ -442,7 +443,7 @@ void swap_node(size_t index)
             f01 = node_gethigh(f0, n0);
         }
     }
-    f10 = f11 = f1;
+    f11 = f10 = f1;
     if (!mtbdd_isleaf(f1)) {
         mtbddnode_t n1 = MTBDD_GETNODE(f1);
         if (mtbddnode_getvariable(n1) == var) {
@@ -451,17 +452,33 @@ void swap_node(size_t index)
         }
     }
 
-    // compute new f0 and f1
-    f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+    if ((mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) || (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var)) {
+        // this is the case when number of nodes is increased
+        levels_var_count_incr(levels, var+1);
+    }
+
+    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01){
+        // this is the case when number of nodes is decreased
+        levels_var_count_decr(levels, var+1);
+    }
+
+    // Create the new high child.
     f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
-    if (f0 == mtbdd_invalid || f1 == mtbdd_invalid) {
+    if (f1 == mtbdd_invalid) {
         fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
         return;
-    } else {
-        // update node, which also removes the mark
-        mtbddnode_makenode(node, var, f0, f1);
-        llmsset_rehash_bucket(nodes, index);
     }
+
+    // Create the low high child.
+    f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+    if (f0 == mtbdd_invalid) {
+        fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
+        return;
+    }
+
+    // update node, which also removes the mark
+    mtbddnode_makenode(node, var, f0, f1);
+    llmsset_rehash_bucket(nodes, index);
 }
 
 /**

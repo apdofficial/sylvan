@@ -200,7 +200,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, sifting_state)
     init_upper_bound(levels, sifting_state->pos, sifting_state->low, &upper_bound, sifting_state);
 
     for (; sifting_state->pos < sifting_state->high &&
-           sifting_state->size - upper_bound.bound < upper_bound.limit; ++sifting_state->pos) {
+                   (int)sifting_state->size - upper_bound.bound < upper_bound.limit; ++sifting_state->pos) {
 
         // Update the upper bound on node decrease
         if (interact_test(levels, sifting_state->pos, sifting_state->pos + 1)) {
@@ -218,7 +218,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, sifting_state)
             break;
         }
         if (should_terminate_reordering(&configs)) break;
-        if (sifting_state->size < upper_bound.limit) upper_bound.limit = sifting_state->size;
+        if ((int)sifting_state->size < upper_bound.limit) upper_bound.limit = sifting_state->size;
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }
@@ -235,7 +235,6 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, sifting_state)
     init_lower_bound(levels, sifting_state->pos, sifting_state->low, &lower_bound, sifting_state);
 
     for (; sifting_state->pos > sifting_state->low && lower_bound.bound < lower_bound.limit; --sifting_state->pos) {
-
         varswap_t res = sylvan_varswap(sifting_state->pos - 1);
         sifting_state->size = llmsset_count_marked(nodes);
 
@@ -249,7 +248,7 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, sifting_state)
         if (should_terminate_reordering(&configs)) break;
 
         update_lower_bound(levels, sifting_state->pos, &lower_bound);
-        if (sifting_state->size < lower_bound.limit) lower_bound.limit = sifting_state->size;
+        if ((int)sifting_state->size < lower_bound.limit) lower_bound.limit = sifting_state->size;
     }
     return SYLVAN_VARSWAP_SUCCESS;
 }
@@ -341,7 +340,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    interact_init(levels);
+    interact_var_ref_init(levels);
 
     // now count all variable levels (parallel...)
     _Atomic (size_t) level_counts[levels->count];
