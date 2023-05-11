@@ -137,6 +137,8 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
         mtbddnode_t f = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(f);
+        if(var >= mtbdd_levelscount()) continue;
+
         levels_var_count_incr(levels, var);
 
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node

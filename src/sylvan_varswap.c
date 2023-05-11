@@ -296,6 +296,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
+        if(nvar >= mtbdd_levelscount()) continue;
 
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
@@ -410,7 +411,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
-
+        if(mtbddnode_getvariable(node) >= mtbdd_levelscount()) continue;
         if (mtbddnode_ismapnode(node)) swap_mapnode(first);
         else swap_node(first);
     }
