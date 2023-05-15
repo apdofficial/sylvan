@@ -309,7 +309,6 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
     }
 
     configs.t_start_sifting = wctime();
-    configs.total_num_swap = 0;
     configs.total_num_var = 0;
 
     // if high == 0, then we sift all variables
@@ -342,23 +341,25 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
 
         sifting_state.best_pos = sifting_state.pos;
 
+        configs.total_num_swap = 0;
+
         // search for the optimum variable position
         // first sift to the closest boundary, then sift in the other direction
         if (lvl > levels->count / 2) {
             res = sylvan_siftdown(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftup(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
+            if (sylvan_varswap_issuccess(res)) {
+                sylvan_siftup(&sifting_state);
+            }
         } else {
             res = sylvan_siftup(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftdown(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
+            if (sylvan_varswap_issuccess(res))  {
+                sylvan_siftdown(&sifting_state);
+            }
         }
-
+        varswap_t old_res = res;
         // optimum variable position restoration
         res = sylvan_siftpos(sifting_state.pos, sifting_state.best_pos);
-        if (!sylvan_varswap_issuccess(res)) break;
+        if (!sylvan_varswap_issuccess(res) || !sylvan_varswap_issuccess(old_res)) break;
 
         configs.total_num_var++;
 
