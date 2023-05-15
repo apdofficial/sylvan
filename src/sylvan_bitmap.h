@@ -6,6 +6,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include <stddef.h>
+#include <stdint-gcc.h>
 
 // use uint64_t to advantage the usual 64 bytes per cache line
 typedef uint64_t word_t;
