@@ -453,29 +453,29 @@ void swap_node(size_t index)
         }
     }
 
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
-        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_incr(levels, var+1);
-        levels_ref_count_incr(levels, var+1);
-        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
-        levels_ref_count_incr(levels, mtbdd_getvar(f10));
-    }
+    // if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
+    //     // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
+    //     levels_var_count_incr(levels, var+1);
+    //     levels_ref_count_incr(levels, var+1);
+    //     // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
+    //     levels_ref_count_incr(levels, mtbdd_getvar(f10));
+    // }
 
-    if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
-        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_incr(levels, var+1);
-        levels_ref_count_incr(levels, var+1);
-        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
-        levels_ref_count_incr(levels, mtbdd_getvar(f01));
-    }
+    // if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
+    //     // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
+    //     levels_var_count_incr(levels, var+1);
+    //     levels_ref_count_incr(levels, var+1);
+    //     // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
+    //     levels_ref_count_incr(levels, mtbdd_getvar(f01));
+    // }
 
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01){
-        // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_decr(levels, var+1);
-        levels_ref_count_decr(levels, mtbdd_getvar(f0));
-        // now we have one less node at level <var+1> pointing to f10 / F01 so we decrease the ref count
-        levels_ref_count_decr(levels, mtbdd_getvar(f10));
-    }
+    // if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01){
+    //     // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
+    //     levels_var_count_decr(levels, var+1);
+    //     levels_ref_count_decr(levels, mtbdd_getvar(f0));
+    //     // now we have one less node at level <var+1> pointing to f10 / F01 so we decrease the ref count
+    //     levels_ref_count_decr(levels, mtbdd_getvar(f10));
+    // }
 
     // Create the new high child.
     f1 = mtbdd_varswap_makenode(var + 1, f01, f11);

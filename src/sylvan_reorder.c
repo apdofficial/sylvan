@@ -16,22 +16,16 @@
 
 #include <sylvan_int.h>
 #include <sys/time.h>
+
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
 #include "sylvan_interact.h"
 
-
 #define STATS 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 static int reorder_is_running = 0;
-
-/**
- * This variable is used for a cas flag so only
- * one reordering runs at one time
- */
-static _Atomic (int) re;
 
 struct sifting_config
 {
@@ -194,10 +188,10 @@ TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, sifting_state)
 
     bounds_state_t upper_bound = {
             .bound = 0,
-            .limit = 0,
+            .limit = sifting_state->size,
             .isolated = 0,
     };
-    init_upper_bound(levels, sifting_state->pos, sifting_state->low, &upper_bound, sifting_state);
+    // init_upper_bound(levels, sifting_state->pos, sifting_state->low, &upper_bound, sifting_state);
 
     for (; sifting_state->pos < sifting_state->high &&
                    (int)sifting_state->size - upper_bound.bound < upper_bound.limit; ++sifting_state->pos) {
@@ -229,10 +223,10 @@ TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, sifting_state)
 
     bounds_state_t lower_bound = {
             .bound = 0,
-            .limit = 0,
+            .limit = sifting_state->size,
             .isolated = 0,
     };
-    init_lower_bound(levels, sifting_state->pos, sifting_state->low, &lower_bound, sifting_state);
+    // init_lower_bound(levels, sifting_state->pos, sifting_state->low, &lower_bound, sifting_state);
 
     for (; sifting_state->pos > sifting_state->low && lower_bound.bound < lower_bound.limit; --sifting_state->pos) {
         varswap_t res = sylvan_varswap(sifting_state->pos - 1);
@@ -321,7 +315,7 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-    interact_var_ref_init(levels);
+    // interact_var_ref_init(levels);
 
     // now count all variable levels (parallel...)
     _Atomic (size_t) level_counts[levels->count];
