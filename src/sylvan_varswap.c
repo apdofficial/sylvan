@@ -147,7 +147,7 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
     ** two functions again. This is done to eliminate the isolated
     ** projection functions from the node count.
     */
-    size_t isolated = -( levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1) );
+//    size_t isolated = -( levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1) );
 
     // ensure that the cache is cleared
     sylvan_clear_cache();
@@ -166,9 +166,9 @@ TASK_IMPL_1(varswap_t, sylvan_varswap, uint32_t, pos)
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
         sylvan_varswap_p2(pos, &result);
-
-        isolated += levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1);
-        levels_isolated_count_add(levels, isolated);
+//
+//        isolated += levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos+1);
+//        levels_isolated_count_add(levels, isolated);
 
         if (result != SYLVAN_VARSWAP_SUCCESS) {
 #if STATS

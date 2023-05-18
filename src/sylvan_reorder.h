@@ -167,7 +167,9 @@ VOID_TASK_DECL_0(sylvan_reduce_heap);
  * @brief Trigger blocking dynamic variable reordering.
  * @details This function performs stop-the-world operation similar to garbage collection.
  */
-#define sylvan_reduce_heap() (RUN(sylvan_reduce_heap))
+void sylvan_reduce_heap();
+
+void sylvan_test_reduce_heap(double percentage);
 
 /**
       @brief Reduce the heap size in the entire forest.
