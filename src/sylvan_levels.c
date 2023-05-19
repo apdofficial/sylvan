@@ -2,6 +2,7 @@
 #include <sylvan_mtbdd_int.h>
 #include <sylvan_align.h>
 #include <errno.h>      // for errno
+#include "sylvan_reorder.h"
 
 static size_t levels_size; // size of the arrays in levels_t used to realloc memory
 
@@ -23,6 +24,8 @@ levels_t mtbdd_levels_create()
     dbs->bitmap_i_size = 0;
     dbs->bitmap_i_nrows = 0;
     dbs->isolated_count = 0;
+    dbs->reorder_count = 0;
+    dbs->reorder_size_threshold = SYLVAN_REORDER_FIRST_REORDER;
 
     levels_size = 0;
     dbs->count = 0;
@@ -68,7 +71,7 @@ int mtbdd_newlevels(size_t amount)
         if (levels->table == 0 ||
             levels->level_to_order == 0 ||
             levels->order_to_level == 0 ||
-            levels->var_count == 0 ) {
+            levels->var_count == 0) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
             return 0;
         }
@@ -163,49 +166,68 @@ void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_count_levelnodes, _Atomic (size_t)*, arr, size_t, first, size_t, count)
+VOID_TASK_IMPL_4(sylvan_count_levelnodes, _Atomic (size_t)*, arr, _Atomic (size_t)*, leaf_count, size_t, first, size_t,
+                 count)
 {
-    if (count > COUNT_NODES_BLOCK_SIZE) {
-        SPAWN(sylvan_count_levelnodes, arr, first, count / 2);
-        CALL(sylvan_count_levelnodes, arr, first + count / 2, count - count / 2);
+    // divide and conquer (if count above BLOCKSIZE)
+    if (count > BLOCKSIZE) {
+        size_t split = count / 2;
+        SPAWN(sylvan_count_levelnodes, arr, leaf_count, first, split);
+        CALL(sylvan_count_levelnodes, arr, leaf_count, first + split, count - split);
         SYNC(sylvan_count_levelnodes);
-    } else {
-        size_t tmp[levels->count];
-        size_t i;
-        for (i = 0; i < levels->count; i++) tmp[i] = 0;
+        return;
+    }
 
-        const size_t end = first + count;
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
 
-        for (; first < end; first++) {
-            if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
-            mtbddnode_t node = MTBDD_GETNODE(first);
-            if (mtbddnode_isleaf(node)) continue; // a leaf
-            tmp[mtbddnode_getvariable(node)]++; // update the variable
+    size_t tmp[levels->count];
+    size_t i;
+    for (i = 0; i < levels->count; i++) tmp[i] = 0;
+
+    const size_t end = first + count;
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        mtbddnode_t node = MTBDD_GETNODE(first);
+        if (mtbddnode_isleaf(node)) {
+            printf("leaf found\n");
+            atomic_fetch_add(leaf_count, 1);
+            continue; // a leaf
         }
-        for (i = 0; i < levels->count; i++) {
-            atomic_fetch_add(&arr[i], tmp[i]);
-        }
+        tmp[mtbddnode_getvariable(node)]++; // update the variable
+    }
+    for (i = 0; i < levels->count; i++) {
+        atomic_fetch_add(&arr[i], tmp[i]);
     }
 }
 
 TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, count)
 {
-    if (count > COUNT_NODES_BLOCK_SIZE) {
+    // divide and conquer (if count above BLOCKSIZE)
+    if (count > BLOCKSIZE) {
         size_t split = count / 2;
         SPAWN(sylvan_count_nodes, var, first, split);
         size_t a = CALL(sylvan_count_nodes, var, first + split, count - split);
         size_t b = SYNC(sylvan_count_nodes);
         return a + b;
-    } else {
-        size_t var_count = 0;
-        const size_t end = first + count;
-        for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
-            mtbddnode_t node = MTBDD_GETNODE(first);
-            if (mtbddnode_getvariable(node) != var) continue; // not the right variable
-            var_count++;
-        }
-        return var_count;
     }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    size_t var_count = 0;
+    const size_t end = first + count;
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        mtbddnode_t node = MTBDD_GETNODE(first);
+        if (mtbddnode_getvariable(node) != var) continue; // not the right variable
+        var_count++;
+    }
+    return var_count;
 }
 
 // set levels below the threshold to -1
@@ -224,15 +246,21 @@ VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first,
         SPAWN(sylvan_init_subtables, bitmap_t, first, split);
         CALL(sylvan_init_subtables, bitmap_t, first + split, count - split);
         SYNC(sylvan_init_subtables);
-    } else {
-        const size_t end = first + count;
-        for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
-            if (!llmsset_is_marked(nodes, first)) continue; // unused bucket
-            mtbddnode_t node = MTBDD_GETNODE(first);
-            BDDVAR var = mtbddnode_getvariable(node);
-            if (var < levels->count) {
-                bitmap_atomic_set(bitmap_t, var * levels->count + first);
-            }
+        return;
+    }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        mtbddnode_t node = MTBDD_GETNODE(first);
+        BDDVAR var = mtbddnode_getvariable(node);
+        if (var < levels->count) {
+            bitmap_atomic_set(bitmap_t, var * levels->count + first);
         }
     }
 }

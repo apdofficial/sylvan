@@ -66,7 +66,7 @@ VOID_TASK_DECL_1(interact_var_ref_init, levels_t)
 /**
   @brief Initialize the variable interaction matrix, nodes count for each variable, and internal reference count for each variable.
 */
-#define interact_var_ref_init(levels) RUN(interact_var_ref_init, levels)
+#define interact_var_ref_init(lvl) RUN(interact_var_ref_init, lvl)
 
 VOID_TASK_DECL_5(init_lower_bound, levels_t, BDDVAR, BDDVAR, bounds_state_t*, sifting_state_t*)
 #define init_lower_bound(dbs, var, low, bounds_state, sifting_state) RUN(init_lower_bound, dbs, var, low, bounds_state, sifting_state)

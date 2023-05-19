@@ -1098,7 +1098,7 @@ void Sylvan::reduceHeap()
     return sylvan_reduce_heap();
 }
 
-varswap_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
+reorder_result_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
 {
     return sylvan_reorder_perm(perm.data());
 }

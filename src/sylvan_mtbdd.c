@@ -26,6 +26,7 @@
 #include <sylvan_refs.h>
 #include <sylvan_sl.h>
 #include <sha2.h>
+#include "sylvan_reorder.h"
 
 /* Primitives */
 int

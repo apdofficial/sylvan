@@ -106,7 +106,7 @@ void sylvan_set_reorder_maxvar(uint32_t max_var);
 */
 void sylvan_set_reorder_timelimit(double time_limit);
 
-TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
+TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
  *
@@ -120,7 +120,7 @@ TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
  */
 #define sylvan_siftdown(state) RUN(sylvan_siftdown, state)
 
-TASK_DECL_1(varswap_t, sylvan_siftup, sifting_state_t*);
+TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
 /**
  * \brief Sift given variable down from its current level to the target level.
  *
@@ -134,7 +134,7 @@ TASK_DECL_1(varswap_t, sylvan_siftup, sifting_state_t*);
  */
 #define sylvan_siftup(state) RUN(sylvan_siftup, state)
 
-TASK_DECL_2(varswap_t, sylvan_siftpos, uint32_t, uint32_t);
+TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
 /**
  * \brief Sift a variable to its best level.
  * \param var - variable to sift
@@ -142,7 +142,7 @@ TASK_DECL_2(varswap_t, sylvan_siftpos, uint32_t, uint32_t);
  */
 #define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
 
-TASK_DECL_2(varswap_t, sylvan_reorder_impl, uint32_t, uint32_t);
+TASK_DECL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, uint32_t);
 /**
       @brief Reduce the heap size in the entire forest.
 
@@ -169,7 +169,7 @@ VOID_TASK_DECL_0(sylvan_reduce_heap);
  */
 void sylvan_reduce_heap();
 
-void sylvan_test_reduce_heap(double percentage);
+void sylvan_test_reduce_heap();
 
 /**
       @brief Reduce the heap size in the entire forest.
@@ -186,7 +186,7 @@ void sylvan_test_reduce_heap(double percentage);
 */
 #define sylvan_reorder_all()  sylvan_reorder_impl(0, 0)
 
-TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
+TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
 /**
   @brief Reorder the variables in the BDDs according to the given permutation.
 

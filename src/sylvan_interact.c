@@ -16,6 +16,7 @@ char interact_malloc(levels_t dbs)
     dbs->bitmap_i_nrows = dbs->count;
     dbs->bitmap_i = NULL;
     dbs->bitmap_i = (atomic_word_t*) alloc_aligned(dbs->bitmap_i_size);
+    dbs->reorder_size_threshold = SYLVAN_REORDER_FIRST_REORDER;
 
     if (dbs->bitmap_i == 0) {
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
@@ -162,8 +163,10 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         interact_update(dbs, bitmap_s);
     }
 
-    for (size_t i = 0; i < nodes->table_size; i++) {
-        if (levels_is_isolated(levels, i)) levels_isolated_count_incr(levels);
+    for (size_t i = 0; i < levels->count; i++) {
+        if (levels_is_isolated(levels, i)) {
+            levels_isolated_count_incr(levels);
+        }
     }
 
     free_aligned(bitmap_s, nvars);

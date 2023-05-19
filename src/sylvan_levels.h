@@ -7,12 +7,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/**
- * 4096, because that is not very small, and not very large
- * typical kind of parameter that is open to tweaking, though I don't expect it matters so much
- * too small is bad for the atomic operations, too large is bad for work-stealing
- * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
- */
+
 #define COUNT_NODES_BLOCK_SIZE 4096
 
 
@@ -34,19 +29,21 @@ typedef struct levels_db {
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
+    size_t              reorder_size_threshold;  // reorder if this size is reached
+    size_t              reorder_count;           // number of reordering calls
 } *levels_t;
 
 typedef struct bounds_state
 {
-    int                 isolated;               // flag to indicate if the current <var> is isolated projection function
+    int                 isolated;               // flag to indicate if the current <var> is isolated projection function (<var>.ref.count <= 1)
     int                 bound;                  // lower/ upper bound on the number of nodes
     int                 limit;                  // limit on the number of nodes
 } bounds_state_t;
 
 /**
- * @brief Check if a variable is isolated. ( isolated => var.ref_count <= 1)
+ * @brief Check if a variable is isolated. ( isolated => var.ref.count == 1)
  */
-#define levels_is_isolated(lvl, var) (levels_ref_count_load(lvl, var) <= 1)
+#define levels_is_isolated(lvl, var) (levels_ref_count_load(lvl, var) == 1)
 #define levels_isolated_count_load(lvl) atomic_load_explicit(&lvl->isolated_count, memory_order_relaxed)
 #define levels_isolated_count_incr(lvl) atomic_fetch_add(&lvl->isolated_count, 1)
 #define levels_isolated_count_add(lvl, val) atomic_fetch_add(&lvl->isolated_count, val)
@@ -54,12 +51,12 @@ typedef struct bounds_state
                                                 atomic_compare_exchange_strong(&lvl->isolated_count, &old_v__, new_v)
 
 #define levels_var_count_add(lvl, val) atomic_fetch_add(&lvl->var_count[var], val)
-#define levels_var_count_load(lvl, var) atomic_load_explicit(&lvl->var_count[var], memory_order_relaxed)
+#define levels_var_count_load(lvl, var) atomic_load(&lvl->var_count[var])
 #define levels_var_count_incr(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
 #define levels_var_count_decr(lvl, var) atomic_fetch_add(&lvl->var_count[var], -1)
 
 #define levels_ref_count_add(lvl, val) atomic_fetch_add(&lvl->ref_count[index], val)
-#define levels_ref_count_load(lvl, index) atomic_load_explicit(&lvl->ref_count[index], memory_order_relaxed)
+#define levels_ref_count_load(lvl, index) atomic_load(&lvl->ref_count[index])
 #define levels_ref_count_incr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
 #define levels_ref_count_decr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], -1)
 
@@ -84,7 +81,7 @@ levels_t mtbdd_levels_create();
  */
 void mtbdd_levels_free(levels_t dbs);
 
-VOID_TASK_DECL_3(sylvan_count_levelnodes, _Atomic(size_t)*, size_t, size_t);
+VOID_TASK_DECL_4(sylvan_count_levelnodes, _Atomic(size_t)*, _Atomic(size_t)*, size_t, size_t);
 /**
  * @brief Count the number of nodes per real variable level in parallel.
  * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
@@ -92,7 +89,7 @@ VOID_TASK_DECL_3(sylvan_count_levelnodes, _Atomic(size_t)*, size_t, size_t);
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define sylvan_count_levelnodes(level_counts) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
+#define sylvan_count_levelnodes(level_counts, leaf_count) RUN(sylvan_count_levelnodes, level_counts, leaf_count, 0, nodes->table_size)
 
 TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
 /**

@@ -5,35 +5,30 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/**
- * Block size tunes the granularity of the parallel distribution
- */
-#define BLOCKSIZE 4096
-
-typedef enum varswap {
+typedef enum reorder_result {
     /// the operation was aborted and rolled back
-    SYLVAN_VARSWAP_ROLLBACK = 1,
+    SYLVAN_REORDER_ROLLBACK = 1,
     /// success
-    SYLVAN_VARSWAP_SUCCESS = 0,
+    SYLVAN_REORDER_SUCCESS = 0,
     //// cannot rehash in phase 1, no marked nodes remaining
-    SYLVAN_VARSWAP_P0_CLEAR_FAIL = -1,
+    SYLVAN_REORDER_P0_CLEAR_FAIL = -1,
     //// cannot rehash in phase 1, no marked nodes remaining
-    SYLVAN_VARSWAP_P1_REHASH_FAIL = -2,
+    SYLVAN_REORDER_P1_REHASH_FAIL = -2,
     /// cannot rehash in phase 1, and marked nodes remaining
-    SYLVAN_VARSWAP_P1_REHASH_FAIL_MARKED = -3,
+    SYLVAN_REORDER_P1_REHASH_FAIL_MARKED = -3,
     /// cannot rehash in phase 2, no marked nodes remaining
-    SYLVAN_VARSWAP_P2_REHASH_FAIL = -4,
+    SYLVAN_REORDER_P2_REHASH_FAIL = -4,
     /// cannot create node in phase 2 (ergo marked nodes remaining)
-    SYLVAN_VARSWAP_P2_CREATE_FAIL = -5,
+    SYLVAN_REORDER_P2_CREATE_FAIL = -5,
     /// cannot rehash and cannot create node in phase 2
-    SYLVAN_VARSWAP_P2_REHASH_AND_CREATE_FAIL = -6,
+    SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -6,
     /// the operation was aborted and rolled back
-    SYLVAN_VARSWAP_ERROR = -7,
+    SYLVAN_REORDER_ERROR = -7,
     /// the operation failed fast because the varswap was not initialised
-    SYLVAN_VARSWAP_NOT_INITIALISED = -8,
+    SYLVAN_REORDER_NOT_INITIALISED = -8,
     /// the operation failed fast because the varswap was already running
-    SYLVAN_VARSWAP_ALREADY_RUNNING = -9,
-} varswap_t;
+    SYLVAN_REORDER_ALREADY_RUNNING = -9,
+} reorder_result_t;
 
 /**
  * @brief Provide description for given result.
@@ -45,16 +40,18 @@ typedef enum varswap {
  * @param buf buffer into which the description will be copied
  * @param buf_len
  */
-void sylvan_varswap_resdescription(varswap_t result, char *buf, size_t buf_len);
+void sylvan_varswap_resdescription(reorder_result_t result, char *buf, size_t buf_len);
 
-static inline int sylvan_varswap_issuccess(varswap_t result)
+static inline int sylvan_varswap_issuccess(reorder_result_t result)
 {
-    return result == SYLVAN_VARSWAP_SUCCESS || result == SYLVAN_VARSWAP_ROLLBACK;
+    return result == SYLVAN_REORDER_SUCCESS ||
+    result == SYLVAN_REORDER_NOT_INITIALISED ||
+    result == SYLVAN_REORDER_ROLLBACK;
 }
 
-void sylvan_print_varswap_res(varswap_t result);
+void sylvan_print_varswap_res(reorder_result_t result);
 
-TASK_DECL_1(varswap_t, sylvan_varswap, uint32_t);
+TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *

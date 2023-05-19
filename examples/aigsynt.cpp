@@ -212,15 +212,10 @@ int *level_to_var;
 #define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
-    if (dynamic_reorder) {
-        sylvan_test_reduce_heap(0.85);
-    }
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a] / 2;
     int rgt = gatergt[a] / 2;
-//    if (verbose) {
-//        INFO("Going to make gate %d with lhs %d (%d) and rhs %d (%d)\n", a, lft, lookup[lft], rgt, lookup[rgt]);
-//    }
+
     MTBDD l, r;
     if (lft == 0) {
         l = sylvan_false;
@@ -242,6 +237,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
     if (gatergt[a] & 1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
+    sylvan_test_reduce_heap();
 }
 
 VOID_TASK_0(parse)
@@ -299,7 +295,7 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-     INFO("Now reading %llu latches\n", L);
+    INFO("Now reading %llu latches\n", L);
 
     for (uint64_t l = 0; l < L; l++) {
         latches[l] = read_uint();
@@ -308,14 +304,14 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-     INFO("Now reading %llu outputs\n", O);
+    INFO("Now reading %llu outputs\n", O);
 
     for (uint64_t o = 0; o < O; o++) {
         outputs[o] = read_uint();
         read_wsnl();
     }
 
-     INFO("Now reading %llu and-gates\n", A);
+    INFO("Now reading %llu and-gates\n", A);
 
     int gatelhs[A];
     int gatelft[A];
@@ -483,25 +479,28 @@ VOID_TASK_0(parse)
             for (int j = 0; j < dm_ncols(m); j++) {
                     if (dm_is_set(m, i, j)) add_edge(i, dm_nrows(m) + j, g);
             }
-    }*/
+    }
 
-//    for (uint64_t a=0; a<A; a++) {
-//        MTBDD lhs = sylvan_ithvar(read_uint()/2);
-//        mtbdd_refs_push(lhs);
-//        read_ws();
-//        int left = read_uint();
-//        read_ws();
-//        int right = read_uint();
-//        read_wsnl();
-//        MTBDD lft = left&1 ? sylvan_nithvar(left/2) : sylvan_ithvar(left/2);
-//        mtbdd_refs_push(lft);
-//        MTBDD rgt = right&1 ? sylvan_nithvar(right/2) : sylvan_ithvar(right/2);
-//        mtbdd_refs_push(rgt);
-//        MTBDD rhs = sylvan_and(lft, rgt);
-//        mtbdd_refs_push(rhs);
-//        gates[a] = sylvan_equiv(lhs, rhs);
-//        mtbdd_ref(gates[a]);
-//    }
+
+    for (uint64_t a=0; a<A; a++) {
+        MTBDD lhs = sylvan_ithvar(read_uint()/2);
+        mtbdd_refs_push(lhs);
+        read_ws();
+        int left = read_uint();
+        read_ws();
+        int right = read_uint();
+        read_wsnl();
+        MTBDD lft = left&1 ? sylvan_nithvar(left/2) : sylvan_ithvar(left/2);
+        mtbdd_refs_push(lft);
+        MTBDD rgt = right&1 ? sylvan_nithvar(right/2) : sylvan_ithvar(right/2);
+        mtbdd_refs_push(rgt);
+        MTBDD rhs = sylvan_and(lft, rgt);
+        mtbdd_refs_push(rhs);
+        gates[a] = sylvan_equiv(lhs, rhs);
+        mtbdd_ref(gates[a]);
+    }
+
+     */
 
 
     MTBDD Xc = sylvan_set_empty(), Xu = sylvan_set_empty();
@@ -541,11 +540,14 @@ VOID_TASK_0(parse)
 
     MTBDD gates[A];
     for (uint64_t a = 0; a < A; a++) gates[a] = sylvan_invalid;
-    for (uint64_t a = 0; a < A; a++) make_gate(a, gates, gatelhs, gatelft, gatergt, lookup);
+    for (uint64_t a = 0; a < A; a++) {
+        make_gate(a, gates, gatelhs, gatelft, gatergt, lookup);
+    }
 
     if (verbose) {
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
     }
+    sylvan_reduce_heap();
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -623,6 +625,7 @@ VOID_TASK_0(parse)
     Unsafe = sylvan_forall(Unsafe, Xc);
     Unsafe = sylvan_exists(Unsafe, Xu);
 
+
 #if 0
     MTBDD supp = sylvan_support(Unsafe);
     while (supp != sylvan_set_empty()) {
@@ -639,6 +642,8 @@ VOID_TASK_0(parse)
     MTBDD Step = sylvan_false;
     mtbdd_protect(&OldUnsafe);
     mtbdd_protect(&Step);
+
+
 
     int iteration = 0;
 
@@ -742,7 +747,7 @@ int main(int argc, char **argv)
      * Second: start all worker threads with default settings.
      * Third: setup local variables using the LACE_ME macro.
      */
-    lace_start(workers, 1000000);
+    lace_start(1, 1000000);
 
 
     // Init Sylvan
@@ -752,7 +757,7 @@ int main(int argc, char **argv)
     sylvan_init_mtbdd();
     sylvan_init_reorder();
 
-    sylvan_set_reorder_threshold(128);
+    sylvan_set_reorder_threshold(32);
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit(1 * 15 * 1000);
 

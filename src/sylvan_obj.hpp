@@ -1096,7 +1096,7 @@ namespace sylvan
           of the array should be equal or greater to the number of variables
           currently in use and and should be less or equal to the number of levels.
          */
-        static varswap_t reorderPerm(const std::vector <uint32_t> &perm);
+        static reorder_result_t reorderPerm(const std::vector <uint32_t> &perm);
 
         static reorder_config_t getReorderConfig();
 
