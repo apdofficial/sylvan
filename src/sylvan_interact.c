@@ -44,7 +44,7 @@ void interact_update(levels_t dbs, atomic_word_t *bitmap_s)
             bitmap_atomic_clear(bitmap_s, i);
             for (j = i + 1; j < dbs->bitmap_i_nrows; j++) {
                 if (bitmap_atomic_get(bitmap_s, j) == 1) {
-                    interact_set(dbs, i, j);
+                    interact_set(dbs, levels->order_to_level[i], levels->order_to_level[j]);
                 }
             }
         }
@@ -97,7 +97,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     BDDVAR var = mtbddnode_getvariable(node);
 
     if (bitmap_atomic_get(bitmap_v, index) == 0) {
-        atomic_fetch_add(&levels->ref_count[var], 1);
+        atomic_fetch_add(&levels->var_count[levels->level_to_order[var]], 1);
     }
 
     if (mtbdd_isleaf(f)) return;
@@ -139,7 +139,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         BDDVAR var = mtbddnode_getvariable(f);
         if(var >= mtbdd_levelscount()) continue;
 
-        atomic_fetch_add(&levels->var_count[var], 1);
+        atomic_fetch_add(&levels->var_count[levels->level_to_order[var]], 1);
 
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
@@ -167,27 +167,6 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
             levels->isolated_count++;
         }
     }
-
-    for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
-        mtbddnode_setflag(MTBDD_GETNODE(index), 1);
-    }
-
-    sylvan_clear_cache();
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
-
-    for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
-        mtbddnode_setflag(MTBDD_GETNODE(index), 0);
-    }
-
-    sylvan_clear_cache();
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
-
-
-    sylvan_clear_cache();
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
 
     free_aligned(bitmap_s, nvars);
     free_aligned(bitmap_v, nnodes);

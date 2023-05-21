@@ -179,24 +179,24 @@ void sylvan_set_reorder_timelimit(double time_limit)
 TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 {
     reorder_result_t res;
-    for (; s_state->pos < s_state->high; s_state->pos++) {
-        res = CALL(sylvan_varswap, s_state->pos);
-        s_state->size = CALL(llmsset_count_marked, nodes);
-        if (!sylvan_varswap_issuccess(res)) return res;
-        configs.total_num_swap++;
-        if (should_terminate_sifting(&configs)) break;
-        // check the max allowed size growth
-        if ((double) (s_state->size) >= (double) s_state->best_size * (double) configs.max_growth) {
-            s_state->pos++;
-            break;
-        }
-        // update best position
-        if (s_state->size < s_state->best_size) {
-            s_state->best_size = s_state->size;
-            s_state->best_pos = s_state->pos;
-        }
-    }
-    return SYLVAN_REORDER_SUCCESS;
+//    for (; s_state->pos < s_state->high; s_state->pos++) {
+//        res = CALL(sylvan_varswap, s_state->pos);
+//        s_state->size = CALL(llmsset_count_marked, nodes);
+//        if (!sylvan_varswap_issuccess(res)) return res;
+//        configs.total_num_swap++;
+//        if (should_terminate_sifting(&configs)) break;
+//        // check the max allowed size growth
+//        if ((double) (s_state->size) >= (double) s_state->best_size * (double) configs.max_growth) {
+//            s_state->pos++;
+//            break;
+//        }
+//        // update best position
+//        if (s_state->size < s_state->best_size) {
+//            s_state->best_size = s_state->size;
+//            s_state->best_pos = s_state->pos;
+//        }
+//    }
+//    return SYLVAN_REORDER_SUCCESS;
 
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
 
@@ -204,48 +204,64 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
     int isolated;
     int limitSize;
     BDDVAR xIndex;
+    BDDVAR yIndex;
 
-    s_state->size = llmsset_count_marked(nodes);
+    s_state->size = CALL(llmsset_count_marked, nodes);
     xIndex = levels->level_to_order[s_state->pos];
 
-    limitSize = s_state->size = s_state->size - levels->isolated_count;
+    limitSize = s_state->size - levels->isolated_count;
     R = 0;
 
+    // Let <x> be the variable at level <pos>. (s_state->pos)
+    // Let <Ni> be the number of nodes at level i.
+    // Let <n> be the number of levels. (levels->count)
+
+    // Then the size of DD can not be reduced below:
+    // LB(DN) = Nj + ∑ Ni | 0<i<pos
+
+    // The part of the DD above <x> will not change.
+    // The part of the DD below <x> that does not interact with <x> will not change.
+    // The rest may vanish in the best case, except for
+    // the nodes at level <high>, which will not vanish, regardless.
+
+    // x = pos
+    // y = pos+1
+
     // Initialize the upper bound
-    for (BDDVAR y = s_state->high; y > s_state->pos; --y) {
-        BDDVAR yIndex = levels->level_to_order[y];
+    for (BDDVAR y = s_state->high; y > s_state->pos; y--) {
+        yIndex = levels->level_to_order[y];
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) == 1;
-            R += (int) atomic_load_explicit(&levels->var_count[y], memory_order_relaxed) - isolated;
+            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) <= 1;
+            R += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
         }
     }
 
-    for (; s_state->pos <= s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
+//    printf("INIT: R = %d, size = %d, limitSize = %d\n", R, s_state->size, limitSize);
+
+    for (; s_state->pos < s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
         //  Update the upper bound on node decrease
-        BDDVAR yIndex = levels->level_to_order[s_state->pos];
+        xIndex = levels->level_to_order[s_state->pos];
+        yIndex = levels->level_to_order[s_state->pos + 1];
         if (interact_test(levels, xIndex, yIndex)) {
             isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) == 1;
-            R -= (int) atomic_load_explicit(&levels->var_count[s_state->pos], memory_order_relaxed) - isolated;
+            R -= (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
         }
-
-        reorder_result_t res = sylvan_varswap(s_state->pos);
-        s_state->size = llmsset_count_marked(nodes);
-
+        // swap
+        res = CALL(sylvan_varswap, s_state->pos);
+        s_state->size = CALL(llmsset_count_marked, nodes);
         if (!sylvan_varswap_issuccess(res)) return res;
         configs.total_num_swap++;
-
-        // update best position, update it even if the size is the same
-        // because this becomes the relative best closest position to our current position
-        if (s_state->size <= s_state->best_size) {
-            s_state->best_size = s_state->size;
-            s_state->best_pos = s_state->pos;
-        }
-
-        if ((double) (s_state->size) > (double) s_state->size * (double) configs.max_growth) {
+        if (should_terminate_sifting(&configs)) break;
+        // check the max allowed size growth
+        if ((double) (s_state->size) > (double) s_state->best_size * configs.max_growth) {
             ++s_state->pos;
             break;
         }
-        if (should_terminate_sifting(&configs)) break;
+        // update best position
+        if (s_state->size < s_state->best_size) {
+            s_state->best_size = s_state->size;
+            s_state->best_pos = s_state->pos;
+        }
         if (s_state->size < limitSize) limitSize = s_state->size;
     }
     return SYLVAN_REORDER_SUCCESS;
@@ -278,55 +294,58 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t*, s_state)
     int L;  // lower bound on DD size
     int isolated;
     int limitSize;
+    BDDVAR xIndex;
     BDDVAR yIndex;
 
-    s_state->size = llmsset_count_marked(nodes);
+    s_state->size = CALL(llmsset_count_marked, nodes);
     yIndex = levels->level_to_order[s_state->pos];
 
-    /* Initialize the lower bound.
-    ** The part of the DD below <y> will not change.
-    ** The part of the DD above <y> that does not interact with <y> will not
-    ** change. The rest may vanish in the best case, except for
-    ** the nodes at level <low>, which will not vanish, regardless.
-    */
+    // Let <x> be the variable at level <pos>. (s_state->pos)
+    // Let <Ni> be the number of nodes at level i.
+    // Let <n> be the number of levels. (levels->count)
+
+    // Then the size of DD can not be reduced below:
+    // LB(UP) = N0 + ∑ Ni | i<pos<n
+
+    // The part of the DD below <x> will not change.
+    // The part of the DD above <x> that does not interact with <x> will not change.
+    // The rest may vanish in the best case, except for
+    // the nodes at level <low>, which will not vanish, regardless.
+
     limitSize = L = (int) (s_state->size - levels->isolated_count);
-    for (BDDVAR x = s_state->low + 1; x < s_state->pos; ++x) {
-        BDDVAR xIndex = levels->level_to_order[x];
+    for (BDDVAR x = s_state->low + 1; x < s_state->pos; x++) {
+        xIndex = levels->level_to_order[x];
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) == 1;
-            L -= (int) atomic_load_explicit(&levels->var_count[x], memory_order_relaxed) - isolated;
+            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) == 1;
+            L -= (int) atomic_load_explicit(&levels->var_count[xIndex], memory_order_relaxed) - isolated;
         }
     }
     isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) == 1;
-    L -= (int) atomic_load_explicit(&levels->var_count[s_state->pos], memory_order_relaxed) - isolated;
+    L -= (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
 
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
-        reorder_result_t res = sylvan_varswap(s_state->pos - 1);
-        s_state->size = llmsset_count_marked(nodes);
+        res = CALL(sylvan_varswap, s_state->pos - 1);
+        s_state->size = CALL(llmsset_count_marked, nodes);
         if (!sylvan_varswap_issuccess(res)) return res;
-
         configs.total_num_swap++;
-
-        // update the best position, update it even if the size is the same
-        // because this becomes the relative best and closest position to our current position
-        if (s_state->size <= s_state->best_size) {
-            s_state->best_size = s_state->size;
-            s_state->best_pos = s_state->pos;
-        }
-
-        // Update the lower bound
-        BDDVAR xIndex = levels->level_to_order[s_state->pos - 1];
-        if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) == 1;
-            L += (int) atomic_load_explicit(&levels->var_count[s_state->pos], memory_order_relaxed) - isolated;
-        }
-
-        if ((double) (s_state->size) > (double) limitSize * (double) configs.max_growth) {
+        if (should_terminate_sifting(&configs)) break;
+        // check the max allowed size growth
+        if ((double) (s_state->size) > (double) s_state->best_size * configs.max_growth) {
             --s_state->pos;
             break;
         }
-        if (should_terminate_sifting(&configs)) break;
-
+        // update the best position
+        if (s_state->size < s_state->best_size) {
+            s_state->best_size = s_state->size;
+            s_state->best_pos = s_state->pos;
+        }
+        // Update the lower bound
+        xIndex = levels->level_to_order[s_state->pos - 1];
+        yIndex = levels->level_to_order[s_state->pos];
+        if (interact_test(levels, xIndex, yIndex)) {
+            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) == 1;
+            L += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+        }
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
     }
     return SYLVAN_REORDER_SUCCESS;
@@ -366,7 +385,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
     for (size_t level = 0; level < levels->count; ++level) {
         uint32_t var = permutation[level];
         uint32_t pos = mtbdd_order_to_level(var);
-        res = sylvan_siftpos(pos, level);
+        res = CALL(sylvan_siftpos, pos, level);
         if (!sylvan_varswap_issuccess(res)) break;
     }
 
@@ -587,7 +606,7 @@ TASK_IMPL_2(int, sylvan_simple_reorder_impl, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    CALL(interact_var_ref_init, levels);
+    CALL(interact_var_ref_init, levels);
     double t_start_sifting = wctime();
     size_t before_size = CALL(llmsset_count_marked, nodes);
 

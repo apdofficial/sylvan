@@ -23,10 +23,10 @@ typedef struct levels_db {
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-    _Atomic(uint32_t)*  var_count;               // number of nodes per variable
-    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable
+    _Atomic(uint32_t)*  var_count;               // number of nodes per variable (it expects level wise variable index)
+    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable (it expects level wise variable index)
     int                 isolated_count;          // number of isolated projection functions
-    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
+    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (it expects level wise variable index)
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
     size_t              reorder_size_threshold;  // reorder if this size is reached
@@ -74,7 +74,7 @@ TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
 /**
  * @brief Count the number of nodes for a given variable label.
  */
-#define sylvan_count_nodes(var) CALL(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
+#define sylvan_count_nodes(var) CALL(sylvan_count_nodes, level_counts, 0, nodes->table_size)
 
 VOID_TASK_DECL_3(sylvan_init_subtables, atomic_word_t*, size_t, size_t);
 #define sylvan_init_subtables(bitmap_t) CALL(sylvan_init_subtables, bitmap_t, 0, nodes->table_size)
