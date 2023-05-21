@@ -502,32 +502,32 @@ void swap_node(size_t index)
 
     // there are 3 cases to consider:
 
-//    // 1. # of nodes is increased at <var+1> level due to f1 having higher <var> index than f0
-//    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
-//        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[var + 1]], 1);
-//        atomic_fetch_add(&levels->var_count[levels->level_to_order[var + 1]], 1);
-//        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], 1);
-//    }
-//
-//    // 2. # of nodes is increased at <var+1> level due to f0 having higher <var> index than f1
-//    if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
-//        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[var + 1]], 1);
-//        atomic_fetch_add(&levels->var_count[levels->level_to_order[var + 1]], 1);
-//        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f01)]], 1);
-//    }
-//
-//    // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
-//    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
-//        // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
-//        atomic_fetch_add(&levels->var_count[levels->level_to_order[var + 1]], -1);
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], -1);
-//        // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
-//        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], -1);
-//    }
+    // 1. # of nodes is increased at <var+1> level due to f1 having higher <var> index than f0
+    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
+        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
+        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], 1, memory_order_relaxed);
+    }
+
+    // 2. # of nodes is increased at <var+1> level due to f0 having higher <var> index than f1
+    if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
+        // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
+        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f01)]], 1, memory_order_relaxed);
+    }
+
+    // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
+    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
+        // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
+        atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], -1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], -1, memory_order_relaxed);
+        // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], -1, memory_order_relaxed);
+    }
 
     // Create the new high child.
     f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
