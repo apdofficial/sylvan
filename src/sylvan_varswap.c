@@ -170,6 +170,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     size_t y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
     size_t isolated = -(x_isolated + y_isolated);
 
+    //TODO: take case of the implications of swapping the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]) == 0) {
 //        levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
 //        levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
