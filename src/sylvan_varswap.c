@@ -502,8 +502,8 @@ void swap_node(size_t index)
 
     // there are 3 cases to consider:
 
-    // 1. # of nodes is increased at <var+1> level due to f1 having higher <var> index than f0
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
+    // 1. # of nodes is increased at <var+1> level due to f1 having <var> index which is higher than f0
+    if (mtbdd_getvar(f1) == var && var > mtbdd_getvar(f0)) {
         // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
         atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
@@ -511,8 +511,8 @@ void swap_node(size_t index)
         atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], 1, memory_order_relaxed);
     }
 
-    // 2. # of nodes is increased at <var+1> level due to f0 having higher <var> index than f1
-    if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
+    // 2. # of nodes is increased at <var+1> level due to f0 having <var> index which is higher than f1
+    if (mtbdd_getvar(f0) == var && var > mtbdd_getvar(f1)) {
         // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
         atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);

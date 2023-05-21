@@ -204,9 +204,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
     // The rest may vanish in the best case, except for
     // the nodes at level <high>, which will not vanish, regardless.
 
-    // x = pos
-    // y = pos+1
-
     // Initialize the upper bound
     for (BDDVAR y = s_state->high; y > s_state->pos; y--) {
         yIndex = levels->level_to_order[y];
