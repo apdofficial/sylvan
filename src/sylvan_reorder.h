@@ -26,9 +26,9 @@ extern "C" {
 typedef struct sifting_state
 {
     uint32_t pos;
-    size_t size;
+    int size;
     uint32_t best_pos;
-    size_t best_size;
+    int best_size;
     uint32_t low;
     uint32_t high;
 } sifting_state_t;
@@ -118,7 +118,7 @@ TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sylvan_siftdown(state) RUN(sylvan_siftdown, state)
+#define sylvan_siftdown(state) CALL(sylvan_siftdown, state)
 
 TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
 /**
@@ -132,7 +132,7 @@ TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
  *
  * \sideeffect order of variables is changed
  */
-#define sylvan_siftup(state) RUN(sylvan_siftup, state)
+#define sylvan_siftup(state) CALL(sylvan_siftup, state)
 
 TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
 /**
@@ -140,7 +140,7 @@ TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
  * \param var - variable to sift
  * \param targetPos - target position (w.r.t. dynamic variable reordering)
  */
-#define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
+#define sylvan_siftpos(pos, target) CALL(sylvan_siftpos, pos, target)
 
 TASK_DECL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, uint32_t);
 /**
@@ -161,13 +161,12 @@ TASK_DECL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, uint32_t);
 */
 #define sylvan_reorder_impl(low, high)  RUNEX(sylvan_reorder_impl, low, high)
 
-
-VOID_TASK_DECL_0(sylvan_reduce_heap);
 /**
  * @brief Trigger blocking dynamic variable reordering.
  * @details This function performs stop-the-world operation similar to garbage collection.
  */
 void sylvan_reduce_heap();
+void sylvan_simple_reduce_heap();
 
 void sylvan_test_reduce_heap();
 

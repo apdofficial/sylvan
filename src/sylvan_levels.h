@@ -25,7 +25,7 @@ typedef struct levels_db {
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
     _Atomic(uint32_t)*  var_count;               // number of nodes per variable
     _Atomic(uint32_t)*  ref_count;               // number of internal references per variable
-    _Atomic(size_t)     isolated_count;          // number of isolated projection functions
+    int                 isolated_count;          // number of isolated projection functions
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
@@ -33,33 +33,12 @@ typedef struct levels_db {
     size_t              reorder_count;           // number of reordering calls
 } *levels_t;
 
-typedef struct bounds_state
-{
-    int                 isolated;               // flag to indicate if the current <var> is isolated projection function (<var>.ref.count <= 1)
-    int                 bound;                  // lower/ upper bound on the number of nodes
-    int                 limit;                  // limit on the number of nodes
-} bounds_state_t;
-
-/**
- * @brief Check if a variable is isolated. ( isolated => var.ref.count == 1)
- */
-#define levels_is_isolated(lvl, var) (levels_ref_count_load(lvl, var) == 1)
-#define levels_isolated_count_load(lvl) atomic_load_explicit(&lvl->isolated_count, memory_order_relaxed)
-#define levels_isolated_count_incr(lvl) atomic_fetch_add(&lvl->isolated_count, 1)
-#define levels_isolated_count_add(lvl, val) atomic_fetch_add(&lvl->isolated_count, val)
-#define levels_isolated_count_set(lvl, new_v) size_t old_v__ = levels_isolated_count_load(lvl); \
-                                                atomic_compare_exchange_strong(&lvl->isolated_count, &old_v__, new_v)
-
-#define levels_var_count_add(lvl, val) atomic_fetch_add(&lvl->var_count[var], val)
-#define levels_var_count_load(lvl, var) atomic_load(&lvl->var_count[var])
-#define levels_var_count_incr(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
-#define levels_var_count_decr(lvl, var) atomic_fetch_add(&lvl->var_count[var], -1)
-
-#define levels_ref_count_add(lvl, val) atomic_fetch_add(&lvl->ref_count[index], val)
-#define levels_ref_count_load(lvl, index) atomic_load(&lvl->ref_count[index])
-#define levels_ref_count_incr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
-#define levels_ref_count_decr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], -1)
-
+//#define levels_var_count_load(lvl, var) atomic_load(&lvl->var_count[var])
+//#define levels_var_count_incr(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
+//
+//#define levels_ref_count_load(lvl, index) atomic_load(&lvl->ref_count[index])
+//#define levels_ref_count_incr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
+//
 
 /**
  * Index to first node in phase 2 mark bitmap
@@ -89,16 +68,16 @@ VOID_TASK_DECL_4(sylvan_count_levelnodes, _Atomic(size_t)*, _Atomic(size_t)*, si
  * Fortunately, we only do this once per call to dynamic variable reordering.
  * \param level_counts array into which the result is stored
  */
-#define sylvan_count_levelnodes(level_counts, leaf_count) RUN(sylvan_count_levelnodes, level_counts, leaf_count, 0, nodes->table_size)
+#define sylvan_count_levelnodes(level_counts, leaf_count) CALL(sylvan_count_levelnodes, level_counts, leaf_count, 0, nodes->table_size)
 
 TASK_DECL_3(size_t, sylvan_count_nodes, BDDVAR, size_t, size_t);
 /**
  * @brief Count the number of nodes for a given variable label.
  */
-#define sylvan_count_nodes(var) RUN(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
+#define sylvan_count_nodes(var) CALL(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
 
 VOID_TASK_DECL_3(sylvan_init_subtables, atomic_word_t*, size_t, size_t);
-#define sylvan_init_subtables(bitmap_t) RUN(sylvan_init_subtables, bitmap_t, 0, nodes->table_size)
+#define sylvan_init_subtables(bitmap_t) CALL(sylvan_init_subtables, bitmap_t, 0, nodes->table_size)
 
 /**
  * @brief Get the number of levels

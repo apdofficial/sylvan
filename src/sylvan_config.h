@@ -48,10 +48,10 @@
 #define SYLVAN_REORDER_MAX_SWAPS	    10000
 #define SYLVAN_REORDER_GROWTH	        1.2f
 #define SYLVAN_REORDER_NODES_THRESHOLD	16
-#define SYLVAN_REORDER_TIME_LIMIT_MS	(1 * 30 * 1000)     // 30 seconds
-#define SYLVAN_REORDER_FIRST_REORDER	4004	            // 4 for the constants
+#define SYLVAN_REORDER_TIME_LIMIT_MS	(1 * 15 * 1000)     // 15 seconds
+#define SYLVAN_REORDER_FIRST_REORDER	4002	            // 2 for the constants
 #define SYLVAN_REORDER_SIZE_RATIO	    2
-#define SYLVAN_REORDER_LIMIT	        10                  // maximum number of reordering calls allowed
+#define SYLVAN_REORDER_LIMIT	        20                  // maximum number of reordering calls allowed
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
   *

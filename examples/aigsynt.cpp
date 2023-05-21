@@ -547,7 +547,6 @@ VOID_TASK_0(parse)
     if (verbose) {
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
     }
-    sylvan_reduce_heap();
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -643,7 +642,7 @@ VOID_TASK_0(parse)
     mtbdd_protect(&OldUnsafe);
     mtbdd_protect(&Step);
 
-
+//    sylvan_test_reduce_heap();
 
     int iteration = 0;
 
@@ -750,8 +749,6 @@ int main(int argc, char **argv)
     lace_start(1, 1000000);
 
 
-    // Init Sylvan
-    // Give 1 GB memory
     sylvan_set_limits(2LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();

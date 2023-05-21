@@ -24,15 +24,6 @@ static double t_start;
 #define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
-void print_bits(unsigned int num)
-{
-   for(size_t bit=0;bit<(sizeof(unsigned int) * 8); bit++)
-   {
-      printf("%i ", num & 0x01);
-      num = num >> 1;
-   }
-}
-
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
 {
@@ -611,24 +602,24 @@ TASK_0(int, test_ref_count)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-//    printf("test_varswap\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
-//    printf("test_varswap_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
-//    printf("test_varswap_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-//    printf("test_sift_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-//    printf("test_sift_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-//    printf("test_sift_pos\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
-//    printf("test_reorder_perm\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
-//    printf("test_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
-//    printf("test_map_reorder\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    printf("test_varswap\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    printf("test_varswap_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    printf("test_varswap_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    printf("test_sift_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_sift_pos\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+    printf("test_reorder_perm\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    printf("test_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    printf("test_map_reorder\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
     printf("test_var_count\n");

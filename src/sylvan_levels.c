@@ -154,8 +154,8 @@ void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
     unsigned int i = 1;
     unsigned int j = 2;
     while (i < levels->count) {
-        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i - 1])];
-        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[mtbdd_level_to_order(levels_arr[i])];
+        long p = levels_arr[i - 1] == -1 ? -1 : (long) level_counts[levels->level_to_order[levels_arr[i - 1]]];
+        long q = levels_arr[i] == -1 ? -1 : (long) level_counts[levels->level_to_order[levels_arr[i]]];
         if (p < q) {
             int t = levels_arr[i];
             levels_arr[i] = levels_arr[i - 1];
@@ -191,16 +191,9 @@ VOID_TASK_IMPL_4(sylvan_count_levelnodes, _Atomic (size_t)*, arr, _Atomic (size_
     const size_t end = first + count;
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) {
-            printf("leaf found\n");
-            atomic_fetch_add(leaf_count, 1);
-            continue; // a leaf
-        }
         tmp[mtbddnode_getvariable(node)]++; // update the variable
     }
-    for (i = 0; i < levels->count; i++) {
-        atomic_fetch_add(&arr[i], tmp[i]);
-    }
+    for (i = 0; i < levels->count; i++)  atomic_fetch_add(&arr[i], tmp[i]);
 }
 
 TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, count)

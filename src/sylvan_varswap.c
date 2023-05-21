@@ -43,6 +43,13 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_r
 */
 #define sylvan_varswap_p2(var, result) CALL(sylvan_varswap_p2, var, 0, nodes->table_size, result)
 
+VOID_TASK_DECL_4(sylvan_varswap_p3, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *);
+/*!
+   \brief Adjacent variable swap phase 3
+   \details Rehash <va> and <var+1> nodes.
+*/
+#define sylvan_varswap_p3(var, result) CALL(sylvan_varswap_p3, var, 0, nodes->table_size, result)
+
 void sylvan_varswap_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
     assert(buf_len >= 100);
@@ -166,10 +173,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     ** two functions again. This is done to eliminate the isolated
     ** projection functions from the node count.
     */
-    size_t isolated = -(levels_is_isolated(levels, pos) +
-                        levels_is_isolated(levels, pos + 1));
+    size_t x_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos]], memory_order_relaxed) == 1;
+    size_t y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
+    size_t isolated = -(x_isolated + y_isolated);
 
-    if (interact_test(levels, pos, pos + 1) == 0) {
+    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]) == 0) {
         levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
         levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
         uint32_t save = levels->level_to_order[pos];
@@ -179,7 +187,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     }
 
     // ensure that the cache is cleared
-    sylvan_clear_cache();
+    CALL(sylvan_clear_cache);
 
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
@@ -229,8 +237,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         }
     }
 
-    isolated += levels_is_isolated(levels, pos) + levels_is_isolated(levels, pos + 1);
-    levels_isolated_count_add(levels, isolated);
+    x_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos]], memory_order_relaxed) == 1;
+    y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
+    isolated += x_isolated + y_isolated;
+    levels->isolated_count += isolated;
 
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
     levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
@@ -238,8 +248,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     levels->level_to_order[pos] = levels->level_to_order[pos + 1];
     levels->level_to_order[pos + 1] = save;
 
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
+    CALL(sylvan_clear_and_mark);
+    CALL(sylvan_rehash_all);
 
     return result;
 }
@@ -276,16 +286,55 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
+        if (mtbddnode_isleaf(node)) {
+            printf("sylvan_varswap_p0: leaf\n");
+            continue; // a leaf
+        }
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
             llmsset_clear_one(nodes, first);
         }
     }
+}
+#endif
+
+/**
+ * Implementation of the third phase of variable swapping.
+ * Rehash all <var> and <var+1> nodes.
+ */
+VOID_TASK_IMPL_4(sylvan_varswap_p3,
+                 uint32_t, var, /** variable label **/
+                 uint64_t, first, /** index in the unique table **/
+                 uint64_t, count, /** index in the unique table **/
+                 _Atomic (reorder_result_t)*, result)
+{
+    // divide and conquer (if count above BLOCKSIZE)
+    if (count > BLOCKSIZE) {
+        size_t split = count / 2;
+        SPAWN(sylvan_varswap_p0, var, first, split, result);
+        CALL(sylvan_varswap_p0, var, first + split, count - split, result);
+        SYNC(sylvan_varswap_p0);
+        return;
+    }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        mtbddnode_t node = MTBDD_GETNODE(first);
+        if (mtbddnode_isleaf(node)) continue; // a leaf
+        uint32_t nvar = mtbddnode_getvariable(node);
+        if (nvar == var || nvar == (var + 1)) {
+            llmsset_rehash_bucket(nodes, first);
+        }
+    }
 
 }
-
-#endif
 
 /**
  * Implementation of the first phase of variable swapping.
@@ -326,7 +375,10 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
+        if (mtbddnode_isleaf(node)) {
+            printf("sylvan_varswap_p1: leaf\n");
+            continue; // a leaf
+        }
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar >= mtbdd_levelscount()) continue;  // not registered <var>
 
@@ -442,7 +494,10 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         if (*result != SYLVAN_REORDER_SUCCESS) return; // the table is full
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
+        if (mtbddnode_isleaf(node)) {
+            printf("sylvan_varswap_p2: leaf\n");
+            continue; // a leaf
+        }
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
         if (mtbddnode_getvariable(node) >= mtbdd_levelscount()) continue; // not registered <var>
         if (mtbddnode_ismapnode(node)) {
@@ -489,28 +544,33 @@ void swap_node(size_t index)
         }
     }
 
+    // there are 3 cases to consider:
+
+    // 1. # of nodes is increased at <var+1> level due to f1 having higher <var> index than f0
     if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
         // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_incr(levels, var + 1);
-        levels_ref_count_incr(levels, var + 1);
-        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
-        levels_ref_count_incr(levels, mtbdd_getvar(f10));
+        atomic_fetch_add(&levels->ref_count[var + 1], 1);
+        atomic_fetch_add(&levels->var_count[var + 1], 1);
+        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
+        atomic_fetch_add(&levels->ref_count[mtbdd_getvar(f10)], 1);
     }
 
+    // 2. # of nodes is increased at <var+1> level due to f0 having higher <var> index than f1
     if (mtbdd_getvar(f1) > var && mtbdd_getvar(f0) == var) {
         // this is the case when # of nodes is increased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_incr(levels, var + 1);
-        levels_ref_count_incr(levels, var + 1);
-        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be after the swap so we increase the ref count
-        levels_ref_count_incr(levels, mtbdd_getvar(f01));
+        atomic_fetch_add(&levels->ref_count[var + 1], 1);
+        atomic_fetch_add(&levels->var_count[var + 1], 1);
+        // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
+        atomic_fetch_add(&levels->ref_count[mtbdd_getvar(f01)], 1);
     }
 
+    // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
     if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
         // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
-        levels_var_count_decr(levels, var + 1);
-        levels_ref_count_decr(levels, mtbdd_getvar(f0));
-        // now we have one less node at level <var+1> pointing to f10 / F01 so we decrease the ref count
-        levels_ref_count_decr(levels, mtbdd_getvar(f10));
+        atomic_fetch_add(&levels->var_count[var + 1], -1);
+        atomic_fetch_add(&levels->ref_count[mtbdd_getvar(f0)], -1);
+        // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
+        atomic_fetch_add(&levels->ref_count[mtbdd_getvar(f10)], -1);
     }
 
     // Create the new high child.

@@ -202,12 +202,6 @@ TASK_DECL_1(size_t, llmsset_count_marked, llmsset_t);
 #define llmsset_count_marked(dbs) RUN(llmsset_count_marked, dbs)
 
 /**
- * Retrieve number of marked buckets with terminal nodes.
- */
-TASK_DECL_1(size_t, llmsset_count_marked_constants, llmsset_t);
-#define llmsset_count_marked_constants(dbs) RUN(llmsset_count_marked_constants, dbs)
-
-/**
  * During garbage collection, this method calls the destroy callback
  * for all 'custom' data that is not kept.
  */
