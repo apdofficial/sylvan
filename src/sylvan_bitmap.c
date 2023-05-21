@@ -193,7 +193,7 @@ size_t bitmap_atomic_prev(atomic_word_t *words, size_t pos)
         // there exist some predecessor 1 bit in the word, thus return the pos directly
         return get_first_lsb_one_bit_pos(word, word_idx);
     } else {
-        // the current word does not contain any successor 1-bits,
+        // the current word does not contain any predecessor 1-bits,
         // thus now find the next word that is not 0 and return the first 1-bit lsb pos
         word_idx--;
         return bitmap_atomic_last_from(words, word_idx);
