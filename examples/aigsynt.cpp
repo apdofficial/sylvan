@@ -750,7 +750,7 @@ int main(int argc, char **argv)
     lace_start(8, 1000000);
 
 
-    sylvan_set_limits(4LL << 30, 1, 8);
+    sylvan_set_limits(8LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

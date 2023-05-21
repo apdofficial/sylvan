@@ -44,7 +44,7 @@ void interact_update(levels_t dbs, atomic_word_t *bitmap_s)
             bitmap_atomic_clear(bitmap_s, i);
             for (j = i + 1; j < dbs->bitmap_i_nrows; j++) {
                 if (bitmap_atomic_get(bitmap_s, j) == 1) {
-                    interact_set(dbs, levels->order_to_level[i], levels->order_to_level[j]);
+                    interact_set(dbs, levels->level_to_order[i], levels->level_to_order[j]);
                 }
             }
         }
@@ -97,7 +97,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     BDDVAR var = mtbddnode_getvariable(node);
 
     if (bitmap_atomic_get(bitmap_v, index) == 0) {
-        atomic_fetch_add(&levels->var_count[levels->level_to_order[var]], 1);
+        atomic_fetch_add(&levels->ref_count[levels->level_to_order[var]], 1);
     }
 
     if (mtbdd_isleaf(f)) return;
@@ -145,6 +145,8 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 
         // set support bitmap, <var> is on the support of <f>
         bitmap_atomic_set(bitmap_s, var);
+        if (mtbddnode_isleaf(f)) continue;
+
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new depth-first search from it.

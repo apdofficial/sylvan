@@ -350,9 +350,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 void sylvan_test_reduce_heap()
 {
     if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
-//        RUNEX(sylvan_reorder_stop_world);
-        RUNEX(sylvan_reorder_impl, 0, 0);
-
+        RUNEX(sylvan_reorder_stop_world);
+//        RUNEX(sylvan_reorder_impl, 0, 0);
     }
 }
 
@@ -550,7 +549,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high
     if (high == 0) high = levels->count - 1;
 
     // parallel
-    SPAWN(interact_var_ref_init, levels);
+    CALL(interact_var_ref_init, levels);
     double t_start_sifting = wctime();
     size_t before_size = CALL(llmsset_count_marked, nodes);
 
@@ -575,8 +574,6 @@ TASK_IMPL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high
     s_state.best_size = s_state.size;
     s_state.low = low;
     s_state.high = high;
-
-    SYNC(interact_var_ref_init);
 
     for (int i = 0; i < (int) levels->count; i++) {
         int lvl = sorted_levels_counts[i];
