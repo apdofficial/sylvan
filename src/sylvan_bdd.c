@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include <avl.h>
+#include "sylvan_reorder.h"
 
 static int granularity = 1; // default
 

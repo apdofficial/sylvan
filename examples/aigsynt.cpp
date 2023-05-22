@@ -212,19 +212,11 @@ int *level_to_var;
 #define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
-    if (dynamic_reorder) {
-        size_t used, total;
-        sylvan_table_usage(&used, &total);
-        if (used > total * 0.85) {
-            sylvan_reduce_heap();
-        }
-    }
+    sylvan_test_reduce_heap();
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a] / 2;
     int rgt = gatergt[a] / 2;
-//    if (verbose) {
-//        INFO("Going to make gate %d with lhs %d (%d) and rhs %d (%d)\n", a, lft, lookup[lft], rgt, lookup[rgt]);
-//    }
+
     MTBDD l, r;
     if (lft == 0) {
         l = sylvan_false;
@@ -246,6 +238,7 @@ VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*
     if (gatergt[a] & 1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
+    sylvan_test_reduce_heap();
 }
 
 VOID_TASK_0(parse)
@@ -287,6 +280,7 @@ VOID_TASK_0(parse)
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
     sylvan_newlevels(M + 1);
+    INFO("Created %llu variables\n", M + 1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", (size_t) I, (size_t) L, (size_t) A);
 
@@ -302,7 +296,7 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-    // INFO("Now reading %zu latches\n", L);
+    INFO("Now reading %llu latches\n", L);
 
     for (uint64_t l = 0; l < L; l++) {
         latches[l] = read_uint();
@@ -311,14 +305,14 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-    // INFO("Now reading %zu outputs\n", O);
+    INFO("Now reading %llu outputs\n", O);
 
     for (uint64_t o = 0; o < O; o++) {
         outputs[o] = read_uint();
         read_wsnl();
     }
 
-    // INFO("Now reading %zu and-gates\n", A);
+    INFO("Now reading %llu and-gates\n", A);
 
     int gatelhs[A];
     int gatelft[A];
@@ -397,7 +391,7 @@ VOID_TASK_0(parse)
             }
         }
 
-        boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
+//        boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
         std::vector<Vertex> inv_perm(boost::num_vertices(g));
 
         boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g),
@@ -486,25 +480,28 @@ VOID_TASK_0(parse)
             for (int j = 0; j < dm_ncols(m); j++) {
                     if (dm_is_set(m, i, j)) add_edge(i, dm_nrows(m) + j, g);
             }
-    }*/
+    }
 
-//    for (uint64_t a=0; a<A; a++) {
-//        MTBDD lhs = sylvan_ithvar(read_uint()/2);
-//        mtbdd_refs_push(lhs);
-//        read_ws();
-//        int left = read_uint();
-//        read_ws();
-//        int right = read_uint();
-//        read_wsnl();
-//        MTBDD lft = left&1 ? sylvan_nithvar(left/2) : sylvan_ithvar(left/2);
-//        mtbdd_refs_push(lft);
-//        MTBDD rgt = right&1 ? sylvan_nithvar(right/2) : sylvan_ithvar(right/2);
-//        mtbdd_refs_push(rgt);
-//        MTBDD rhs = sylvan_and(lft, rgt);
-//        mtbdd_refs_push(rhs);
-//        gates[a] = sylvan_equiv(lhs, rhs);
-//        mtbdd_ref(gates[a]);
-//    }
+
+    for (uint64_t a=0; a<A; a++) {
+        MTBDD lhs = sylvan_ithvar(read_uint()/2);
+        mtbdd_refs_push(lhs);
+        read_ws();
+        int left = read_uint();
+        read_ws();
+        int right = read_uint();
+        read_wsnl();
+        MTBDD lft = left&1 ? sylvan_nithvar(left/2) : sylvan_ithvar(left/2);
+        mtbdd_refs_push(lft);
+        MTBDD rgt = right&1 ? sylvan_nithvar(right/2) : sylvan_ithvar(right/2);
+        mtbdd_refs_push(rgt);
+        MTBDD rhs = sylvan_and(lft, rgt);
+        mtbdd_refs_push(rhs);
+        gates[a] = sylvan_equiv(lhs, rhs);
+        mtbdd_ref(gates[a]);
+    }
+
+     */
 
 
     MTBDD Xc = sylvan_set_empty(), Xu = sylvan_set_empty();
@@ -544,7 +541,9 @@ VOID_TASK_0(parse)
 
     MTBDD gates[A];
     for (uint64_t a = 0; a < A; a++) gates[a] = sylvan_invalid;
-    for (uint64_t a = 0; a < A; a++) make_gate(a, gates, gatelhs, gatelft, gatergt, lookup);
+    for (uint64_t a = 0; a < A; a++) {
+        make_gate(a, gates, gatelhs, gatelft, gatergt, lookup);
+    }
 
     if (verbose) {
         INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
@@ -626,6 +625,7 @@ VOID_TASK_0(parse)
     Unsafe = sylvan_forall(Unsafe, Xc);
     Unsafe = sylvan_exists(Unsafe, Xu);
 
+
 #if 0
     MTBDD supp = sylvan_support(Unsafe);
     while (supp != sylvan_set_empty()) {
@@ -643,34 +643,20 @@ VOID_TASK_0(parse)
     mtbdd_protect(&OldUnsafe);
     mtbdd_protect(&Step);
 
-    int iteration = 0;
+//    sylvan_test_reduce_heap();
 
+    int iteration = 0;
 
     while (Unsafe != OldUnsafe) {
         OldUnsafe = Unsafe;
         iteration++;
-//        if (verbose) {
-//            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
-//        }
+        if (verbose) {
+            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
+        }
         INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
-//        INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
         Step = sylvan_compose(Unsafe, CV);
-//         INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
         Step = sylvan_forall(Step, Xc);
-        // INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
         Step = sylvan_exists(Step, Xu);
-//         INFO("Hello we are %zu size\n", sylvan_nodecount(Step));
-
-
-//        MTBDD supp = sylvan_support(Step);
-//        while (supp != sylvan_set_empty()) {
-//            printf("%d ", sylvan_set_first(supp));
-//            supp = sylvan_set_next(supp);
-//        }
-//        printf("\n");
-//        sylvan_print(Step);
-//        printf("\n");
-
 
         // check if initial state in Step (all 0)
         MTBDD Check = Step;
@@ -683,10 +669,7 @@ VOID_TASK_0(parse)
             }
         }
 
-//        INFO("Sizes: %zu and %zu\n", sylvan_nodecount(Unsafe), sylvan_nodecount(Step));
-//        INFO("Time to OR\n");
         Unsafe = sylvan_or(Unsafe, Step);
-        // INFO("Welcome baque\n");
     }
 
     INFO("Thank you for using me. I realize that.\n");
@@ -706,23 +689,22 @@ VOID_TASK_0(gc_mark)
 
 VOID_TASK_0(gc_start)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: str: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
 VOID_TASK_0(gc_end)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: end: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
-static size_t prev_size = 0;
+static int prev_size = 0;
 VOID_TASK_0(reordering_start)
 {
     terminate_reordering = 0;
-    sylvan_gc();
     size_t size = llmsset_count_marked(nodes);
     prev_size = size;
     INFO("RE: str: %zu size\n", size);
@@ -731,8 +713,8 @@ VOID_TASK_0(reordering_start)
 VOID_TASK_0(reordering_progress)
 {
     size_t size = llmsset_count_marked(nodes);
-    // we allow growth of at most 5%
-    if (size >= prev_size * 1.05) terminate_reordering = 1;
+    // we allow growth of at most 20%
+    if (size >= prev_size * 1.2) terminate_reordering = 1;
     else prev_size = size;
     INFO("RE: prg: %zu size\n", size);
 }
@@ -741,6 +723,7 @@ VOID_TASK_0(reordering_end)
 {
     size_t size = llmsset_count_marked(nodes);
     INFO("RE: end: %zu size\n", size);
+    sylvan_gc();
 }
 
 int should_reordering_terminate()
@@ -764,26 +747,22 @@ int main(int argc, char **argv)
      * Second: start all worker threads with default settings.
      * Third: setup local variables using the LACE_ME macro.
      */
-    lace_start(workers, 1000000);
+    lace_start(8, 1000000);
 
-
-    // Init Sylvan
-    // Give 1 GB memory
-    sylvan_set_limits(2LL << 30, 1, 8);
+    sylvan_set_limits(8LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
+    sylvan_gc_enable();
 
-    sylvan_set_reorder_maxswap(10000);
-    sylvan_set_reorder_maxvar(500);
-    sylvan_set_reorder_threshold(128);
+    sylvan_set_reorder_nodes_threshold(32);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 60 * 1000);
+    sylvan_set_reorder_timelimit_sec(30);
 
-    sylvan_re_hook_prere(TASK(reordering_start));
-    sylvan_re_hook_postre(TASK(reordering_end));
-    sylvan_re_hook_progre(TASK(reordering_progress));
-    sylvan_re_hook_termre(should_reordering_terminate);
+//    sylvan_re_hook_prere(TASK(reordering_start));
+//    sylvan_re_hook_postre(TASK(reordering_end));
+//    sylvan_re_hook_progre(TASK(reordering_progress));
+//    sylvan_re_hook_termre(should_reordering_terminate);
 
     // Set hooks for logging garbage collection
     if (verbose) {
@@ -792,7 +771,7 @@ int main(int argc, char **argv)
     }
 
     if (model_filename == NULL) {
-        Abort("stream not yet supported\n");
+        Abort("Invalid file name.\n");
     }
 
     int fd = open(model_filename, O_RDONLY);

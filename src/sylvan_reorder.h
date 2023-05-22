@@ -26,9 +26,9 @@ extern "C" {
 typedef struct sifting_state
 {
     uint32_t pos;
-    size_t size;
+    int size;
     uint32_t best_pos;
-    size_t best_size;
+    int best_size;
     uint32_t low;
     uint32_t high;
 } sifting_state_t;
@@ -36,155 +36,136 @@ typedef struct sifting_state
 typedef int (*re_term_cb)();
 
 /**
- * Callback type
+ * @brief Callback type
  */
 LACE_TYPEDEF_CB(void, re_hook_cb);
 
 /**
- * Add a hook that is called before dynamic variable reordering begins.
+ * @brief Add a hook that is called before dynamic variable reordering begins.
  */
 void sylvan_re_hook_prere(re_hook_cb callback);
 
 /**
- * Add a hook that is called after dynamic variable reordering is finished.
+ * @brief Add a hook that is called after dynamic variable reordering is finished.
  */
 void sylvan_re_hook_postre(re_hook_cb callback);
 
 /**
- * Add a hook that is called after dynamic variable reordering managed to reduce number of nodes.
+ * @brief Add a hook that is called after dynamic variable reordering managed to reduce number of nodes.
  */
 void sylvan_re_hook_progre(re_hook_cb callback);
 
 /**
- * Add a hook that is called regularly to see whether sifting should terminate.
+ * @brief Add a hook that is called regularly to see whether sifting should terminate.
  */
 void sylvan_re_hook_termre(re_term_cb callback);
 
 // opaque type
 typedef struct reorder_config *reorder_config_t;
 
+/**
+ * @brief Initialize the dynamic variable reordering.
+ */
 void sylvan_init_reorder(void);
 
+/**
+ * @brief Quit the dynamic variable reordering.
+ */
 void sylvan_quit_reorder(void);
 
+/**
+ * @brief Get the reorder configuration.
+ */
 reorder_config_t sylvan_get_reorder_config();
 
 /**
  * @brief Set threshold for the number of nodes per level to consider during the reordering.
  * @details If the number of nodes per level is less than the threshold, the level is skipped during the reordering.
- *         The default value is 32.
  * @param threshold The threshold for the number of nodes per level.
 */
-void sylvan_set_reorder_threshold(uint32_t threshold);
+void sylvan_set_reorder_nodes_threshold(uint32_t threshold);
 
 /**
  * @brief Set the maximum growth coefficient.
  * @details The maximum growth coefficient is used to calculate the maximum growth of the number of nodes during the reordering.
- *        The default value is 1.2. If the number of nodes grows more than the maximum growth coefficient , sift up/down is terminated.
+ *        If the number of nodes grows more than the maximum growth coefficient , sift up/down is terminated.
  * @param max_growth The maximum growth coefficient.
 */
 void sylvan_set_reorder_maxgrowth(float max_growth);
 
 /**
  * @brief Set the maximum number of swaps per sifting.
- * @details The default value is 10000.
  * @param max_swap The maximum number of swaps per sifting.
 */
 void sylvan_set_reorder_maxswap(uint32_t max_swap);
 
 /**
  * @brief Set the maximum number of vars swapped per sifting.
- * @details The default value is 2000.
  * @param max_var The maximum number of vars swapped per sifting.
-*/
+ */
 void sylvan_set_reorder_maxvar(uint32_t max_var);
 
 /**
- * @brief Set the time limit for the reordering.
- * @details The default value is 50000 milliseconds.
+ * @brief Set the time limit in minutes for the reordering.
  * @param time_limit The time limit for the reordering.
-*/
-void sylvan_set_reorder_timelimit(double time_limit);
-
-TASK_DECL_1(varswap_t, sylvan_siftdown, sifting_state_t*);
-/**
- * \brief Sift given variable up from its current level to the target level.
- *
- * \param var - variable to sift up
- * \param high - target position
- * \param curSize - pointer to current size of the bdd
- * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestPos - pointer to best position of the variable (w.r.t. dynamic variable reordering)
- *
- * \sideeffect order of variables is changed
  */
-#define sylvan_siftdown(state) RUN(sylvan_siftdown, state)
+void sylvan_set_reorder_timelimit_min(double time_limit);
 
-TASK_DECL_1(varswap_t, sylvan_siftup, sifting_state_t*);
 /**
- * \brief Sift given variable down from its current level to the target level.
+ * @brief Set the time limit in seconds for the reordering.
+ * @param time_limit The time limit for the reordering.
+ */
+void sylvan_set_reorder_timelimit_sec(double time_limit);
+
+/**
+ * @brief Set the time limit in milliseconds for the reordering.
+ * @param time_limit The time limit for the reordering.
+ */
+void sylvan_set_reorder_timelimit_ms(double time_limit);
+
+/**
+ * @brief Sift given variable up from its current level to the target level.
+ * @sideeffect order of variables is changed
+ */
+TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
+
+/**
+ * @brief Sift given variable down from its current level to the target level.
+ * @sideeffect order of variables is changed
+ */
+TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
+
+/**
+ * @brief Sift a variable to its best level.
+ * @param var - variable to sift
+ * @param targetPos - target position (w.r.t. dynamic variable reordering)
+ */
+TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
+
+/**
+ * @brief Reduce the heap size in the entire forest.
  *
- * \param var - variable to sift down
- * \param low - target level
- * \param curSize - pointer to current size of the bdd
- * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestPos - pointer to best position of the variable (w.r.t. dynamic variable reordering)
+ * @details Implementation of Rudell's sifting algorithm.
+ * This function performs stop-the-world operation similar to garbage collection.
+ * It proceeds as follows:
+ * 1. Order all the variables according to the number of entries in each unique table.
+ * 2. Sift the variable up and down, remembering each time the total size of the bdd size.
+ * 3. Select the best permutation.
+ * 4. Repeat 2 and 3 for all variables in given range.
  *
- * \sideeffect order of variables is changed
+ * @param low - the lowest position to sift
+ * @param high - the highest position to sift
+ *
+ * @sideeffect order of variables is changed, mappings level -> order and order -> level are updated
  */
-#define sylvan_siftup(state) RUN(sylvan_siftup, state)
+void sylvan_reduce_heap();
 
-TASK_DECL_2(varswap_t, sylvan_siftpos, uint32_t, uint32_t);
 /**
- * \brief Sift a variable to its best level.
- * \param var - variable to sift
- * \param targetPos - target position (w.r.t. dynamic variable reordering)
+ * @brief Maybe reduce the heap size in the entire forest.
  */
-#define sylvan_siftpos(pos, target) RUN(sylvan_siftpos, pos, target)
+void sylvan_test_reduce_heap();
 
-TASK_DECL_2(varswap_t, sylvan_reorder_impl, uint32_t, uint32_t);
-/**
-      @brief Reduce the heap size in the entire forest.
-
-      @details Implementation of Rudell's sifting algorithm.
-        <ol>
-        <li> Order all the variables according to the number of entries
-        in each unique table.
-        <li> Sift the variable up and down, remembering each time the
-        total size of the bdd size.
-        <li> Select the best permutation.
-        <li> Repeat 2 and 3 for all variables in given range.
-        </ol>
-
-      @param low - the lowest position to sift
-      @param high - the highest position to sift
-*/
-#define sylvan_reorder_impl(low, high)  RUN(sylvan_reorder_impl, low, high)
-
-
-VOID_TASK_DECL_0(sylvan_reduce_heap);
-/**
- * @brief Trigger blocking dynamic variable reordering.
- * @details This function performs stop-the-world operation similar to garbage collection.
- */
-#define sylvan_reduce_heap() (RUN(sylvan_reduce_heap))
-
-/**
-      @brief Reduce the heap size in the entire forest.
-
-      @details Implementation of Rudell's sifting algorithm.
-        <ol>
-        <li> Order all the variables according to the number of entries
-        in each unique table.
-        <li> Sift the variable up and down, remembering each time the
-        total size of the bdd size.
-        <li> Select the best permutation.
-        <li> Repeat 2 and 3 for all variables in given range.
-        </ol>
-*/
-#define sylvan_reorder_all()  sylvan_reorder_impl(0, 0)
-
-TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
+TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
 /**
   @brief Reorder the variables in the BDDs according to the given permutation.
 
@@ -193,7 +174,7 @@ TASK_DECL_1(varswap_t, sylvan_reorder_perm, const uint32_t*);
   of the array should be equal or greater to the number of variables
   currently in use.
  */
-#define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
+#define sylvan_reorder_perm(permutation)  RUNEX(sylvan_reorder_perm, permutation)
 
 #ifdef __cplusplus
 }

@@ -26,6 +26,7 @@
 #include <sylvan_refs.h>
 #include <sylvan_sl.h>
 #include <sha2.h>
+#include "sylvan_reorder.h"
 
 /* Primitives */
 int
@@ -469,6 +470,32 @@ _mtbdd_makenode_exit(void)
 }
 
 MTBDD
+_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+{
+    // Normalization to keep canonicity
+    // low will have no mark
+    MTBDD result = low & mtbdd_complement;
+    low ^= result;
+    high ^= result;
+
+    struct mtbddnode n;
+    mtbddnode_makenode(&n, var, low, high);
+
+    int created;
+    uint64_t index = llmsset_lookup(nodes, n.a, n.b, &created);
+
+    mtbddnode_makenode(&n, var, low, high);
+    index = llmsset_lookup(nodes, n.a, n.b, &created);
+    if (index == 0) return mtbdd_invalid;
+
+    if (created) sylvan_stats_count(BDD_NODES_CREATED);
+    else sylvan_stats_count(BDD_NODES_REUSED);
+
+    result |= index;
+    return result;
+}
+
+MTBDD
 _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
 {
     // Normalization to keep canonicity
@@ -494,6 +521,31 @@ _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
 
     result |= index;
     return result;
+}
+
+/**
+ * Custom makemapnode that doesn't trigger garbage collection.
+ * Instead, returns mtbdd_invalid if we can't create the node.
+ */
+MTBDD
+mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high)
+{
+    struct mtbddnode n;
+    uint64_t index;
+    int created;
+
+    // in an MTBDDMAP, the low edges eventually lead to 0 and cannot have a low mark
+    assert(!MTBDD_HASMARK(low));
+
+    mtbddnode_makemapnode(&n, var, low, high);
+
+    index = llmsset_lookup(nodes, n.a, n.b, &created);
+    if (index == 0) return mtbdd_invalid;
+
+    if (created) sylvan_stats_count(BDD_NODES_CREATED);
+    else sylvan_stats_count(BDD_NODES_REUSED);
+
+    return index;
 }
 
 MTBDD

@@ -162,6 +162,27 @@ static inline MTBDD mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
     return low == high ? low : _mtbdd_makenode(var, low, high);
 }
 
+ /**
+ * Create an internal MTBDD node of Boolean variable <var>, with low edge <low> and high edge <high>
+  * that doesn't trigger garbage collection. Instead, returns mtbdd_invalid if we can't create the node.
+  * <var> is a 24-bit integer.
+  * Please note that this does NOT check variable ordering!
+ */
+ MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high);
+static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+{
+    return low == high ? low : _mtbdd_varswap_makenode(var, low, high);
+}
+
+/**
+ * Create an internal MTBDD map node of Boolean variable <var>, with low edge <low> and high edge <high>.
+ * that doesn't trigger garbage collection. Instead, returns mtbdd_invalid if we can't create the node.
+ * <var> is a 24-bit integer.
+ * Please note that this does NOT check variable ordering!
+ */
+MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high);
+
+
 /**
  * Return 1 if the MTBDD is a terminal, or 0 otherwise.
  */

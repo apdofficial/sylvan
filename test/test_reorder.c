@@ -1,10 +1,6 @@
 #include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 #include <locale.h>
 #include <sys/time.h>
-#include <errno.h>
 
 #include "sylvan.h"
 #include "test_assert.h"
@@ -14,7 +10,6 @@
 #include "sylvan_levels.h"
 #include "common.h"
 #include "sylvan_interact.h"
-#include <sylvan_align.h>
 
 /* Obtain current wallclock time */
 static double
@@ -28,15 +23,6 @@ wctime()
 static double t_start;
 #define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
-
-void print_bits(unsigned int num)
-{
-   for(size_t bit=0;bit<(sizeof(unsigned int) * 8); bit++)
-   {
-      printf("%i ", num & 0x01);
-      num = num >> 1;
-   }
-}
 
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
@@ -95,7 +81,7 @@ TASK_0(int, test_varswap)
     test_assert(mtbdd_getvar(one) == 6);
     test_assert(mtbdd_getvar(two) == 7);
 
-    test_assert(sylvan_varswap(6) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 6) == SYLVAN_REORDER_SUCCESS);
 
     test_assert(sylvan_level_to_order(7) == 6);
     test_assert(sylvan_level_to_order(6) == 7);
@@ -144,9 +130,9 @@ TASK_0(int, test_varswap_down)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_varswap(0) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(1) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(2) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 0) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 1) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 2) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, 0
 
     test_assert(sylvan_level_to_order(0) == 1);
@@ -197,9 +183,9 @@ TASK_0(int, test_varswap_up)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_varswap(2) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(1) == SYLVAN_VARSWAP_SUCCESS);
-    test_assert(sylvan_varswap(0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 2) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 1) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 0) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -267,8 +253,10 @@ TASK_0(int, test_sift_down)
     state.low = 0;
     state.high = 3;
 
+    interact_var_ref_init(levels);
+
     // 0, 1, 2, 3
-    test_assert(sylvan_siftdown(&state) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_siftdown, &state) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, 0
 
     test_assert(sylvan_level_to_order(0) == 1);
@@ -326,8 +314,10 @@ TASK_0(int, test_sift_up)
     state.low = 0;
     state.high = 3;
 
+    interact_var_ref_init(levels);
+
     // 0, 1, 2, 3
-    test_assert(sylvan_siftup(&state) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_siftup, &state) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -377,7 +367,7 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_siftpos(3, 0) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_siftpos,3, 0) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -401,7 +391,7 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(three) == 0);
 
     // 3, 0, 1, 2
-    test_assert(sylvan_siftpos(0, 3) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(CALL(sylvan_siftpos, 0, 3) == SYLVAN_REORDER_SUCCESS);
     // 0, 1, 2, 3
 
     test_assert(zero == sylvan_ithvar(0));
@@ -443,7 +433,7 @@ TASK_0(int, test_reorder_perm)
 
     uint32_t perm[4] = {3, 0, 2, 1};
 
-    test_assert(sylvan_reorder_perm(perm) == SYLVAN_VARSWAP_SUCCESS);
+    test_assert(sylvan_reorder_perm(perm) == SYLVAN_REORDER_SUCCESS);
 
     test_assert(sylvan_level_to_order(0) == perm[0]);
     test_assert(sylvan_level_to_order(1) == perm[1]);
@@ -479,7 +469,7 @@ TASK_0(int, test_reorder)
     sylvan_protect(&bdd);
 
     size_t not_optimal_order_size = sylvan_nodecount(bdd);
-    sylvan_reorder_all();
+    sylvan_reduce_heap();
     size_t not_optimal_order_reordered_size = sylvan_nodecount(bdd);
 
     test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
@@ -516,7 +506,7 @@ TASK_0(int, test_map_reorder)
     sylvan_protect(&map);
 
     size_t size_before = sylvan_nodecount(map);
-    sylvan_reorder_all();
+    sylvan_reduce_heap();
     size_t size_after = sylvan_nodecount(map);
 
     test_assert(size_after < size_before);
@@ -536,9 +526,7 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    t_start = wctime();
-    interact_init(levels);
-    INFO("interact_init\n");
+    interact_var_ref_init(levels);
 
     interact_print_state(levels);
 
@@ -555,6 +543,57 @@ TASK_0(int, test_interact)
             assert(!interact_test(levels, 0, i));
             assert(!interact_test(levels, 1, j));
             assert(!interact_test(levels, 1, i));
+        }
+    }
+
+    interact_free(levels);
+
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
+    return 0;
+}
+
+TASK_0(int, test_var_count)
+{
+    sylvan_gc();
+    sylvan_resetlevels();
+
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
+
+    interact_var_ref_init(levels);
+
+    for (size_t i = 0; i < levels->count; ++i) {
+        printf("var %zu has %u nodes\n", i, atomic_load(&levels->ref_count[levels->level_to_order[i]]));
+    }
+
+    interact_free(levels);
+
+    sylvan_unprotect(&bdd1);
+    sylvan_unprotect(&bdd2);
+    return 0;
+}
+
+TASK_0(int, test_ref_count)
+{
+    sylvan_gc();
+    sylvan_resetlevels();
+
+    BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
+    sylvan_protect(&bdd1);
+
+    MTBDD bdd2 = create_example_bdd(0);
+    sylvan_protect(&bdd2);
+
+    interact_var_ref_init(levels);
+
+    for (size_t i = 0; i < levels->count; ++i) {
+        size_t ref_count = atomic_load(&levels->ref_count[levels->level_to_order[i]]);
+        if (ref_count > 0) {
+            printf("var %zu has %zu references\n", i, ref_count);
         }
     }
 
@@ -587,6 +626,10 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
+    printf("test_var_count\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_var_count)) return 1;
+    printf("test_ref_count\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_ref_count)) return 1;
     return 0;
 }
 
@@ -622,24 +665,24 @@ int main()
     setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
+    lace_start(2, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL<<20, 1, 2);
+    sylvan_set_limits(1LL<<20, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
 
-    sylvan_set_reorder_threshold(2);
+    sylvan_set_reorder_nodes_threshold(2); // keep it 2, otherwise we skip levels which will fail the test expectations
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(30 * 1000);
+    sylvan_set_reorder_timelimit_sec(30);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));
     sylvan_re_hook_progre(TASK(reordering_progress));
     sylvan_re_hook_termre(should_reordering_terminate);
 
-    size_t ntests = 1;
+    size_t ntests = 10;
 
     int res = RUN(runtests, ntests);
 

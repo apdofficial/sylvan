@@ -128,7 +128,7 @@ int main()
     Sylvan::initReorder();
 
     Sylvan::setReorderMaxGrowth(1.2f);
-    Sylvan::setReorderThreshold(1);
+    Sylvan::setReorderThreshold(2);
     Sylvan::setReorderTimeLimit(1 * 60 * 1000); // 1 minute
     Sylvan::setReorderMaxSwap(1000);
     Sylvan::setReorderMaxVar(500);

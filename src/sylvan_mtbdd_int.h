@@ -148,7 +148,7 @@ mtbddnode_getflag(mtbddnode_t n)
 /**
  * @brief Set a flag on a node.
  * @detail Currently has two use-cases:
- * - Marking nodes that ver visited during a DFS when determining a variable interaction matrix
+ * - Marking nodes which <var> visited during a tree search when determining a variable interaction matrix
  * - Marking nodes which need to be handheld during phase 2 of the variable swap.
  *
  * @note Set the flag to 0 once you are done with it.

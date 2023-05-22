@@ -16,28 +16,24 @@
 
 #include <sylvan_int.h>
 #include <sys/time.h>
+#include <stdatomic.h>
+
 #include "sylvan_varswap.h"
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
 #include "sylvan_interact.h"
 
-
 #define STATS 1 // useful information w.r.t. dynamic reordering
 
-static int reorder_initialized = 0;
-static int reorder_is_running = 0;
 
-/**
- * This variable is used for a cas flag so only
- * one reordering runs at one time
- */
-static _Atomic (int) re;
+static int reorder_initialized = 0;
+static int print_reordering_stat = 1;
 
 struct sifting_config
 {
     double t_start_sifting;                     // start time of the sifting
     uint32_t threshold;                         // threshold for number of nodes per level
-    float max_growth;                           // coefficient used to calculate maximum growth
+    double max_growth;                          // coefficient used to calculate maximum growth
     uint32_t max_swap;                          // maximum number of swaps per sifting
     uint32_t total_num_swap;                    // number of swaps completed
     uint32_t max_var;                           // maximum number of vars swapped per sifting
@@ -48,14 +44,20 @@ struct sifting_config
 /// reordering configurations
 static struct sifting_config configs = {
         .t_start_sifting = 0,
-        .threshold = 128,
-        .max_growth = 1.2f,
-        .max_swap = 10000,
+        .threshold = SYLVAN_REORDER_NODES_THRESHOLD,
+        .max_growth = SYLVAN_REORDER_GROWTH,
+        .max_swap = SYLVAN_REORDER_MAX_SWAPS,
         .total_num_swap = 0,
-        .max_var = 250,
+        .max_var = SYLVAN_REORDER_MAX_VAR,
         .total_num_var = 0,
-        .time_limit_ms = 1 * 60 * 1000 // 1 minute
+        .time_limit_ms = SYLVAN_REORDER_TIME_LIMIT_MS
 };
+
+VOID_TASK_DECL_0(sylvan_reorder_stop_world)
+
+TASK_DECL_2(reorder_result_t, sylvan_sift, uint32_t, uint32_t)
+
+TASK_DECL_2(reorder_result_t, sylvan_plain_sift, uint32_t, uint32_t)
 
 typedef struct re_term_entry
 {
@@ -109,6 +111,8 @@ void sylvan_re_hook_termre(re_term_cb callback)
 
 static int should_terminate_reordering(const struct sifting_config *reorder_config);
 
+static int should_terminate_sifting(const struct sifting_config *reorder_config);
+
 static double wctime()
 {
     struct timeval tv;
@@ -147,8 +151,9 @@ reorder_config_t sylvan_get_reorder_config()
     return (reorder_config_t) &configs;
 }
 
-void sylvan_set_reorder_threshold(uint32_t threshold)
+void sylvan_set_reorder_nodes_threshold(uint32_t threshold)
 {
+    assert(threshold > 1);
     configs.threshold = threshold;
 }
 
@@ -160,94 +165,188 @@ void sylvan_set_reorder_maxgrowth(float max_growth)
 
 void sylvan_set_reorder_maxswap(uint32_t max_swap)
 {
+    assert(max_swap > 1);
     configs.max_swap = max_swap;
 }
 
 void sylvan_set_reorder_maxvar(uint32_t max_var)
 {
+    assert(max_var > 1);
     configs.max_var = max_var;
 }
 
-void sylvan_set_reorder_timelimit(double time_limit)
+void sylvan_set_reorder_timelimit_min(double time_limit)
 {
+    assert(time_limit > 0);
+    sylvan_set_reorder_timelimit_sec(time_limit * 60);
+}
+
+void sylvan_set_reorder_timelimit_sec(double time_limit)
+{
+    assert(time_limit > 0);
+    sylvan_set_reorder_timelimit_ms(time_limit * 1000);
+}
+
+void sylvan_set_reorder_timelimit_ms(double time_limit)
+{
+    assert(time_limit > 0);
     configs.time_limit_ms = time_limit;
 }
 
-static inline void update_best_pos(sifting_state_t *state)
+TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 {
-    state->size = llmsset_count_marked(nodes);
-    // update even if the size is the same
-    // because this becomes the best closest position to our current position
-    if (state->size <= state->best_size) {
-        state->best_size = state->size;
-        state->best_pos = state->pos;
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+
+    reorder_result_t res;
+    int R;  // upper bound on node decrease
+    int isolated;
+    int limitSize;
+    BDDVAR xIndex;
+    BDDVAR yIndex;
+
+    s_state->size = CALL(llmsset_count_marked, nodes);
+    xIndex = levels->level_to_order[s_state->pos];
+
+    limitSize = s_state->size - levels->isolated_count;
+    R = 0;
+
+    // Let <x> be the variable at level <pos>. (s_state->pos)
+    // Let <y> be the variable at level <pos+1>. (s_state->pos+1)
+    // Let Ni be the number of nodes at level i.
+    // Let n be the number of levels. (levels->count)
+
+    // Then the size of DD can not be reduced below:
+    // LB(DN) = Nj + ∑ Ni | 0<i<pos
+
+    // The part of the DD above <x> will not change.
+    // The part of the DD below <x> that does not interact with <x> will not change.
+    // The rest may vanish in the best case, except for
+    // the nodes at level <high>, which will not vanish, regardless.
+
+    // Initialize the upper bound
+    for (BDDVAR y = s_state->high; y > s_state->pos; y--) {
+        yIndex = levels->level_to_order[y];
+        if (interact_test(levels, xIndex, yIndex)) {
+            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) <= 1;
+            R += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+        }
     }
-}
 
-static inline int is_max_growth_reached(const sifting_state_t *state)
-{
-    return ((float) (state->size) >= configs.max_growth * (float) (state->best_size));
-}
-
-TASK_IMPL_1(varswap_t, sylvan_siftdown, sifting_state_t*, state)
-{
-    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
-    for (; state->pos < state->high; ++state->pos) {
-        varswap_t res = sylvan_varswap(state->pos);
-        if (!sylvan_varswap_issuccess(res)) return res;
+    for (; s_state->pos < s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
+        //  Update the upper bound on node decrease
+        yIndex = levels->level_to_order[s_state->pos + 1];
+        if (interact_test(levels, xIndex, yIndex)) {
+            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) <= 1;
+            R -= (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+        }
+        res = CALL(sylvan_varswap, s_state->pos);
+        s_state->size = CALL(llmsset_count_marked, nodes);
+        if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
-        update_best_pos(state);
-        if (is_max_growth_reached(state)) {
-            ++state->pos;
+        if (should_terminate_sifting(&configs)) break;
+        // check the max allowed size growth
+        if ((double) (s_state->size) > (double) s_state->best_size * configs.max_growth) {
+            ++s_state->pos;
             break;
         }
-        if (should_terminate_reordering(&configs)) break;
+        // update best position
+        if (s_state->size < s_state->best_size) {
+            s_state->best_size = s_state->size;
+            s_state->best_pos = s_state->pos;
+        }
+        if (s_state->size < limitSize) limitSize = s_state->size;
     }
-    return SYLVAN_VARSWAP_SUCCESS;
+    return SYLVAN_REORDER_SUCCESS;
 }
 
-TASK_IMPL_1(varswap_t, sylvan_siftup, sifting_state_t*, state)
+TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t*, s_state)
 {
-    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
-    for (; state->pos > state->low; --state->pos) {
-        varswap_t res = sylvan_varswap(state->pos - 1);
-        if (!sylvan_varswap_issuccess(res)) return res;
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+
+    reorder_result_t res;
+    int L;  // lower bound on DD size
+    int isolated;
+    int limitSize;
+    BDDVAR xIndex;
+    BDDVAR yIndex;
+
+    s_state->size = CALL(llmsset_count_marked, nodes);
+    yIndex = levels->level_to_order[s_state->pos];
+
+    // Let <x> be the variable at level <pos-1>. (s_state->pos-1)
+    // Let <y> be the variable at level <pos>. (s_state->pos)
+    // Let Ni be the number of nodes at level i.
+    // Let n be the number of levels. (levels->count)
+
+    // Then the size of DD can not be reduced below:
+    // LB(UP) = N0 + ∑ Ni | i<pos<n
+
+    // The part of the DD below <y> will not change.
+    // The part of the DD above <y> that does not interact with <y> will not change.
+    // The rest may vanish in the best case, except for
+    // the nodes at level <low>, which will not vanish, regardless.
+
+    limitSize = L = (int) (s_state->size - levels->isolated_count);
+    for (BDDVAR x = s_state->low + 1; x < s_state->pos; x++) {
+        xIndex = levels->level_to_order[x];
+        if (interact_test(levels, xIndex, yIndex)) {
+            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) <= 1;
+            L -= (int) atomic_load_explicit(&levels->var_count[xIndex], memory_order_relaxed) - isolated;
+        }
+    }
+
+    for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
+        xIndex = levels->level_to_order[s_state->pos - 1];
+        res = CALL(sylvan_varswap, s_state->pos - 1);
+        s_state->size = CALL(llmsset_count_marked, nodes);
+        if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
-        update_best_pos(state);
-        if (is_max_growth_reached(state)) {
-            --state->pos;
+        if (should_terminate_sifting(&configs)) break;
+        // check the max allowed size growth
+        if ((double) (s_state->size) > (double) s_state->best_size * configs.max_growth) {
+            --s_state->pos;
             break;
         }
-        if (should_terminate_reordering(&configs)) break;
+        // update the best position
+        if (s_state->size < s_state->best_size) {
+            s_state->best_size = s_state->size;
+            s_state->best_pos = s_state->pos;
+        }
+        // Update the lower bound on DD size
+        if (interact_test(levels, xIndex, yIndex)) {
+            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) <= 1;
+            L += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+        }
+        if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
     }
-    return SYLVAN_VARSWAP_SUCCESS;
+    return SYLVAN_REORDER_SUCCESS;
 }
 
-TASK_IMPL_2(varswap_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
+TASK_IMPL_2(reorder_result_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
-    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
     for (; pos < target; pos++) {
-        varswap_t res = sylvan_varswap(pos);
-        if (!sylvan_varswap_issuccess(res)) return res;
+        reorder_result_t res = CALL(sylvan_varswap, pos);
+        if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
     for (; pos > target; pos--) {
-        varswap_t res = sylvan_varswap(pos - 1);
-        if (!sylvan_varswap_issuccess(res)) return res;
+        reorder_result_t res = CALL(sylvan_varswap, pos - 1);
+        if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
-    return SYLVAN_VARSWAP_SUCCESS;
+    return SYLVAN_REORDER_SUCCESS;
 }
 
-TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
+TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
-    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
-    varswap_t res = SYLVAN_VARSWAP_SUCCESS;
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+    reorder_result_t res = SYLVAN_REORDER_SUCCESS;
     int identity = 1;
 
     // check if permutation is identity
     for (size_t level = 0; level < levels->count; level++) {
-        if (permutation[level] != mtbdd_level_to_order(level)) {
+        if (permutation[level] != levels->level_to_order[level]) {
             identity = 0;
             break;
         }
@@ -257,29 +356,39 @@ TASK_IMPL_1(varswap_t, sylvan_reorder_perm, const uint32_t*, permutation)
     for (size_t level = 0; level < levels->count; ++level) {
         uint32_t var = permutation[level];
         uint32_t pos = mtbdd_order_to_level(var);
-        res = sylvan_siftpos(pos, level);
-        if (!sylvan_varswap_issuccess(res)) break;
+        res = CALL(sylvan_siftpos, pos, level);
+        if (!sylvan_reorder_issuccess(res)) break;
     }
 
     return res;
 }
 
-VOID_TASK_IMPL_0(sylvan_reduce_heap)
+void sylvan_test_reduce_heap()
 {
-    if (!reorder_initialized) return;
-    if (reorder_is_running) {
-        // avoid running multiple threads
-        // if we are running RE and this function is invoked nevertheless
-        // we must be in a different thread
-        // since no operations are allowed while reordering
-        // hang here until reordering is done and then exit
-        while (reorder_is_running) {}
-        return;
+    if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
+        sylvan_reduce_heap();
     }
+}
 
+void sylvan_reduce_heap()
+{
+    RUNEX(sylvan_reorder_stop_world);
+}
+
+/**
+ * This variable is used for a cas flag so only
+ * one reordering runs at one time
+ */
+static _Atomic (int) re;
+
+VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
+{
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
-        NEWFRAME(sylvan_reorder_impl, 0, 0);
+        reorder_result_t result = NEWFRAME(sylvan_sift, 0, 0);
+        if (sylvan_reorder_issuccess(result) == 0){
+            sylvan_print_reorder_res(result);
+        }
         re = 0;
     } else {
         /* wait for new frame to appear */
@@ -288,13 +397,12 @@ VOID_TASK_IMPL_0(sylvan_reduce_heap)
     }
 }
 
-TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
+TASK_IMPL_2(reorder_result_t, sylvan_plain_sift, uint32_t, low, uint32_t, high)
 {
-    if (!reorder_initialized) return SYLVAN_VARSWAP_NOT_INITIALISED;
-    if (reorder_is_running) return SYLVAN_VARSWAP_ALREADY_RUNNING;
-    if (levels->count < 1) return SYLVAN_VARSWAP_ERROR;
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+    if (levels->count < 1) return SYLVAN_REORDER_NO_REGISTERED_VARS;
 
-    reorder_is_running = 1;
+    levels->reorder_count++;
 
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
@@ -304,61 +412,130 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
     }
 
     configs.t_start_sifting = wctime();
-    configs.total_num_swap = 0;
     configs.total_num_var = 0;
+
+    reorder_result_t res;
 
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-//    interact_init(levels);
+    CALL(interact_var_ref_init, levels);
+    double t_start_sifting = wctime();
+    size_t before_size = llmsset_count_marked(nodes);
 
-    // now count all variable levels (parallel...)
+    // count all variable levels (parallel...)
     _Atomic (size_t) level_counts[levels->count];
+    _Atomic (size_t) leaf_count = 2;
     for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
-    sylvan_count_levelnodes(level_counts);
-    // mark and sort
+    CALL(sylvan_count_levelnodes, level_counts, &leaf_count, 0, nodes->table_size);
+
+    // mark and sort variable levels based on the threshold
     int sorted_levels_counts[levels->count];
     mtbdd_mark_threshold(sorted_levels_counts, level_counts, configs.threshold);
     gnome_sort(sorted_levels_counts, level_counts);
 
-    varswap_t res;
-    sifting_state_t sifting_state;
-    sifting_state.low = low;
-    sifting_state.high = high;
-    sifting_state.size = llmsset_count_marked(nodes);
-    sifting_state.best_size = sifting_state.size;
+    size_t cursize = llmsset_count_marked(nodes);
 
-    for (size_t i = 0; i < levels->count; i++) {
-        if (sorted_levels_counts[i] < 0) break; // marked level, done
-        uint64_t lvl = sorted_levels_counts[i];
+    for (int i = 0; i < (int) levels->count; i++) {
+        int lvl = sorted_levels_counts[i];
+        if (lvl < 0) break; // done
+        size_t pos = levels->level_to_order[lvl];
+        if (pos < low || pos > high) continue;
 
-        sifting_state.pos = mtbdd_level_to_order(lvl);
-        if (sifting_state.pos < low || sifting_state.pos > high) continue; // skip, not in range
+        size_t bestsize = cursize, bestpos = pos;
 
-        sifting_state.best_pos = sifting_state.pos;
-
-        // search for the optimum variable position
-        // first sift to the closest boundary, then sift in the other direction
-        if (lvl > levels->count / 2) {
-            res = sylvan_siftdown(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftup(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
+        if ((double) lvl > (double) levels->count / 2) {
+            // we are in the lower half of the levels, so sift down first and then up
+            // sifting down
+            for (; pos < high; pos++) {
+                res = CALL(sylvan_varswap, pos);
+                if (sylvan_reorder_issuccess(res)) {
+                    printf("swap failed, table full. TODO garbage collect.\n");
+                    break;
+                }
+                size_t after = llmsset_count_marked(nodes);
+                cursize = after;
+                if (cursize < bestsize) {
+                    bestsize = cursize;
+                    bestpos = pos;
+                }
+                if ((double) cursize >= configs.max_growth * (double) bestsize) {
+                    pos++;
+                    break;
+                }
+            }
+            // sifting up
+            for (; pos > low; pos--) {
+                res = CALL(sylvan_varswap, pos - 1);
+                if (sylvan_reorder_issuccess(res)) {
+                    printf("swap failed, table full. TODO garbage collect.\n");
+                    break;
+                }
+                size_t after = llmsset_count_marked(nodes);
+                cursize = after;
+                if (cursize < bestsize) {
+                    bestsize = cursize;
+                    bestpos = pos;
+                }
+                if ((double) cursize >= configs.max_growth * (double) bestsize) {
+                    pos--;
+                    break;
+                }
+            }
         } else {
-            res = sylvan_siftup(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
-            res = sylvan_siftdown(&sifting_state);
-            if (!sylvan_varswap_issuccess(res)) break;
+            // we are in the upper half of the levels, so sift up first and then down
+            // sifting up
+            for (; pos > low; pos--) {
+                res = CALL(sylvan_varswap, pos - 1);
+                if (sylvan_reorder_issuccess(res)) {
+                    printf("swap failed, table full. TODO garbage collect.\n");
+                    break;
+                }
+                size_t after = llmsset_count_marked(nodes);
+                cursize = after;
+                if (cursize < bestsize) {
+                    bestsize = cursize;
+                    bestpos = pos;
+                }
+                if ((double) cursize >= configs.max_growth * (double) bestsize) {
+                    pos--;
+                    break;
+                }
+            }
+            // sifting down
+            for (; pos < high; pos++) {
+                res = CALL(sylvan_varswap, pos);
+                if (sylvan_reorder_issuccess(res)) {
+                    printf("swap failed, table full. TODO garbage collect.\n");
+                    break;
+                }
+                size_t after = llmsset_count_marked(nodes);
+                cursize = after;
+                if (cursize < bestsize) {
+                    bestsize = cursize;
+                    bestpos = pos;
+                }
+                if ((double) cursize >= configs.max_growth * (double) bestsize) {
+                    pos++;
+                    break;
+                }
+            }
         }
+        reorder_result_t old_res = res;
 
         // optimum variable position restoration
-        res = sylvan_siftpos(sifting_state.pos, sifting_state.best_pos);
-        if (!sylvan_varswap_issuccess(res)) break;
+        for (; pos < bestpos; pos++) {
+            res = CALL(sylvan_varswap, pos);
+        }
+        for (; pos > bestpos; pos--) {
+            res = CALL(sylvan_varswap, pos - 1);
+        }
 
+        if (!sylvan_reorder_issuccess(res) || !sylvan_reorder_issuccess(old_res)) break;
         configs.total_num_var++;
 
         // if we managed to reduce size call progress hooks
-        if (sifting_state.best_size < sifting_state.size) {
+        if (bestsize < cursize) {
             for (re_hook_entry_t e = progre_list; e != NULL; e = e->next) {
                 WRAP(e->cb);
             }
@@ -367,19 +544,140 @@ TASK_IMPL_2(varswap_t, sylvan_reorder_impl, uint32_t, low, uint32_t, high)
         if (should_terminate_reordering(&configs)) break;
     }
 
-    for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
+    size_t after_size = llmsset_count_marked(nodes);
+
+    // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
+    size_t new_size_threshold = (after_size - leaf_count + 1) * SYLVAN_REORDER_SIZE_RATIO + leaf_count;
+    if (levels->reorder_count < SYLVAN_REORDER_LIMIT || new_size_threshold > levels->reorder_size_threshold) {
+        levels->reorder_size_threshold = new_size_threshold;
+    } else {
+        levels->reorder_size_threshold += SYLVAN_REORDER_LIMIT;
+    }
+
+    if (print_reordering_stat) {
+        printf("BDD reordering with simple sifting: from %zu to ... %zu nodes in %f sec\n",
+               before_size, after_size, wctime() - t_start_sifting);
+    }
+
+    return SYLVAN_REORDER_SUCCESS;
+}
+
+
+TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
+{
+    if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+    if (levels->count < 1) return SYLVAN_REORDER_NO_REGISTERED_VARS;
+
+    levels->reorder_count++;
+
+    sylvan_stats_count(SYLVAN_RE_COUNT);
+    sylvan_timer_start(SYLVAN_RE);
+
+    for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
+
+    configs.t_start_sifting = wctime();
+    configs.total_num_var = 0;
+
+    // if high == 0, then we sift all variables
+    if (high == 0) high = levels->count - 1;
+
+    // parallel
+    CALL(interact_var_ref_init, levels);
+    double t_start_sifting = wctime();
+    size_t before_size = CALL(llmsset_count_marked, nodes);
+
+    // count all variable levels (parallel...)
+    _Atomic (size_t) level_counts[levels->count];
+    _Atomic (size_t) leaf_count = 2;
+    for (size_t i = 0; i < levels->count; i++) level_counts[i] = 0;
+    // parallel
+    CALL(sylvan_count_levelnodes, level_counts, &leaf_count, 0, nodes->table_size);
+
+    // mark and sort variable levels based on the threshold
+    int sorted_levels_counts[levels->count];
+    mtbdd_mark_threshold(sorted_levels_counts, level_counts, configs.threshold);
+    gnome_sort(sorted_levels_counts, level_counts);
+
+    reorder_result_t res;
+    sifting_state_t s_state;
+
+    s_state.pos = 0;
+    s_state.best_pos = 0;
+    s_state.size = CALL(llmsset_count_marked, nodes);
+    s_state.best_size = s_state.size;
+    s_state.low = low;
+    s_state.high = high;
+
+    for (int i = 0; i < (int) levels->count; i++) {
+        int lvl = sorted_levels_counts[i];
+        if (lvl < 0) break; // done
+        s_state.pos = levels->level_to_order[lvl];
+        if (s_state.pos < low || s_state.pos > high) continue;
+
+        configs.total_num_swap = 0;
+        s_state.best_pos = s_state.pos;
+
+        if ((s_state.pos - s_state.low) > (s_state.high - s_state.pos)) {
+            // we are in the lower half, so sift down first and then up
+            res = CALL(sylvan_siftdown, &s_state);
+            if (sylvan_reorder_issuccess(res)) {
+                res = CALL(sylvan_siftup, &s_state);
+            }
+        } else {
+            // we are in the upper half, so sift up first and then down
+            res = CALL(sylvan_siftup, &s_state);
+            if (sylvan_reorder_issuccess(res)) {
+                res = CALL(sylvan_siftdown, &s_state);
+            }
+        }
+
+        reorder_result_t old_res = res;
+
+        // optimum variable position restoration
+        res = CALL(sylvan_siftpos, s_state.pos, s_state.best_pos);
+        s_state.best_size = CALL(llmsset_count_marked, nodes);
+
+        if (!sylvan_reorder_issuccess(res) || !sylvan_reorder_issuccess(old_res)) break;
+        configs.total_num_var++;
+
+        // if we managed to reduce size call progress hooks
+        if (s_state.best_size < s_state.size) {
+            for (re_hook_entry_t e = progre_list; e != NULL; e = e->next) {
+                WRAP(e->cb);
+            }
+        }
+
+        if (should_terminate_reordering(&configs)) break;
+    }
+
+    s_state.best_size = CALL(llmsset_count_marked, nodes);
 
     sylvan_timer_stop(SYLVAN_RE);
     configs.t_start_sifting = 0;
 
-    reorder_is_running = 0;
+    // new size threshold for next reordering is SYLVAN_REORDER_SIZE_RATIO * the size of non-terminal nodes + the terminal nodes
+    size_t new_size_threshold = (s_state.best_size - leaf_count + 1) * SYLVAN_REORDER_SIZE_RATIO + leaf_count;
+    if (levels->reorder_count < SYLVAN_REORDER_LIMIT || new_size_threshold > levels->reorder_size_threshold) {
+        levels->reorder_size_threshold = new_size_threshold;
+    } else {
+        levels->reorder_size_threshold += SYLVAN_REORDER_LIMIT;
+    }
+
+    if (print_reordering_stat) {
+        printf("BDD reordering with simple sifting: from %zu to ... %d nodes in %f sec\n",
+               before_size, s_state.best_size, wctime() - t_start_sifting);
+    }
+
+    for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
+        WRAP(e->cb);
+    }
 
     return res;
 }
 
-static int should_terminate_reordering(const struct sifting_config *reorder_config)
+static int should_terminate_sifting(const struct sifting_config *reorder_config)
 {
     for (re_term_entry_t e = termre_list; e != NULL; e = e->next) {
         if (e->cb()) {
@@ -389,7 +687,6 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
             return 1;
         }
     }
-
     if (reorder_config->total_num_swap > reorder_config->max_swap) {
 #if STATS
         printf("sifting exit: reached %u from the total_num_swap %u\n",
@@ -398,9 +695,33 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
 #endif
         return 1;
     }
+
+    double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
+    if (t_elapsed > reorder_config->time_limit_ms && reorder_config->t_start_sifting != 0) {
+#if STATS
+        printf("sifting exit: reached %fms from the time_limit %.2fms\n",
+               t_elapsed,
+               reorder_config->time_limit_ms);
+#endif
+        return 1;
+    }
+    return 0;
+}
+
+static int should_terminate_reordering(const struct sifting_config *reorder_config)
+{
+    for (re_term_entry_t e = termre_list; e != NULL; e = e->next) {
+        if (e->cb()) {
+#if STATS
+            printf("reordering exit: termination_cb\n");
+#endif
+            return 1;
+        }
+    }
+
     if (reorder_config->total_num_var > reorder_config->max_var) {
 #if STATS
-        printf("sifting exit: reached %u from the total_num_var %u\n",
+        printf("reordering exit: reached %u from the total_num_var %u\n",
                reorder_config->total_num_var,
                reorder_config->max_var);
 #endif
@@ -409,7 +730,7 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
     double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms && reorder_config->t_start_sifting != 0) {
 #if STATS
-        printf("sifting exit: reached %fms from the time_limit %.2fms\n",
+        printf("reordering exit: reached %fms from the time_limit %.2fms\n",
                t_elapsed,
                reorder_config->time_limit_ms);
 #endif

@@ -119,7 +119,7 @@ int test_atomic_backwards_iterator(size_t i, size_t j, size_t size)
 
 static inline size_t _rand()
 {
-    return rand() % 7919;
+    return rand() % 7919; // some not small prime number
 }
 
 int runtests(size_t ntests)
