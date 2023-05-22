@@ -30,21 +30,29 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reord
 
 TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 /*!
-   \brief Adjacent variable swap phase 1
-   \details Handle all trivial cases where no node is created, mark cases that are not trivial.
-   \return number of nodes that were marked
+   @brief Adjacent variable swap phase 2
+   @details Handle all trivial cases where no node is created, mark cases that are not trivial.
+   @return number of nodes that were marked
 */
 #define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
 
 VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 /*!
-   \brief Adjacent variable swap phase 2
-   \details Handle the not so trivial cases. (creates new nodes)
+   @brief Adjacent variable swap phase 2
+   @details Handle the not so trivial cases. (creates new nodes)
 */
 #define sylvan_varswap_p2(var, result) CALL(sylvan_varswap_p2, var, 0, nodes->table_size, result)
 
+VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
+/*!
+   \brief Adjacent variable swap phase 3
+   \details Recovery phase, restore the nodes that were marked in phase 1.
+*/
+#define sylvan_varswap_p3(var, result) CALL(sylvan_varswap_p3, var, result)
+
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
+    (void) buf_len;
     assert(buf_len >= 100);
     switch (result) {
         case SYLVAN_REORDER_ROLLBACK:
@@ -52,6 +60,9 @@ void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t bu
             break;
         case SYLVAN_REORDER_SUCCESS:
             sprintf(buf, "SYLVAN_REORDER: success (%d)", result);
+            break;
+        case SYLVAN_REORDER_P0_CLEAR_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 0, no marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P1_REHASH_FAIL:
             sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, no marked nodes remaining (%d)", result);
@@ -68,11 +79,15 @@ void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t bu
         case SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL:
             sprintf(buf, "SYLVAN_REORDER: cannot rehash and cannot create node in phase 2 (%d)", result);
             break;
-        case SYLVAN_REORDER_NOT_INITIALISED:
-            sprintf(buf, "SYLVAN_REORDER: please make sure you first initialize reordering (%d)", result);
+        case SYLVAN_REORDER_P3_REHASH_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 3, maybe there are marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_NO_REGISTERED_VARS:
-            sprintf(buf, "SYLVAN_REORDER: the operation failed fast because there are no registered variables (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: the operation failed fast because there are no registered variables (%d)",
+                    result);
+            break;
+        case SYLVAN_REORDER_NOT_INITIALISED:
+            sprintf(buf, "SYLVAN_REORDER: please make sure you first initialize reordering (%d)", result);
             break;
         case SYLVAN_REORDER_ALREADY_RUNNING:
             sprintf(buf, "SYLVAN_REORDER: cannot start reordering when it is already running (%d)", result);
@@ -160,7 +175,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     ** projection functions from the node count.
     */
     int x_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos]], memory_order_relaxed) == 1;
-    int y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
+    int y_isolated =
+            atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
     int isolated = -(x_isolated + y_isolated);
 
     //TODO: take case of the implications of swapping the mappings (eg., sylvan operations referring to variables)
@@ -182,31 +198,15 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result);
 #endif
+    if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
+    if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
         sylvan_varswap_p2(pos, &result);
         if (sylvan_reorder_issuccess(result) == 0) {
-#if SYLVAN_USE_LINEAR_PROBING
-            // clear the entire table
-            sylvan_varswap_p0();
-#else
-            // clear hashes of nodes with <var> and <var+1>
-            sylvan_varswap_p0(pos, &result);
-#endif
-            // handle all trivial cases, mark cases that are not trivial
-            marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
-            if (marked_count > 0 && sylvan_reorder_issuccess(result)) {
-                // do the not so trivial cases (but won't create new nodes this time)
-                sylvan_varswap_p2(pos, &result);
-                if (sylvan_reorder_issuccess(result) == 0) {
-                    return SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL;
-                }
-            } else {
-                return SYLVAN_REORDER_P1_REHASH_FAIL_MARKED;
-            }
-            return SYLVAN_REORDER_ROLLBACK;
+            sylvan_varswap_p3(pos, &result);
         }
     }
 
@@ -268,6 +268,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         }
     }
 }
+
 #endif
 
 /**
@@ -308,6 +309,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
     const size_t end = first + count;
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
@@ -329,7 +331,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             mtbddnode_setflag(node, 0);
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
-                atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
+                atomic_exchange(result, SYLVAN_REORDER_P3_REHASH_FAIL);
             }
             continue;
         }
@@ -419,7 +421,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     reorder_result_t res;
     const size_t end = first + count;
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
-        if (*result != SYLVAN_REORDER_SUCCESS) return; // the table is full
+        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
@@ -470,7 +472,8 @@ reorder_result_t swap_node(size_t index)
         atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], 1,
+                                  memory_order_relaxed);
     }
 
     // 2. # of nodes is increased at <var+1> level due to f0 having <var> index which is higher than f1
@@ -479,16 +482,19 @@ reorder_result_t swap_node(size_t index)
         atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], 1, memory_order_relaxed);
         // now we have two nodes at level <var+1> pointing to f10 and F01 which will be added after the swap so we increase the ref count
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f01)]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f01)]], 1,
+                                  memory_order_relaxed);
     }
 
     // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
     if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
         // this is the case when # of nodes is decreased at <var+1> level (other levels don't change # of nodes)
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var + 1]], -1, memory_order_relaxed);
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], -1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], -1,
+                                  memory_order_relaxed);
         // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], -1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f10)]], -1,
+                                  memory_order_relaxed);
     }
 
     // Create the new high child.
@@ -533,3 +539,30 @@ reorder_result_t swap_mapnode(size_t index)
     }
     return SYLVAN_REORDER_SUCCESS;
 }
+
+/**
+ * Implementation of third phase of variable swapping.
+ */
+VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result)
+{
+#if SYLVAN_USE_LINEAR_PROBING
+    // clear the entire table
+    sylvan_varswap_p0();
+#else
+    // clear hashes of nodes with <var> and <var+1>
+    sylvan_varswap_p0(pos, result);
+#endif
+    // at this point we have already nodes marked from P2 so we will unmark then now in P1
+    size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, result);
+    if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
+        // do the not so trivial cases (but won't create new nodes this time)
+        sylvan_varswap_p2(pos, result);
+        if (sylvan_reorder_issuccess(*result) == 0) {
+            atomic_exchange(result, SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL);
+        }
+    } else {
+        atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL_MARKED);
+    }
+}
+
+

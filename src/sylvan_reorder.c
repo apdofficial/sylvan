@@ -385,9 +385,9 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
 {
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
-        reorder_result_t res = NEWFRAME(sylvan_sift, 0, 0);
-        if (sylvan_reorder_issuccess(res) == 0){
-            sylvan_print_reorder_res(res);
+        reorder_result_t result = NEWFRAME(sylvan_sift, 0, 0);
+        if (sylvan_reorder_issuccess(result) == 0){
+            sylvan_print_reorder_res(result);
         }
         re = 0;
     } else {

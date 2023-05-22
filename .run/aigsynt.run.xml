@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="aigsynt" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="-w 8 $PROJECT_DIR$/../sylvan-benchmarks/syntcomp/models/toy_examples/add12y.aag" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="sylvan" TARGET_NAME="aigsynt" CONFIG_NAME="debug-clang-chaining" RUN_TARGET_PROJECT_NAME="sylvan" RUN_TARGET_NAME="aigsynt">
+    <method v="2">
+      <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>
