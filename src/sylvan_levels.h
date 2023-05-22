@@ -23,8 +23,8 @@ typedef struct levels_db {
     size_t              count;                   // number of created levels
     _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-    _Atomic(uint32_t)*  var_count;               // number of nodes per variable (it expects level wise variable index)
-    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable (it expects level wise variable index)
+    _Atomic(uint32_t)*  var_count;               // number of nodes per variable (it expects order wise variable index)
+    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable (it expects order wise variable index)
     int                 isolated_count;          // number of isolated projection functions
     atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (it expects level wise variable index)
     size_t              bitmap_i_nrows;          // number of rows and columns
@@ -32,13 +32,6 @@ typedef struct levels_db {
     size_t              reorder_size_threshold;  // reorder if this size is reached
     size_t              reorder_count;           // number of reordering calls
 } *levels_t;
-
-//#define levels_var_count_load(lvl, var) atomic_load(&lvl->var_count[var])
-//#define levels_var_count_incr(lvl, var) atomic_fetch_add(&lvl->var_count[var], 1)
-//
-//#define levels_ref_count_load(lvl, index) atomic_load(&lvl->ref_count[index])
-//#define levels_ref_count_incr(lvl, index) atomic_fetch_add(&lvl->ref_count[index], 1)
-//
 
 /**
  * Index to first node in phase 2 mark bitmap

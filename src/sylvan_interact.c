@@ -96,18 +96,24 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     mtbddnode_t node = MTBDD_GETNODE(f);
     BDDVAR var = mtbddnode_getvariable(node);
 
-    if (bitmap_atomic_get(bitmap_v, index) == 0) {
-        atomic_fetch_add(&levels->ref_count[levels->level_to_order[var]], 1);
-    }
-
     if (mtbdd_isleaf(f)) return;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
 
     // set support bitmap, <var> is on the support of <f>
     bitmap_atomic_set(bitmap_s, var);
 
-    SPAWN(find_support, mtbdd_gethigh(f), bitmap_s, bitmap_v, bitmap_l);
-    CALL(find_support, mtbdd_getlow(f), bitmap_s, bitmap_v, bitmap_l);
+    MTBDD high = mtbdd_gethigh(f);
+    if (bitmap_atomic_get(bitmap_v, high & 0x000000ffffffffff) == 0) { // avoid duplicate ref count
+        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(high)]], 1);
+    }
+
+    MTBDD low = mtbdd_getlow(f);
+    if (bitmap_atomic_get(bitmap_v, low & 0x000000ffffffffff) == 0) { // avoid duplicate ref count
+        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(low)]], 1);
+    }
+
+    SPAWN(find_support, high, bitmap_s, bitmap_v, bitmap_l);
+    CALL(find_support, low, bitmap_s, bitmap_v, bitmap_l);
     SYNC(find_support);
 
     // locally visited node used for calculating support array
@@ -140,7 +146,6 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         if(var >= mtbdd_levelscount()) continue;
 
         atomic_fetch_add(&levels->var_count[levels->level_to_order[var]], 1);
-
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>
@@ -165,7 +170,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < levels->count; i++) {
-        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) == 1) {
+        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) <= 1) {
             levels->isolated_count++;
         }
     }

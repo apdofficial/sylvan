@@ -230,12 +230,12 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
 #define llmsset_nindex npos
 
 /**
- * Index to first node in the hash table.
+ * Index to the first node in the hash table.
  */
 #define llmsset_first() bitmap_atomic_first(nodes->bitmap2, nodes->table_size)
 
 /**
- * Index ot the next node index relative to the provided node index.
+ * Index to the next node index relative to the provided node index.
  */
 #define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
 

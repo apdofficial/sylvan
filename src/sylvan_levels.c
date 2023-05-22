@@ -227,7 +227,7 @@ TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, coun
 void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
 {
     for (unsigned int i = 0; i < levels->count; i++) {
-        if (level_counts[mtbdd_level_to_order(i)] < threshold) level[i] = -1;
+        if (level_counts[levels->level_to_order[i]] < threshold) level[i] = -1;
         else level[i] = i;
     }
 }

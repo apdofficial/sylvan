@@ -109,13 +109,6 @@ void sylvan_set_reorder_timelimit(double time_limit);
 TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
 /**
  * \brief Sift given variable up from its current level to the target level.
- *
- * \param var - variable to sift up
- * \param high - target position
- * \param curSize - pointer to current size of the bdd
- * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestPos - pointer to best position of the variable (w.r.t. dynamic variable reordering)
- *
  * \sideeffect order of variables is changed
  */
 #define sylvan_siftdown(state) CALL(sylvan_siftdown, state)
@@ -123,13 +116,6 @@ TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
 TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
 /**
  * \brief Sift given variable down from its current level to the target level.
- *
- * \param var - variable to sift down
- * \param low - target level
- * \param curSize - pointer to current size of the bdd
- * \param bestSize - pointer to best size of the bdd (w.r.t. dynamic variable reordering)
- * \param bestPos - pointer to best position of the variable (w.r.t. dynamic variable reordering)
- *
  * \sideeffect order of variables is changed
  */
 #define sylvan_siftup(state) CALL(sylvan_siftup, state)
@@ -166,7 +152,6 @@ TASK_DECL_2(reorder_result_t, sylvan_reorder_impl, uint32_t, uint32_t);
  * @details This function performs stop-the-world operation similar to garbage collection.
  */
 void sylvan_reduce_heap();
-void sylvan_simple_reduce_heap();
 
 void sylvan_test_reduce_heap();
 

@@ -347,8 +347,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 void sylvan_test_reduce_heap()
 {
     if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
-        RUNEX(sylvan_reorder_stop_world);
-//        RUNEX(sylvan_reorder_impl, 0, 0);
+        sylvan_reduce_heap();
     }
 }
 
