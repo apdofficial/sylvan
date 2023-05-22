@@ -128,17 +128,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     // swap invalidates all active operations, thus we clear the cache
     CALL(sylvan_clear_cache);
+
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
+//    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
 #endif
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
+
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
         CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
@@ -252,7 +254,11 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar >= mtbdd_levelscount()) continue;  // not registered <var>
-
+#if !SYLVAN_USE_LINEAR_PROBING
+        if (nvar == var || nvar == (var + 1)) {
+            llmsset_clear_one(nodes, first);
+        }
+#endif
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
             mtbddnode_setvariable(node, var);
