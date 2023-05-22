@@ -4,51 +4,39 @@
 #include "sylvan_align.h"
 #include "sylvan_interact.h"
 
-#define STATS 1 // useful information w.r.t. dynamic reordering
-
 reorder_result_t swap_node(size_t index);
 
 reorder_result_t swap_mapnode(size_t index);
 
 int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
 
-#if SYLVAN_USE_LINEAR_PROBING
-/*!
-   \brief Adjacent variable swap phase 0 (Linear probing compatible)
-   \details Clear hashes of the entire table.
-*/
-#define sylvan_varswap_p0() llmsset_clear_hashes(nodes);
-#else
-VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *);
+#if !SYLVAN_USE_LINEAR_PROBING
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
 */
-#define sylvan_varswap_p0(var, result) CALL(sylvan_varswap_p0, var, 2, nodes->table_size, result)
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *);
 #endif
 
-TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle all trivial cases where no node is created, mark cases that are not trivial.
    @return number of nodes that were marked
 */
-#define sylvan_varswap_p1(var, first, count, result) CALL(sylvan_varswap_p1, var, first, count, result)
+TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 
-VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle the not so trivial cases. (creates new nodes)
 */
-#define sylvan_varswap_p2(var, result) CALL(sylvan_varswap_p2, var, 0, nodes->table_size, result)
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
 
-VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
 /*!
    \brief Adjacent variable swap phase 3
    \details Recovery phase, restore the nodes that were marked in phase 1.
 */
-#define sylvan_varswap_p3(var, result) CALL(sylvan_varswap_p3, var, result)
+VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
@@ -80,10 +68,12 @@ void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t bu
             sprintf(buf, "SYLVAN_REORDER: cannot rehash and cannot create node in phase 2 (%d)", result);
             break;
         case SYLVAN_REORDER_P3_REHASH_FAIL:
-            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 3, maybe there are marked nodes remaining (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 3, maybe there are marked nodes remaining (%d)",
+                    result);
             break;
         case SYLVAN_REORDER_P3_CLEAR_FAIL:
-            sprintf(buf, "SYLVAN_REORDER: cannot clear in phase 3, maybe there are marked nodes remaining (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: cannot clear in phase 3, maybe there are marked nodes remaining (%d)",
+                    result);
             break;
         case SYLVAN_REORDER_NO_REGISTERED_VARS:
             sprintf(buf, "SYLVAN_REORDER: the operation failed fast because there are no registered variables (%d)",
@@ -140,20 +130,20 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     CALL(sylvan_clear_cache);
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
-    sylvan_varswap_p0();
+    llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, &result);
+    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
 #endif
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
+    size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(pos, &result);
+        CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
         if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_varswap_p3(pos, &result);
+            CALL(sylvan_varswap_p3, pos, &result);
         }
     }
 
@@ -212,12 +202,11 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
             if (llmsset_clear_one(nodes, first) != 1) {
-                atomic_exchange(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
+//                atomic_exchange(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
             }
         }
     }
 }
-
 #endif
 
 /**
@@ -451,7 +440,7 @@ reorder_result_t swap_node(size_t index)
     if (f1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
     // Create the low high child.
     f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
-    if (f0 == mtbdd_invalid)  return SYLVAN_REORDER_P2_CREATE_FAIL;
+    if (f0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
 
     // update node, which also removes the mark
     mtbddnode_makenode(node, var, f0, f1);
@@ -488,18 +477,18 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
 {
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
-    sylvan_varswap_p0();
+    llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    RUNEX(sylvan_varswap_p0, pos, 2, nodes->table_size, result);
+    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result);
     if (sylvan_reorder_issuccess(*result) == 0) {
         atomic_exchange(result, SYLVAN_REORDER_P3_CLEAR_FAIL);
     }
 #endif
     // at this point we already have nodes marked from P2 so we will unmark them now in P1
-    size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, result);
+    size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result);
     if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
         // do the not so trivial cases (but won't create new nodes this time)
-        sylvan_varswap_p2(pos, result);
+        CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, result);
     }
 }

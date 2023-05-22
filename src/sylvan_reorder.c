@@ -207,7 +207,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
     s_state->size = CALL(llmsset_count_marked, nodes);
     xIndex = levels->level_to_order[s_state->pos];
 
-    limitSize = s_state->size - levels->isolated_count;
+    limitSize = s_state->size = s_state->size - levels->isolated_count;
     R = 0;
 
     // Let <x> be the variable at level <pos>. (s_state->pos)

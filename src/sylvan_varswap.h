@@ -69,22 +69,13 @@ void sylvan_print_reorder_res(reorder_result_t result);
   * The operation is not thread-safe, so make sure no other Sylvan operations are
   * done when performing variable swapping.
   *
-  * Variable swapping consists of two phases. The first phase performs
-  * variable swapping on all simple cases. The cases that require node
-  * lookups are left marked. The second phase then fixes the marked nodes.
-  *
   * It is recommended to clear the cache and perform clear-and-mark (the first part of garbage
   * collection, before resizing and rehashing) before running sylvan_varswap.
   *
   * If the parameter <recovery> is set, then phase 1 only rehashes nodes that have variable "var+1".
   * Phase 2 will not abort on the first error, but try to finish as many nodes as possible.
   *
-  * Return varswap_res_t
-  *
-  * See the implementation of sylvan_simple_varswap for notes on recovery/rollback.
-  *
-  * Due to the nature of bounded probe sequences, it is possible that rehashing
-  * fails, even when nothing is changed. Worst case: recovery impossible.
+  * See the implementation of sylvan_varswap for notes on recovery/rollback.
   *
   * @param var variable to swap
   * @return varswap_res_t
