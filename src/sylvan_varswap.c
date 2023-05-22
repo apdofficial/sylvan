@@ -552,17 +552,10 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, result);
 #endif
-    // at this point we have already nodes marked from P2 so we will unmark then now in P1
+    // at this point we already have nodes marked from P2 so we will unmark them now in P1
     size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, result);
     if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
         // do the not so trivial cases (but won't create new nodes this time)
         sylvan_varswap_p2(pos, result);
-        if (sylvan_reorder_issuccess(*result) == 0) {
-            atomic_exchange(result, SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL);
-        }
-    } else {
-        atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL_MARKED);
     }
 }
-
-
