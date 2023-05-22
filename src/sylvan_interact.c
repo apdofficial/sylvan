@@ -130,11 +130,14 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     size_t nvars = dbs->count;
     levels->isolated_count = 0;
 
+    // clear all previous data related to interaction matrix/ dynamic lower bounds
+    clear_aligned(levels->ref_count, nodes->table_size);
+    clear_aligned(levels->var_count, levels->count);
+    clear_aligned(levels->bitmap_i, levels->bitmap_i_size);
+
     atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars);  // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap
-
-    clear_aligned(levels->ref_count, nodes->table_size);
 
     if (bitmap_s == 0 || bitmap_v == 0 || bitmap_l == 0) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
