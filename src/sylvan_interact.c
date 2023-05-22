@@ -76,8 +76,7 @@ void interact_print_state(const levels_t dbs)
  *
  * @sideeffect Accumulates in support the variables on which f depends.
  *
- * If F00 = F01 and F10 = F11, then F does not depend on <y>.
- * Therefore, it is not moved or changed by the swap. If this is the case
+ * If F00 = F01 and F10 = F11, then F does not depend on <y>. If this is the case
  * for all the nodes of variable <x>, we say that variables <x> and <y> do not interact.
  *
  * Performs a tree search on the BDD to accumulate the support array of the variables on which f depends.
@@ -172,7 +171,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < levels->count; i++) {
-        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) <= 1) {
+        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) == 0) {
             levels->isolated_count++;
         }
     }

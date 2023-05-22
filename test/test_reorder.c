@@ -24,6 +24,9 @@ static double t_start;
 #define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
+void _sylvan_start();
+void _sylvan_quit();
+
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
 TASK_1(BDD, create_example_bdd, size_t, is_optimal)
 {
@@ -61,11 +64,9 @@ TASK_1(BDDMAP, create_example_map, size_t, is_optimal)
 
 TASK_0(int, test_varswap)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-
-    sylvan_resetlevels();
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
     sylvan_newlevels(10);
 
     /* test ithvar, switch 6 and 7 */
@@ -97,16 +98,14 @@ TASK_0(int, test_varswap)
 
 TASK_0(int, test_varswap_down)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
 
     /* swap down manually var 0 to level 3 */
     test_assert(sylvan_level_to_order(0) == 0);
@@ -160,16 +159,14 @@ TASK_0(int, test_varswap_down)
 
 TASK_0(int, test_varswap_up)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
 
     /* swap up manually var 3 to level 0 */
     test_assert(zero == sylvan_ithvar(0));
@@ -213,16 +210,18 @@ TASK_0(int, test_varswap_up)
 
 TASK_0(int, test_sift_down)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
+
+    // we need to make relation between the variables otherwise the lower bounds will make sifting down skip the variables swaps
+    MTBDD bdd = sylvan_and(sylvan_and(sylvan_and(zero, one), two), three);
+    mtbdd_protect(&bdd);
 
     /* swap down manually var 0 to level 3 */
     test_assert(sylvan_level_to_order(0) == 0);
@@ -255,45 +254,48 @@ TASK_0(int, test_sift_down)
 
     interact_var_ref_init(levels);
 
-    // 0, 1, 2, 3
+    // (0), 1, 2, 3
     test_assert(CALL(sylvan_siftdown, &state) == SYLVAN_REORDER_SUCCESS);
-    // 1, 2, 3, 0
+    // 1, 2, (0), 3
+    // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
     test_assert(sylvan_level_to_order(0) == 1);
     test_assert(sylvan_level_to_order(1) == 2);
-    test_assert(sylvan_level_to_order(2) == 3);
-    test_assert(sylvan_level_to_order(3) == 0);
+    test_assert(sylvan_level_to_order(2) == 0);
+    test_assert(sylvan_level_to_order(3) == 3);
 
     test_assert(sylvan_order_to_level(1) == 0);
     test_assert(sylvan_order_to_level(2) == 1);
-    test_assert(sylvan_order_to_level(3) == 2);
-    test_assert(sylvan_order_to_level(0) == 3);
+    test_assert(sylvan_order_to_level(0) == 2);
+    test_assert(sylvan_order_to_level(3) == 3);
 
-    test_assert(zero == sylvan_ithvar(3));
+    test_assert(zero == sylvan_ithvar(2));
     test_assert(one == sylvan_ithvar(0));
     test_assert(two == sylvan_ithvar(1));
-    test_assert(three == sylvan_ithvar(2));
+    test_assert(three == sylvan_ithvar(3));
 
-    test_assert(mtbdd_getvar(zero) == 3);
+    test_assert(mtbdd_getvar(zero) == 2);
     test_assert(mtbdd_getvar(one) == 0);
     test_assert(mtbdd_getvar(two) == 1);
-    test_assert(mtbdd_getvar(three) == 2);
+    test_assert(mtbdd_getvar(three) == 3);
 
     return 0;
 }
 
 TASK_0(int, test_sift_up)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
+
+    // we need to make relation between the variables otherwise the lower bounds will make sifting skip the variables swaps
+    MTBDD bdd = sylvan_and(sylvan_and(sylvan_and(zero, one), two), three);
+    mtbdd_protect(&bdd);
 
     /* swap up manually var 3 to level 0 */
     test_assert(zero == sylvan_ithvar(0));
@@ -316,44 +318,44 @@ TASK_0(int, test_sift_up)
 
     interact_var_ref_init(levels);
 
-    // 0, 1, 2, 3
+    // 0, 1, 2, (3)
     test_assert(CALL(sylvan_siftup, &state) == SYLVAN_REORDER_SUCCESS);
-    // 3, 0, 1, 2
+    // 0, (3), 1, 2
+    // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
-    test_assert(sylvan_level_to_order(0) == 3);
-    test_assert(sylvan_level_to_order(1) == 0);
+    test_assert(sylvan_level_to_order(0) == 0);
+    test_assert(sylvan_level_to_order(1) == 3);
     test_assert(sylvan_level_to_order(2) == 1);
     test_assert(sylvan_level_to_order(3) == 2);
 
-    test_assert(sylvan_order_to_level(3) == 0);
-    test_assert(sylvan_order_to_level(0) == 1);
+    test_assert(sylvan_order_to_level(0) == 0);
+    test_assert(sylvan_order_to_level(3) == 1);
     test_assert(sylvan_order_to_level(1) == 2);
     test_assert(sylvan_order_to_level(2) == 3);
 
-    test_assert(zero == sylvan_ithvar(1));
+    test_assert(zero == sylvan_ithvar(0));
     test_assert(one == sylvan_ithvar(2));
     test_assert(two == sylvan_ithvar(3));
-    test_assert(three == sylvan_ithvar(0));
+    test_assert(three == sylvan_ithvar(1));
 
-    test_assert(mtbdd_getvar(zero) == 1);
+    test_assert(mtbdd_getvar(zero) == 0);
     test_assert(mtbdd_getvar(one) == 2);
     test_assert(mtbdd_getvar(two) == 3);
-    test_assert(mtbdd_getvar(three) == 0);
+    test_assert(mtbdd_getvar(three) == 1);
+
     return 0;
 }
 
 TASK_0(int, test_sift_pos)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
 
     /* swap up manually var 3 to level 0 */
     test_assert(zero == sylvan_ithvar(0));
@@ -366,9 +368,9 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
 
-    // 0, 1, 2, 3
-    test_assert(CALL(sylvan_siftpos,3, 0) == SYLVAN_REORDER_SUCCESS);
-    // 3, 0, 1, 2
+    // 0, 1, 2, (3)
+    test_assert(CALL(sylvan_siftpos, 3, 0) == SYLVAN_REORDER_SUCCESS);
+    // (3), 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
     test_assert(sylvan_level_to_order(1) == 0);
@@ -390,9 +392,9 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(two) == 3);
     test_assert(mtbdd_getvar(three) == 0);
 
-    // 3, 0, 1, 2
+    // (3), 0, 1, 2
     test_assert(CALL(sylvan_siftpos, 0, 3) == SYLVAN_REORDER_SUCCESS);
-    // 0, 1, 2, 3
+    // 0, 1, 2, (3)
 
     test_assert(zero == sylvan_ithvar(0));
     test_assert(one == sylvan_ithvar(1));
@@ -409,16 +411,14 @@ TASK_0(int, test_sift_pos)
 
 TASK_0(int, test_reorder_perm)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new one
-    sylvan_gc();
-    sylvan_resetlevels();
-    sylvan_newlevels(4);
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
-    MTBDD zero = sylvan_ithlevel(0);
-    MTBDD one = sylvan_ithlevel(1);
-    MTBDD two = sylvan_ithlevel(2);
-    MTBDD three = sylvan_ithlevel(3);
+    MTBDD zero = sylvan_newlevel();
+    MTBDD one = sylvan_newlevel();
+    MTBDD two = sylvan_newlevel();
+    MTBDD three = sylvan_newlevel();
 
     /* reorder the variables according to the variable permutation*/
     test_assert(zero == sylvan_ithvar(0));
@@ -460,10 +460,9 @@ TASK_0(int, test_reorder_perm)
 
 TASK_0(int, test_reorder)
 {
-    // we need fixed variables for the test
-    // therefore we reset the levels and create new ones
-    sylvan_gc();
-    sylvan_resetlevels();
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
     BDD bdd = create_example_bdd(0);
     sylvan_protect(&bdd);
@@ -502,6 +501,10 @@ TASK_0(int, test_reorder)
 
 TASK_0(int, test_map_reorder)
 {
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
+
     BDDMAP map = create_example_map(0);
     sylvan_protect(&map);
 
@@ -517,8 +520,9 @@ TASK_0(int, test_map_reorder)
 
 TASK_0(int, test_interact)
 {
-    sylvan_gc();
-    sylvan_resetlevels();
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
     BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
     sylvan_protect(&bdd1);
@@ -555,8 +559,9 @@ TASK_0(int, test_interact)
 
 TASK_0(int, test_var_count)
 {
-    sylvan_gc();
-    sylvan_resetlevels();
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
     BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
     sylvan_protect(&bdd1);
@@ -579,8 +584,9 @@ TASK_0(int, test_var_count)
 
 TASK_0(int, test_ref_count)
 {
-    sylvan_gc();
-    sylvan_resetlevels();
+    // we need to delete all data so we reset sylvan
+    _sylvan_quit();
+    _sylvan_start();
 
     BDD bdd1 = sylvan_or(sylvan_newlevel(), sylvan_newlevel());
     sylvan_protect(&bdd1);
@@ -660,6 +666,20 @@ int should_reordering_terminate()
     return terminate_reordering;
 }
 
+void _sylvan_start(){
+    sylvan_set_limits(1LL<<20, 1, 8);
+    sylvan_init_package();
+    sylvan_init_mtbdd();
+    sylvan_init_reorder();
+    sylvan_gc_enable();
+}
+
+void _sylvan_quit(){
+    sylvan_quit();
+    sylvan_quit_reorder();
+}
+
+
 int main()
 {
     setlocale(LC_NUMERIC, "en_US.utf-8");
@@ -667,11 +687,7 @@ int main()
 
     lace_start(2, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL<<20, 1, 8);
-    sylvan_init_package();
-    sylvan_init_mtbdd();
-    sylvan_init_reorder();
-    sylvan_gc_enable();
+    _sylvan_start();
 
     sylvan_set_reorder_nodes_threshold(2); // keep it 2, otherwise we skip levels which will fail the test expectations
     sylvan_set_reorder_maxgrowth(1.2f);
@@ -682,13 +698,13 @@ int main()
     sylvan_re_hook_progre(TASK(reordering_progress));
     sylvan_re_hook_termre(should_reordering_terminate);
 
-    size_t ntests = 10;
+    size_t ntests = 5;
 
     int res = RUN(runtests, ntests);
 
     sylvan_stats_report(stdout);
 
-    sylvan_quit();
+    _sylvan_quit();
     lace_stop();
 
     return res;

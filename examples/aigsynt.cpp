@@ -747,7 +747,7 @@ int main(int argc, char **argv)
      * Second: start all worker threads with default settings.
      * Third: setup local variables using the LACE_ME macro.
      */
-    lace_start(8, 1000000);
+    lace_start(1, 1000000);
 
     sylvan_set_limits(8LL << 30, 1, 8);
     sylvan_init_package();
