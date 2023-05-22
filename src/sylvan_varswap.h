@@ -10,7 +10,7 @@ typedef enum reorder_result {
     SYLVAN_REORDER_ROLLBACK = 1,
     /// success
     SYLVAN_REORDER_SUCCESS = 0,
-    //// cannot rehash in phase 0, no marked nodes remaining
+    //// cannot clear in phase 0, no marked nodes remaining
     SYLVAN_REORDER_P0_CLEAR_FAIL = -1,
     //// cannot rehash in phase 1, no marked nodes remaining
     SYLVAN_REORDER_P1_REHASH_FAIL = -2,
@@ -24,12 +24,14 @@ typedef enum reorder_result {
     SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -6,
     //// cannot rehash in phase 3, maybe there are marked nodes remaining
     SYLVAN_REORDER_P3_REHASH_FAIL = -7,
+    //// cannot clear in phase 3, maybe there are marked nodes remaining
+    SYLVAN_REORDER_P3_CLEAR_FAIL = -8,
     /// the operation failed fast because there are no registered variables
-    SYLVAN_REORDER_NO_REGISTERED_VARS = -8,
+    SYLVAN_REORDER_NO_REGISTERED_VARS = -9,
     /// the operation failed fast because the varswap was not initialised
-    SYLVAN_REORDER_NOT_INITIALISED = -9,
+    SYLVAN_REORDER_NOT_INITIALISED = -10,
     /// the operation failed fast because the varswap was already running
-    SYLVAN_REORDER_ALREADY_RUNNING = -10,
+    SYLVAN_REORDER_ALREADY_RUNNING = -11,
 } reorder_result_t;
 
 /**

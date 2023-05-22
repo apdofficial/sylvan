@@ -212,8 +212,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 
     // Let <x> be the variable at level <pos>. (s_state->pos)
     // Let <y> be the variable at level <pos+1>. (s_state->pos+1)
-    // Let <Ni> be the number of nodes at level i.
-    // Let <n> be the number of levels. (levels->count)
+    // Let Ni be the number of nodes at level i.
+    // Let n be the number of levels. (levels->count)
 
     // Then the size of DD can not be reduced below:
     // LB(DN) = Nj + ∑ Ni | 0<i<pos
@@ -275,14 +275,14 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t*, s_state)
 
     // Let <x> be the variable at level <pos-1>. (s_state->pos-1)
     // Let <y> be the variable at level <pos>. (s_state->pos)
-    // Let <Ni> be the number of nodes at level i.
-    // Let <n> be the number of levels. (levels->count)
+    // Let Ni be the number of nodes at level i.
+    // Let n be the number of levels. (levels->count)
 
     // Then the size of DD can not be reduced below:
     // LB(UP) = N0 + ∑ Ni | i<pos<n
 
     // The part of the DD below <y> will not change.
-    // The part of the DD above <y> that does not interact with <x> will not change.
+    // The part of the DD above <y> that does not interact with <y> will not change.
     // The rest may vanish in the best case, except for
     // the nodes at level <low>, which will not vanish, regardless.
 
