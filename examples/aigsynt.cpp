@@ -689,41 +689,41 @@ VOID_TASK_0(gc_mark)
 
 VOID_TASK_0(gc_start)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: str: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
 VOID_TASK_0(gc_end)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: end: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
-//static size_t prev_size = 0;
+static int prev_size = 0;
 VOID_TASK_0(reordering_start)
 {
-//    terminate_reordering = 0;
-//    sylvan_gc();
-//    size_t size = llmsset_count_marked(nodes);
-//    prev_size = size;
-//    INFO("RE: str: %zu size\n", size);
+    terminate_reordering = 0;
+    size_t size = llmsset_count_marked(nodes);
+    prev_size = size;
+    INFO("RE: str: %zu size\n", size);
 }
 
 VOID_TASK_0(reordering_progress)
 {
-//    size_t size = llmsset_count_marked(nodes);
-//    // we allow growth of at most 5%
-//    if (size >= prev_size * 1.05) terminate_reordering = 1;
-//    else prev_size = size;
-//    INFO("RE: prg: %zu size\n", size);
+    size_t size = llmsset_count_marked(nodes);
+    // we allow growth of at most 20%
+    if (size >= prev_size * 1.2) terminate_reordering = 1;
+    else prev_size = size;
+    INFO("RE: prg: %zu size\n", size);
 }
 
 VOID_TASK_0(reordering_end)
 {
-//    size_t size = llmsset_count_marked(nodes);
-//    INFO("RE: end: %zu size\n", size);
+    size_t size = llmsset_count_marked(nodes);
+    INFO("RE: end: %zu size\n", size);
+    sylvan_gc();
 }
 
 int should_reordering_terminate()
@@ -749,20 +749,20 @@ int main(int argc, char **argv)
      */
     lace_start(8, 1000000);
 
-
     sylvan_set_limits(8LL << 30, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
+    sylvan_gc_enable();
 
-    sylvan_set_reorder_threshold(32);
+    sylvan_set_reorder_nodes_threshold(32);
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(1 * 15 * 1000);
+    sylvan_set_reorder_timelimit_sec(30);
 
-    sylvan_re_hook_prere(TASK(reordering_start));
-    sylvan_re_hook_postre(TASK(reordering_end));
-    sylvan_re_hook_progre(TASK(reordering_progress));
-    sylvan_re_hook_termre(should_reordering_terminate);
+//    sylvan_re_hook_prere(TASK(reordering_start));
+//    sylvan_re_hook_postre(TASK(reordering_end));
+//    sylvan_re_hook_progre(TASK(reordering_progress));
+//    sylvan_re_hook_termre(should_reordering_terminate);
 
     // Set hooks for logging garbage collection
     if (verbose) {
@@ -771,7 +771,7 @@ int main(int argc, char **argv)
     }
 
     if (model_filename == NULL) {
-        Abort("stream not yet supported\n");
+        Abort("Invalid file name.\n");
     }
 
     int fd = open(model_filename, O_RDONLY);

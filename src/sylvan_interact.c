@@ -102,14 +102,16 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     // set support bitmap, <var> is on the support of <f>
     bitmap_atomic_set(bitmap_s, var);
 
+    int visited = bitmap_atomic_get(bitmap_v, index) == 0; // avoid duplicate ref count
+
     MTBDD high = mtbdd_gethigh(f);
-    if (bitmap_atomic_get(bitmap_v, high & 0x000000ffffffffff) == 0) { // avoid duplicate ref count
-        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(high)]], 1);
+    if (visited == 0) {
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(high)]], 1, memory_order_relaxed);
     }
 
     MTBDD low = mtbdd_getlow(f);
-    if (bitmap_atomic_get(bitmap_v, low & 0x000000ffffffffff) == 0) { // avoid duplicate ref count
-        atomic_fetch_add(&levels->ref_count[levels->level_to_order[mtbdd_getvar(low)]], 1);
+    if (visited == 0) {
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(low)]], 1, memory_order_relaxed);
     }
 
     SPAWN(find_support, high, bitmap_s, bitmap_v, bitmap_l);
@@ -129,7 +131,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     size_t nvars = dbs->count;
     levels->isolated_count = 0;
 
-    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars); // support bitmap
+    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars);  // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap
 
@@ -145,7 +147,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         BDDVAR var = mtbddnode_getvariable(f);
         if(var >= mtbdd_levelscount()) continue;
 
-        atomic_fetch_add(&levels->var_count[levels->level_to_order[var]], 1);
+        atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var]], 1, memory_order_relaxed);
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>

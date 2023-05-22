@@ -22,8 +22,8 @@ typedef enum reorder_result {
     SYLVAN_REORDER_P2_CREATE_FAIL = -5,
     /// cannot rehash and cannot create node in phase 2
     SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -6,
-    /// the operation was aborted and rolled back
-    SYLVAN_REORDER_ERROR = -7,
+    /// the operation failed fast because there are no registered variables
+    SYLVAN_REORDER_NO_REGISTERED_VARS = -7,
     /// the operation failed fast because the varswap was not initialised
     SYLVAN_REORDER_NOT_INITIALISED = -8,
     /// the operation failed fast because the varswap was already running
@@ -40,18 +40,17 @@ typedef enum reorder_result {
  * @param buf buffer into which the description will be copied
  * @param buf_len
  */
-void sylvan_varswap_resdescription(reorder_result_t result, char *buf, size_t buf_len);
+void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len);
 
-static inline int sylvan_varswap_issuccess(reorder_result_t result)
+static inline int sylvan_reorder_issuccess(reorder_result_t result)
 {
     return result == SYLVAN_REORDER_SUCCESS ||
     result == SYLVAN_REORDER_NOT_INITIALISED ||
     result == SYLVAN_REORDER_ROLLBACK;
 }
 
-void sylvan_print_varswap_res(reorder_result_t result);
+void sylvan_print_reorder_res(reorder_result_t result);
 
-TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t);
  /**
   * @brief Swaps two consecutive variables in the entire forest.
   *
@@ -87,7 +86,7 @@ TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t);
   * @return varswap_res_t
   *
   */
-#define sylvan_varswap(pos) CALL(sylvan_varswap, pos)
+TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t);
 
 #ifdef __cplusplus
 }

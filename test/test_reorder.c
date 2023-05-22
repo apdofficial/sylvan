@@ -81,7 +81,7 @@ TASK_0(int, test_varswap)
     test_assert(mtbdd_getvar(one) == 6);
     test_assert(mtbdd_getvar(two) == 7);
 
-    test_assert(sylvan_varswap(6) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 6) == SYLVAN_REORDER_SUCCESS);
 
     test_assert(sylvan_level_to_order(7) == 6);
     test_assert(sylvan_level_to_order(6) == 7);
@@ -130,9 +130,9 @@ TASK_0(int, test_varswap_down)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
-    test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
-    test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 0) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 1) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 2) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, 0
 
     test_assert(sylvan_level_to_order(0) == 1);
@@ -183,9 +183,9 @@ TASK_0(int, test_varswap_up)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
-    test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
-    test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 2) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 1) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_varswap, 0) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -253,8 +253,10 @@ TASK_0(int, test_sift_down)
     state.low = 0;
     state.high = 3;
 
+    interact_var_ref_init(levels);
+
     // 0, 1, 2, 3
-    test_assert(sylvan_siftdown(&state) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftdown, &state) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, 0
 
     test_assert(sylvan_level_to_order(0) == 1);
@@ -312,8 +314,10 @@ TASK_0(int, test_sift_up)
     state.low = 0;
     state.high = 3;
 
+    interact_var_ref_init(levels);
+
     // 0, 1, 2, 3
-    test_assert(sylvan_siftup(&state) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftup, &state) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -363,7 +367,7 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(three) == 3);
 
     // 0, 1, 2, 3
-    test_assert(sylvan_siftpos(3, 0) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftpos,3, 0) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -387,7 +391,7 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(three) == 0);
 
     // 3, 0, 1, 2
-    test_assert(sylvan_siftpos(0, 3) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftpos, 0, 3) == SYLVAN_REORDER_SUCCESS);
     // 0, 1, 2, 3
 
     test_assert(zero == sylvan_ithvar(0));
@@ -465,7 +469,7 @@ TASK_0(int, test_reorder)
     sylvan_protect(&bdd);
 
     size_t not_optimal_order_size = sylvan_nodecount(bdd);
-    sylvan_reorder_all();
+    sylvan_reduce_heap();
     size_t not_optimal_order_reordered_size = sylvan_nodecount(bdd);
 
     test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
@@ -502,7 +506,7 @@ TASK_0(int, test_map_reorder)
     sylvan_protect(&map);
 
     size_t size_before = sylvan_nodecount(map);
-    sylvan_reorder_all();
+    sylvan_reduce_heap();
     size_t size_after = sylvan_nodecount(map);
 
     test_assert(size_after < size_before);
@@ -563,7 +567,7 @@ TASK_0(int, test_var_count)
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
-        printf("var %zu has %u nodes\n", i, levels_var_count_load(levels, i));
+        printf("var %zu has %u nodes\n", i, atomic_load(&levels->ref_count[levels->level_to_order[i]]));
     }
 
     interact_free(levels);
@@ -587,7 +591,7 @@ TASK_0(int, test_ref_count)
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
-        size_t ref_count = levels_ref_count_load(levels, i);
+        size_t ref_count = atomic_load(&levels->ref_count[levels->level_to_order[i]]);
         if (ref_count > 0) {
             printf("var %zu has %zu references\n", i, ref_count);
         }
@@ -661,24 +665,24 @@ int main()
     setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    lace_start(4, 1000000); // 4 workers, use a 1,000,000 size task queue
+    lace_start(2, 1000000); // 4 workers, use a 1,000,000 size task queue
 
-    sylvan_set_limits(1LL<<20, 1, 2);
+    sylvan_set_limits(1LL<<20, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
 
-    sylvan_set_reorder_threshold(2);
+    sylvan_set_reorder_nodes_threshold(2); // keep it 2, otherwise we skip levels which will fail the test expectations
     sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit(30 * 1000);
+    sylvan_set_reorder_timelimit_sec(30);
 
     sylvan_re_hook_prere(TASK(reordering_start));
     sylvan_re_hook_postre(TASK(reordering_end));
     sylvan_re_hook_progre(TASK(reordering_progress));
     sylvan_re_hook_termre(should_reordering_terminate);
 
-    size_t ntests = 1;
+    size_t ntests = 10;
 
     int res = RUN(runtests, ntests);
 

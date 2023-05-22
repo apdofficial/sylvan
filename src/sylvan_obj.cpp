@@ -1070,7 +1070,7 @@ void Sylvan::initReorder()
 
 void Sylvan::setReorderThreshold(uint32_t threshold)
 {
-    sylvan_set_reorder_threshold(threshold);
+    sylvan_set_reorder_nodes_threshold(threshold);
 }
 
 void Sylvan::setReorderMaxGrowth(float max_growth)
@@ -1090,7 +1090,7 @@ void Sylvan::setReorderMaxVar(uint32_t max_var)
 
 void Sylvan::setReorderTimeLimit(double time_limit)
 {
-    sylvan_set_reorder_timelimit(time_limit);
+    sylvan_set_reorder_timelimit_ms(time_limit);
 }
 
 void Sylvan::reduceHeap()

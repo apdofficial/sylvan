@@ -4,11 +4,11 @@
 #include "sylvan_align.h"
 #include "sylvan_interact.h"
 
-#define STATS 0 // useful information w.r.t. dynamic reordering
+#define STATS 1 // useful information w.r.t. dynamic reordering
 
-void swap_node(size_t index);
+reorder_result_t swap_node(size_t index);
 
-void swap_mapnode(size_t index);
+reorder_result_t swap_mapnode(size_t index);
 
 int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
 
@@ -43,46 +43,39 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_r
 */
 #define sylvan_varswap_p2(var, result) CALL(sylvan_varswap_p2, var, 0, nodes->table_size, result)
 
-void sylvan_varswap_resdescription(reorder_result_t result, char *buf, size_t buf_len)
+void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
     assert(buf_len >= 100);
     switch (result) {
         case SYLVAN_REORDER_ROLLBACK:
-            sprintf(buf, "SYLVAN_VARSWAP_ROLLBACK: the operation was aborted and rolled back");
+            sprintf(buf, "SYLVAN_REORDER: the operation was aborted and rolled back (%d)", result);
             break;
         case SYLVAN_REORDER_SUCCESS:
-            sprintf(buf, "SYLVAN_REORDER_SUCCESS: success (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: success (%d)", result);
             break;
         case SYLVAN_REORDER_P1_REHASH_FAIL:
-            sprintf(buf, "SYLVAN_REORDER_P1_REHASH_FAIL: cannot rehash in phase 1, no marked nodes remaining (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, no marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P1_REHASH_FAIL_MARKED:
-            sprintf(buf,
-                    "SYLVAN_REORDER_P1_REHASH_FAIL_MARKED: cannot rehash in phase 1, and marked nodes remaining (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, and marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P2_REHASH_FAIL:
-            sprintf(buf, "SYLVAN_REORDER_P2_REHASH_FAIL: cannot rehash in phase 2, no marked nodes remaining (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 2, no marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P2_CREATE_FAIL:
-            sprintf(buf,
-                    "SYLVAN_REORDER_P2_CREATE_FAIL: cannot create node in phase 2 (ergo marked nodes remaining) (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot create node in phase 2 (ergo marked nodes remaining) (%d)", result);
             break;
         case SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL:
-            sprintf(buf,
-                    "SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL: cannot rehash and cannot create node in phase 2 (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash and cannot create node in phase 2 (%d)", result);
             break;
         case SYLVAN_REORDER_NOT_INITIALISED:
-            sprintf(buf, "SYLVAN_REORDER_NOT_INITIALISED: please make sure you first initialize reordering (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: please make sure you first initialize reordering (%d)", result);
+            break;
+        case SYLVAN_REORDER_NO_REGISTERED_VARS:
+            sprintf(buf, "SYLVAN_REORDER: the operation failed fast because there are no registered variables (%d)", result);
             break;
         case SYLVAN_REORDER_ALREADY_RUNNING:
-            sprintf(buf, "SYLVAN_REORDER_ALREADY_RUNNING: cannot start reordering when it is already running (%d)",
-                    result);
+            sprintf(buf, "SYLVAN_REORDER: cannot start reordering when it is already running (%d)", result);
             break;
         default:
             sprintf(buf, "SYLVAN_REORDER: UNKNOWN ERROR (%d)", result);
@@ -90,11 +83,11 @@ void sylvan_varswap_resdescription(reorder_result_t result, char *buf, size_t bu
     }
 }
 
-void sylvan_print_varswap_res(reorder_result_t result)
+void sylvan_print_reorder_res(reorder_result_t result)
 {
     char buff[100];
-    sylvan_varswap_resdescription(result, buff, 100);
-    if (!sylvan_varswap_issuccess(result)) fprintf(stderr, "%s\n", buff);
+    sylvan_reorder_resdescription(result, buff, 100);
+    if (!sylvan_reorder_issuccess(result)) fprintf(stderr, "%s\n", buff);
     else fprintf(stdout, "%s\n", buff);
 }
 
@@ -166,9 +159,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     ** two functions again. This is done to eliminate the isolated
     ** projection functions from the node count.
     */
-    size_t x_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos]], memory_order_relaxed) == 1;
-    size_t y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
-    size_t isolated = -(x_isolated + y_isolated);
+    int x_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos]], memory_order_relaxed) == 1;
+    int y_isolated = atomic_load_explicit(&levels->ref_count[levels->level_to_order[pos + 1]], memory_order_relaxed) == 1;
+    int isolated = -(x_isolated + y_isolated);
 
     //TODO: take case of the implications of swapping the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]) == 0) {
@@ -182,7 +175,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     // ensure that the cache is cleared
     CALL(sylvan_clear_cache);
-
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     sylvan_varswap_p0();
@@ -190,43 +182,30 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // first clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result);
 #endif
-
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    uint64_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
-
+    size_t marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
     if (marked_count > 0) {
-
         // do the not so trivial cases (creates new nodes)
         sylvan_varswap_p2(pos, &result);
-
-        if (result != SYLVAN_REORDER_SUCCESS) {
-#if STATS
-            printf("Recovery time!\n");
-#endif
+        if (sylvan_reorder_issuccess(result) == 0) {
 #if SYLVAN_USE_LINEAR_PROBING
             // clear the entire table
             sylvan_varswap_p0();
 #else
-            // first clear hashes of nodes with <var> and <var+1>
+            // clear hashes of nodes with <var> and <var+1>
             sylvan_varswap_p0(pos, &result);
 #endif
             // handle all trivial cases, mark cases that are not trivial
             marked_count = sylvan_varswap_p1(pos, 0, nodes->table_size, &result);
-
-            if (marked_count > 0 && result == SYLVAN_REORDER_SUCCESS) {
+            if (marked_count > 0 && sylvan_reorder_issuccess(result)) {
                 // do the not so trivial cases (but won't create new nodes this time)
                 sylvan_varswap_p2(pos, &result);
-                if (result != SYLVAN_REORDER_SUCCESS) {
-                    // actually, we should not see this!
-                    fprintf(stderr, "sylvan: recovery varswap failed!\n");
+                if (sylvan_reorder_issuccess(result) == 0) {
                     return SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL;
                 }
             } else {
                 return SYLVAN_REORDER_P1_REHASH_FAIL_MARKED;
             }
-#if STATS
-            printf("Recovery good.\n");
-#endif
             return SYLVAN_REORDER_ROLLBACK;
         }
     }
@@ -280,13 +259,12 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) {
-            printf("sylvan_varswap_p0: leaf\n");
-            continue; // a leaf
-        }
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            llmsset_clear_one(nodes, first);
+            if (llmsset_clear_one(nodes, first) != 1) {
+                atomic_exchange(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
+            }
         }
     }
 }
@@ -331,10 +309,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) {
-            printf("sylvan_varswap_p1: leaf\n");
-            continue; // a leaf
-        }
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar >= mtbdd_levelscount()) continue;  // not registered <var>
 
@@ -342,8 +317,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             // if <var+1>, then replace with <var> and rehash
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
-                fprintf(stderr, "sylvan_varswap_p1: llmsset_rehash_bucket(%zu) failed!\n", first);
-                *result = SYLVAN_REORDER_P1_REHASH_FAIL;
+                atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
             }
             continue;
         } else if (nvar != var) {
@@ -355,8 +329,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             mtbddnode_setflag(node, 0);
             llmsset_rehash_bucket(nodes, first);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
-                fprintf(stderr, "sylvan_varswap_p1:recovery: llmsset_rehash_bucket(%zu) failed!\n", first);
-                *result = SYLVAN_REORDER_P1_REHASH_FAIL;
+                atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
             }
             continue;
         }
@@ -374,8 +347,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                     // next in chain wasn't <var+1>...
                     mtbddnode_setvariable(node, var + 1);
                     if (!llmsset_rehash_bucket(nodes, first)) {
-                        fprintf(stderr, "sylvan_varswap_p1: llmsset_rehash_bucket(%zu) failed!\n", first);
-                        *result = SYLVAN_REORDER_P1_REHASH_FAIL;
+                        atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                     }
                 } else {
                     // mark for phase 2
@@ -391,8 +363,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             } else {
                 mtbddnode_setvariable(node, var + 1);
                 if (!llmsset_rehash_bucket(nodes, first)) {
-                    fprintf(stderr, "sylvan_varswap_p1: llmsset_rehash_bucket(%zu) failed!\n", first);
-                    *result = SYLVAN_REORDER_P1_REHASH_FAIL;
+                    atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                 }
             }
         }
@@ -445,36 +416,27 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         count = count + first - 2;
         first = 2;
     }
-
+    reorder_result_t res;
     const size_t end = first + count;
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         if (*result != SYLVAN_REORDER_SUCCESS) return; // the table is full
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) {
-            printf("sylvan_varswap_p2: leaf\n");
-            continue; // a leaf
-        }
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getflag(node)) continue; // an unmarked node
         if (mtbddnode_getvariable(node) >= mtbdd_levelscount()) continue; // not registered <var>
         if (mtbddnode_ismapnode(node)) {
-            swap_mapnode(first);
+            res = swap_mapnode(first);
         } else {
-            swap_node(first);
+            res = swap_node(first);
+        }
+        if (sylvan_reorder_issuccess(res) == 0) { // if we failed let the parent know
+            atomic_exchange(result, res);
         }
     }
 }
 
-/**
- *
- * Swap a node <var> with its successor nodes <var+1>.
- *
- * @preconditions:
- *  - node is marked
- *  - node is not a leaf
- *  - node is <var>
- *  - node childrens are <var+1>
- */
-void swap_node(size_t index)
+
+reorder_result_t swap_node(size_t index)
 {
     mtbddnode_t node = MTBDD_GETNODE(index);
     BDDVAR var = mtbddnode_getvariable(node);
@@ -533,33 +495,24 @@ void swap_node(size_t index)
     f1 = mtbdd_varswap_makenode(var + 1, f01, f11);
     if (f1 == mtbdd_invalid) {
         fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
-        return;
+        return SYLVAN_REORDER_P2_CREATE_FAIL;
     }
 
     // Create the low high child.
     f0 = mtbdd_varswap_makenode(var + 1, f00, f10);
     if (f0 == mtbdd_invalid) {
         fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
-        return;
+        return SYLVAN_REORDER_P2_CREATE_FAIL;
     }
 
     // update node, which also removes the mark
     mtbddnode_makenode(node, var, f0, f1);
     llmsset_rehash_bucket(nodes, index);
+
+    return SYLVAN_REORDER_SUCCESS;
 }
 
-/**
- *
- * Swap a map node <var> with its successor nodes <var+1>.
- *
- * @preconditions:
- *  - node is a map node
- *  - node is marked
- *  - node is not a leaf
- *  - node is <var>
- *  - node childrens are <var+1>
- */
-void swap_mapnode(size_t index)
+reorder_result_t swap_mapnode(size_t index)
 {
     mtbddnode_t node = MTBDD_GETNODE(index);
     BDDVAR var = mtbddnode_getvariable(node);
@@ -573,9 +526,10 @@ void swap_mapnode(size_t index)
     f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
     if (f0 == mtbdd_invalid) {
         fprintf(stderr, "sylvan_varswap_p2: SYLVAN_VARSWAP_P2_CREATE_FAIL\n");
-        return;
+        return SYLVAN_REORDER_P2_CREATE_FAIL;
     } else {
         mtbddnode_makemapnode(node, var, f0, f01);
         llmsset_rehash_bucket(nodes, var);
     }
+    return SYLVAN_REORDER_SUCCESS;
 }
