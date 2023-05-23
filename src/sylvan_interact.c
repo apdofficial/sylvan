@@ -103,18 +103,18 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
     int visited = bitmap_atomic_get(bitmap_v, index) == 0; // avoid duplicate ref count
 
-    MTBDD high = mtbdd_gethigh(f);
+    MTBDD f1 = mtbdd_gethigh(f);
     if (visited == 0) {
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(high)]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f1)]], 1, memory_order_relaxed);
     }
 
-    MTBDD low = mtbdd_getlow(f);
+    MTBDD f0 = mtbdd_getlow(f);
     if (visited == 0) {
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(low)]], 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], 1, memory_order_relaxed);
     }
 
-    SPAWN(find_support, high, bitmap_s, bitmap_v, bitmap_l);
-    CALL(find_support, low, bitmap_s, bitmap_v, bitmap_l);
+    SPAWN(find_support, f1, bitmap_s, bitmap_v, bitmap_l);
+    CALL(find_support, f0, bitmap_s, bitmap_v, bitmap_l);
     SYNC(find_support);
 
     // locally visited node used for calculating support array
@@ -174,7 +174,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < levels->count; i++) {
-        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) == 0) {
+        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) <= 1) {
             levels->isolated_count++;
         }
     }

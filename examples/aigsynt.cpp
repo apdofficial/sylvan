@@ -212,7 +212,6 @@ int *level_to_var;
 #define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
 VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
 {
-    sylvan_test_reduce_heap();
     if (gates[a] != sylvan_invalid) return;
     int lft = gatelft[a] / 2;
     int rgt = gatergt[a] / 2;
@@ -689,16 +688,16 @@ VOID_TASK_0(gc_mark)
 
 VOID_TASK_0(gc_start)
 {
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("GC: str: %zu/%zu size\n", used, total);
+//    size_t used, total;
+//    sylvan_table_usage(&used, &total);
+//    INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
 VOID_TASK_0(gc_end)
 {
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("GC: end: %zu/%zu size\n", used, total);
+//    size_t used, total;
+//    sylvan_table_usage(&used, &total);
+//    INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
 static int prev_size = 0;
@@ -747,7 +746,7 @@ int main(int argc, char **argv)
      * Second: start all worker threads with default settings.
      * Third: setup local variables using the LACE_ME macro.
      */
-    lace_start(1, 1000000);
+    lace_start(8, 1000000);
 
     sylvan_set_limits(8LL << 30, 1, 8);
     sylvan_init_package();
