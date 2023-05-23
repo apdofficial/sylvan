@@ -152,7 +152,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>
-        bitmap_atomic_set(bitmap_s, var);
+        bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
         if (mtbddnode_isleaf(f)) continue;
 
         // A node is a root of the DAG if it cannot be reached by nodes above it.
