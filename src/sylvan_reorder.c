@@ -462,7 +462,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_plain_sift, uint32_t, low, uint32_t, high)
                     break;
                 }
             }
-//            // sifting up
+            // sifting up
             for (; pos > low; pos--) {
                 res = CALL(sylvan_varswap, pos - 1);
                 if (sylvan_reorder_issuccess(res)) break;

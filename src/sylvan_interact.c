@@ -36,20 +36,20 @@ void interact_free(levels_t dbs)
     dbs->bitmap_i_size = 0;
 }
 
-void interact_update(levels_t dbs, atomic_word_t *bitmap_s)
+void interact_update(levels_t dbs, atomic_word_t *bitmap)
 {
     size_t i, j;
     for (i = 0; i < dbs->bitmap_i_nrows - 1; i++) {
-        if (bitmap_atomic_get(bitmap_s, i) == 1) {
-            bitmap_atomic_clear(bitmap_s, i);
+        if (bitmap_atomic_get(bitmap, i) == 1) {
+            bitmap_atomic_clear(bitmap, i);
             for (j = i + 1; j < dbs->bitmap_i_nrows; j++) {
-                if (bitmap_atomic_get(bitmap_s, j) == 1) {
-                    interact_set(dbs, levels->level_to_order[i], levels->level_to_order[j]);
+                if (bitmap_atomic_get(bitmap, j) == 1) {
+                    interact_set(dbs, i, j);
                 }
             }
         }
     }
-    bitmap_atomic_clear(bitmap_s, dbs->bitmap_i_nrows - 1);
+    bitmap_atomic_clear(bitmap, dbs->bitmap_i_nrows - 1);
 }
 
 void interact_print_state(const levels_t dbs)
@@ -92,14 +92,13 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 {
     // The low 40 bits are an index into the unique table.
     uint64_t index = f & 0x000000ffffffffff;
-    mtbddnode_t node = MTBDD_GETNODE(f);
-    BDDVAR var = mtbddnode_getvariable(node);
+    BDDVAR var = mtbdd_getvar(f);
 
     if (mtbdd_isleaf(f)) return;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
 
     // set support bitmap, <var> is on the support of <f>
-    bitmap_atomic_set(bitmap_s, var);
+    bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
 
     int visited = bitmap_atomic_get(bitmap_v, index) == 0; // avoid duplicate ref count
 
@@ -117,7 +116,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     CALL(find_support, f0, bitmap_s, bitmap_v, bitmap_l);
     SYNC(find_support);
 
-    // locally visited node used for calculating support array
+    // locally visited node used to avoid duplicate node visit for a given tree
     bitmap_atomic_set(bitmap_l, index);
     // globally visited node used to determining root nodes
     bitmap_atomic_set(bitmap_v, index);

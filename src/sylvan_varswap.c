@@ -134,6 +134,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
+//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
+//    if (are_interacting) {
+//        assert(marked_count > 0);
+//    } else {
+//        if (marked_count > 0) {
+//            printf("interacting: marked %zu (x= %d, y=%d)\n", marked_count, pos, pos + 1);
+//            printf("interacting: marked %zu (x= %d, y=%d)\n", marked_count, levels->level_to_order[pos],
+//                   levels->level_to_order[pos + 1]);
+//        }
+//
+//        assert(marked_count == 0);
+//    }
+
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
         CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
@@ -388,26 +401,20 @@ reorder_result_t swap_node(size_t index)
     f1 = mtbddnode_gethigh(node);
 
     f01 = f00 = f0;
-    if (!mtbdd_isleaf(f0)) {
-        mtbddnode_t n0 = MTBDD_GETNODE(f0);
-        if (mtbddnode_getvariable(n0) == var) {
-            f00 = node_getlow(f0, n0);
-            f01 = node_gethigh(f0, n0);
-        }
+    if (!mtbdd_isleaf(f0) && mtbdd_getvar(f0) == var) {
+        f00 = mtbdd_getlow(f0);
+        f01 = mtbdd_gethigh(f0);
     }
 
     f11 = f10 = f1;
-    if (!mtbdd_isleaf(f1)) {
-        mtbddnode_t n1 = MTBDD_GETNODE(f1);
-        if (mtbddnode_getvariable(n1) == var) {
-            f10 = node_getlow(f1, n1);
-            f11 = node_gethigh(f1, n1);
-        }
+    if (!mtbdd_isleaf(f1) && mtbdd_getvar(f1) == var) {
+        f10 = mtbdd_getlow(f1);
+        f11 = mtbdd_gethigh(f1);
     }
 
     ref_dec(mtbdd_getvar(f0));
 
-    if(f10 == f00) {
+    if (f10 == f00) {
         newf0 = f00;
         ref_inc(mtbdd_getvar(newf0));
     } else {
@@ -418,11 +425,10 @@ reorder_result_t swap_node(size_t index)
         MTBDD newf00 = newf0;
         MTBDD newf01 = newf0;
         if (!mtbdd_isleaf(newf0)) {
-            mtbddnode_t n = MTBDD_GETNODE(newf0);
-            newf00 = node_low(newf0, n);
-            newf01 = node_high(newf0, n);
+            newf00 = mtbdd_getlow(newf0);
+            newf01 = mtbdd_gethigh(newf0);
         }
-        if(newf01 == f10 && newf00 == f00) {
+        if (newf01 == f10 && newf00 == f00) {
             ref_inc(mtbdd_getvar(f0));
         } else {
             ref_inc(mtbdd_getvar(f10));
@@ -432,7 +438,7 @@ reorder_result_t swap_node(size_t index)
 
     ref_dec(mtbdd_getvar(f1));
 
-    if(f11 == f01) {
+    if (f11 == f01) {
         newf1 = f11;
         ref_inc(mtbdd_getvar(newf1));
     } else {
@@ -443,40 +449,33 @@ reorder_result_t swap_node(size_t index)
         MTBDD newf10 = newf1;
         MTBDD newf11 = newf1;
         if (!mtbdd_isleaf(newf0)) {
-            mtbddnode_t n = MTBDD_GETNODE(newf1);
-            newf10 = node_low(newf1, n);
-            newf11 = node_high(newf1, n);
+            newf10 = mtbdd_getlow(newf1);
+            newf11 = mtbdd_gethigh(newf1);
         }
-        if(newf10 == f01 && newf11 == f11) {
+        if (newf10 == f01 && newf11 == f11) {
             ref_inc(mtbdd_getvar(f1));
 
         } else {
             ref_inc(mtbdd_getvar(f01));
             ref_inc(mtbdd_getvar(f11));
-
         }
     }
 
     // 1. # of nodes is increased at <var+1> level due to only f1 having <var> index
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var+1) {
-//        var_inc(var);
-//        var_inc(mtbdd_getvar(f10));
+    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
+        // we mutate <var> since we did not swap the mapping yet
+        var_inc(var);
     }
     // 2. # of nodes is increased at <var+1> level due to only f0 having <var> index
-    if (mtbdd_getvar(f0) == var && mtbdd_getvar(f1) > var+1) {
-//        var_inc(var);
-//        var_dec(mtbdd_getvar(f01));
+    if (mtbdd_getvar(f0) == var && mtbdd_getvar(f1) > var) {
+        // we mutate <var> since we did not swap the mapping yet
+        var_inc(var);
     }
     // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
     if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
-        var_inc(var);
-//        var_dec(var+1);
-//        var_inc(mtbdd_getvar(f01));
-    }
-    // 4. # of nodes does not change
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 != f01) {
-//        var_inc(var+1);
-//        var_inc(var);
+        // we mutate <var> since we did not swap the mapping yet
+        var_dec(var);
+        // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
     }
 
     // update node, which also removes the mark
