@@ -117,35 +117,31 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     int isolated = -(x_isolated + y_isolated);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
-//        swap the mappings
+//    if (!interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
+//        levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
+//        levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
+//        uint32_t save = levels->level_to_order[pos];
+//        levels->level_to_order[pos] = levels->level_to_order[pos + 1];
+//        levels->level_to_order[pos + 1] = save;
+//        return SYLVAN_REORDER_SUCCESS;
 //    }
 
     CALL(sylvan_clear_cache);
 
+    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
 #if SYLVAN_USE_LINEAR_PROBING
-    // clear the entire table
-    llmsset_clear_hashes(nodes);
+        // clear the entire table
+        llmsset_clear_hashes(nodes);
 #else
-    // clear hashes of nodes with <var> and <var+1>
-    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
-    if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
+        // clear hashes of nodes with <var> and <var+1>
+        CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
+        if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
+    }
+
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
-//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
-//    if (are_interacting) {
-//        assert(marked_count > 0);
-//    } else {
-//        if (marked_count > 0) {
-//            printf("interacting: marked %zu (x= %d, y=%d)\n", marked_count, pos, pos + 1);
-//            printf("interacting: marked %zu (x= %d, y=%d)\n", marked_count, levels->level_to_order[pos],
-//                   levels->level_to_order[pos + 1]);
-//        }
-//
-//        assert(marked_count == 0);
-//    }
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
@@ -167,8 +163,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     levels->level_to_order[pos] = levels->level_to_order[pos + 1];
     levels->level_to_order[pos + 1] = save;
 
-    // clear the nodes table (data part) and mark all nodes with the marking mechanisms.
-    CALL(sylvan_clear_and_mark);
+    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
+        // clear the nodes table (data part) and mark all nodes with the marking mechanisms.
+        CALL(sylvan_clear_and_mark);
+    }
     // clear the nodes table (hash part) and rehash all marked nodes.
     CALL(sylvan_rehash_all);
 
@@ -299,14 +297,14 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                         atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                     }
                 } else {
-//                    // mark for phase 2
+                    // mark for phase 2
                     mtbddnode_setflag(node, 1);
                     marked++;
                 }
             }
         } else {
             if (is_node_dependent_on(node, var)) {
-//                // mark for phase 2
+                // mark for phase 2
                 mtbddnode_setflag(node, 1);
                 marked++;
             } else {
@@ -475,7 +473,6 @@ reorder_result_t swap_node(size_t index)
     if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
         // we mutate <var> since we did not swap the mapping yet
         var_dec(var);
-        // now we have one less node at level <var+1> pointing to f10 / f01 so we decrease the ref count
     }
 
     // update node, which also removes the mark

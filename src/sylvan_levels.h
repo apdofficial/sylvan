@@ -26,22 +26,12 @@ typedef struct levels_db {
     _Atomic(uint32_t)*  var_count;               // number of nodes per variable (it expects order wise variable index)
     _Atomic(uint32_t)*  ref_count;               // number of internal references per variable (it expects order wise variable index)
     int                 isolated_count;          // number of isolated projection functions
-    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (it expects level wise variable index)
+    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
     size_t              bitmap_i_nrows;          // number of rows and columns
     size_t              bitmap_i_size;           // size of the bitmaps
     size_t              reorder_size_threshold;  // reorder if this size is reached
     size_t              reorder_count;           // number of reordering calls
 } *levels_t;
-
-/**
- * Index to first node in phase 2 mark bitmap
- */
-#define bitmap_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
-
-/**
- * Index of the next node relative to the provided index in th phase 2 bitmap.
- */
-#define bitmap_p2_next(index) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, index)
 
 /**
  * @brief Create a new levels_t object
