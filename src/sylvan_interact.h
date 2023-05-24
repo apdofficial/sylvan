@@ -37,9 +37,6 @@ static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 
 static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
-    assert(dbs->bitmap_i != NULL);
-    assert(x < dbs->bitmap_i_nrows && y < dbs->bitmap_i_nrows);
-    assert(x < dbs->count && y < dbs->count);
     if (dbs->bitmap_i == NULL) return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
     // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
     if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;

@@ -385,11 +385,13 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
 {
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
+        sylvan_gc_disable();
         reorder_result_t result = NEWFRAME(sylvan_sift, 0, 0);
         if (sylvan_reorder_issuccess(result) == 0){
             sylvan_print_reorder_res(result);
         }
         re = 0;
+        sylvan_gc_enable();
     } else {
         /* wait for new frame to appear */
         while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}

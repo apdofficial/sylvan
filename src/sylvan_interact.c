@@ -90,13 +90,13 @@ void interact_print_state(const levels_t dbs)
 #define find_support(f, bitmap_s, bitmap_v, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_v, bitmap_l)
 VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, bitmap_v, atomic_word_t *, bitmap_l)
 {
+    if (mtbdd_isleaf(f)) return;
+
     // The low 40 bits are an index into the unique table.
     uint64_t index = f & 0x000000ffffffffff;
-    BDDVAR var = mtbdd_getvar(f);
-
-    if (mtbdd_isleaf(f)) return;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
 
+    BDDVAR var = mtbdd_getvar(f);
     // set support bitmap, <var> is on the support of <f>
     bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
 
@@ -146,7 +146,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)){
         mtbddnode_t f = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(f);
-        if(var >= mtbdd_levelscount()) continue;
+        if(var >= mtbdd_levelscount()) continue; // not registered variable
 
         atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var]], 1, memory_order_relaxed);
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
@@ -157,7 +157,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
-        // then it is a root, and we start a new depth-first search from it.
+        // then it is a root, and we start a new search from it.
         MTBDD f1 = mtbddnode_gethigh(f);
         MTBDD f0 = mtbddnode_getlow(f);
 

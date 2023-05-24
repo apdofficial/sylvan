@@ -279,7 +279,7 @@ VOID_TASK_0(parse)
     if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
 
     sylvan_newlevels(M + 1);
-    INFO("Created %llu variables\n", M + 1);
+    INFO("Created %lu variables\n", (size_t)M + 1);
 
     INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", (size_t) I, (size_t) L, (size_t) A);
 
@@ -295,7 +295,7 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-    INFO("Now reading %llu latches\n", L);
+    INFO("Now reading %lu latches\n", (size_t)L);
 
     for (uint64_t l = 0; l < L; l++) {
         latches[l] = read_uint();
@@ -304,14 +304,14 @@ VOID_TASK_0(parse)
         read_wsnl();
     }
 
-    INFO("Now reading %llu outputs\n", O);
+    INFO("Now reading %lu outputs\n", (size_t)O);
 
     for (uint64_t o = 0; o < O; o++) {
         outputs[o] = read_uint();
         read_wsnl();
     }
 
-    INFO("Now reading %llu and-gates\n", A);
+    INFO("Now reading %lu and-gates\n", (size_t)A);
 
     int gatelhs[A];
     int gatelft[A];
@@ -739,16 +739,9 @@ int main(int argc, char **argv)
     setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    /**
-     * Initialize Lace.
-     *
-     * First: setup with given number of workers (0 for autodetect) and some large size task queue.
-     * Second: start all worker threads with default settings.
-     * Third: setup local variables using the LACE_ME macro.
-     */
-    lace_start(8, 1000000);
+    lace_start(8, 0);
 
-    sylvan_set_limits(1LL << 30, 1, 8);
+    sylvan_set_limits(3LL * 1024 * 1024 * 1024, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -768,7 +761,7 @@ int main(int argc, char **argv)
         sylvan_gc_hook_pregc(TASK(gc_start));
         sylvan_gc_hook_postgc(TASK(gc_end));
     }
-
+    INFO("Model: %s\n", model_filename);
     if (model_filename == NULL) {
         Abort("Invalid file name.\n");
     }
