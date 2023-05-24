@@ -39,10 +39,6 @@
 #define SYLVAN_USE_LINEAR_PROBING 0
 #endif
 
-/* Either use chaining or linear implementation as a hash collision strategy */
-#ifndef SYLVAN_LIMIT_PROBE_SEQUENCE
-#define SYLVAN_LIMIT_PROBE_SEQUENCE 0
-
 // Variable ordering default parameter values
 #define SYLVAN_REORDER_MAX_VAR		    1000
 #define SYLVAN_REORDER_MAX_SWAPS	    10000
@@ -61,5 +57,3 @@
   * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
   */
 #define BLOCKSIZE 4096
-
-#endif
