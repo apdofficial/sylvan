@@ -1,8 +1,5 @@
 #include <getopt.h>
-#include <locale.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <boost/graph/sloan_ordering.hpp>
@@ -11,29 +8,20 @@
 #include <string>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <span>
 
 #include <sylvan.h>
 #include <sylvan_int.h>
 #include <sylvan_table.h>
 #include <sylvan_reorder.h>
-
+#include "aag.hpp"
 
 using namespace sylvan;
 
-/**************************************************
-
-TODO
-====
-
-Use Boost to provide automatic .bz2 and .gz pipes.
-Use dynamic reordering and/or static orders
-
-**************************************************/
-
 /* Configuration */
 static int workers = 4;
-static int verbose = 1;
-static char *model_filename = NULL; // filename of the aag file
+static int verbose = 0;
+static char *model_filename = nullptr; // filename of the aag file
 static int static_reorder = 0;
 static int dynamic_reorder = 1;
 
@@ -41,10 +29,6 @@ static int sloan_w1 = 1;
 static int sloan_w2 = 8;
 
 static int terminate_reordering = 0;
-
-static double t_start;
-#define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
-#define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
 static void
 print_usage()
@@ -107,421 +91,211 @@ parse_args(int argc, char **argv)
         exit(0);
     }
     model_filename = argv[optind];
-    std::string path = std::string{model_filename};
-    std::string base_filename = path.substr(path.find_last_of("/\\") + 1);
-    std::cout << "Model file: " << base_filename << std::endl;
-}
-
-/* Obtain current wallclock time */
-static double
-wctime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec + 1E-6 * tv.tv_usec);
 }
 
 
-/**
- * Global stuff
- */
-
-uint8_t *buf;
-size_t pos, size;
-
-int parser_peek()
-{
-    if (pos == size) return EOF;
-    return (int) buf[pos];
-}
-
-int parser_read()
-{
-    if (pos == size) return EOF;
-    return (int) buf[pos++];
-}
-
-void parser_skip()
-{
-    pos++;
-}
-
-void err()
-{
-    Abort("File read error.");
-}
-
-void read_wsnl()
-{
-    while (1) {
-        int c = parser_peek();
-        if (c != ' ' && c != '\n' && c != '\t') return;
-        parser_skip();
-    }
-}
-
-void read_ws()
-{
-    while (1) {
-        int c = parser_peek();
-        if (c != ' ' && c != '\t') return;
-        parser_skip();
-    }
-}
-
-void read_token(const char *str)
-{
-    while (*str != 0) if (parser_read() != (int) (uint8_t) (*str++)) err();
-}
-
-uint64_t read_uint()
-{
-    uint64_t r = 0;
-    while (1) {
-        int c = parser_peek();
-        if (c < '0' || c > '9') return r;
-        r *= 10;
-        r += c - '0';
-        parser_skip();
-    }
-}
-
-int64_t read_int()
-{
-    if (parser_peek() == '-') {
-        parser_skip();
-        return -(int64_t) read_uint();
-    } else {
-        return read_uint();
-    }
-}
-
-void read_string(std::string &s)
-{
-    s = "";
-    while (1) {
-        int c = parser_peek();
-        if (c == EOF || c == '\n') return;
-        s += (char) c;
-        parser_skip();
-    }
-}
-
-int *level_to_var;
-
-#define make_gate(a, b, c, d, e, f) CALL(make_gate,a,b,c,d,e,f)
-VOID_TASK_6(make_gate, int, a, MTBDD*, gates, int*, gatelhs, int*, gatelft, int*, gatergt, int*, lookup)
+#define make_gate(a, b, c, d) CALL(make_gate, a, b, c, d)
+VOID_TASK_4(make_gate, int, a, MTBDD*, gates, aag_t &, aag, std::span<int>, level_to_var)
 {
     if (gates[a] != sylvan_invalid) return;
-    int lft = gatelft[a] / 2;
-    int rgt = gatergt[a] / 2;
+    int lft = (int) aag.gatelft[a] / 2;
+    int rgt = (int) aag.gatergt[a] / 2;
 
     MTBDD l, r;
     if (lft == 0) {
         l = sylvan_false;
-    } else if (lookup[lft] != -1) {
-        make_gate(lookup[lft], gates, gatelhs, gatelft, gatergt, lookup);
-        l = gates[lookup[lft]];
+    } else if (aag.lookup[lft] != -1) {
+        make_gate(aag.lookup[lft], gates, aag, level_to_var);
+        l = gates[aag.lookup[lft]];
     } else {
         l = sylvan_ithlevel(level_to_var[lft]); // always use even variables (prime is odd)
     }
     if (rgt == 0) {
         r = sylvan_false;
-    } else if (lookup[rgt] != -1) {
-        make_gate(lookup[rgt], gates, gatelhs, gatelft, gatergt, lookup);
-        r = gates[lookup[rgt]];
+    } else if (aag.lookup[rgt] != -1) {
+        make_gate(aag.lookup[rgt], gates, aag, level_to_var);
+        r = gates[aag.lookup[rgt]];
     } else {
         r = sylvan_ithlevel(level_to_var[rgt]); // always use even variables (prime is odd)
     }
-    if (gatelft[a] & 1) l = sylvan_not(l);
-    if (gatergt[a] & 1) r = sylvan_not(r);
+    if (aag.gatelft[a] & 1) l = sylvan_not(l);
+    if (aag.gatergt[a] & 1) r = sylvan_not(r);
     gates[a] = sylvan_and(l, r);
     mtbdd_protect(&gates[a]);
     sylvan_test_reduce_heap();
 }
 
-VOID_TASK_0(parse)
+std::vector<int> order_statically(const aag_t &aag)
 {
-    read_wsnl();
-    read_token("aag");
-    read_ws();
-    uint64_t M = read_uint(); // maximum variable index
-    read_ws();
-    uint64_t I = read_uint(); // number of inputs
-    read_ws();
-    uint64_t L = read_uint(); // number of latches
-    read_ws();
-    uint64_t O = read_uint(); // number of outputs
-    read_ws();
-    uint64_t A = read_uint(); // number of AND gates
-    read_ws();
-    uint64_t B = 0, C = 0, J = 0, F = 0; // optional
-    read_ws();
-    if (parser_peek() != '\n') {
-        B = read_uint(); // number of bad state properties
-        read_ws();
-    }
-    if (parser_peek() != '\n') {
-        C = read_uint(); // number of invariant constraints
-        read_ws();
-    }
-    if (parser_peek() != '\n') {
-        J = read_uint(); // number of justice properties
-        read_ws();
-    }
-    if (parser_peek() != '\n') {
-        F = read_uint(); // number of fairness constraints
-    }
-    read_wsnl();
+    std::vector<int> matrix;
+    for (unsigned m = 0; m < aag.header.m * aag.header.m; m++) matrix[m] = 0;
+    for (unsigned m = 0; m < aag.header.m; m++) matrix[m * aag.header.m + m] = 1;
 
-    // we expect one output
-    if (O != 1) Abort("expecting 1 output\n");
-    if (B != 0 or C != 0 or J != 0 or F != 0) Abort("no support for new format\n");
-
-    sylvan_newlevels(M + 1);
-    INFO("Created %lu variables\n", (size_t)M + 1);
-
-    INFO("Preparing %zu inputs, %zu latches and %zu AND-gates\n", (size_t) I, (size_t) L, (size_t) A);
-
-    // INFO("Now reading %zu inputs\n", I);
-
-    int inputs[I];
-    int outputs[O];
-    int latches[L];
-    int l_next[L];
-
-    for (uint64_t i = 0; i < I; i++) {
-        inputs[i] = read_uint();
-        read_wsnl();
+    for (uint64_t i = 0; i < aag.header.i; i++) {
+        int v = (int) aag.inputs[i] / 2 - 1;
+        matrix[v * aag.header.m + v] = 1;
     }
 
-    INFO("Now reading %lu latches\n", (size_t)L);
-
-    for (uint64_t l = 0; l < L; l++) {
-        latches[l] = read_uint();
-        read_ws();
-        l_next[l] = read_uint();
-        read_wsnl();
+    for (uint64_t l = 0; l < aag.header.l; l++) {
+        int v = (int) aag.latches[l] / 2 - 1;
+        int n = (int) aag.l_next[l] / 2 - 1;
+        matrix[v * aag.header.m + v] = 1; // l -> l
+        if (n >= 0) {
+            matrix[v * aag.header.m + n] = 1; // l -> n
+            matrix[n * aag.header.m + v] = 1; // make symmetric
+        }
     }
 
-    INFO("Now reading %lu outputs\n", (size_t)O);
+    for (uint64_t a = 0; a < aag.header.a; a++) {
+        int v = (int) aag.gatelhs[a] / 2 - 1;
+        int x = (int) aag.gatelft[a] / 2 - 1;
+        int y = (int) aag.gatergt[a] / 2 - 1;
+        matrix[v * aag.header.m + v] = 1;
+        if (x >= 0) {
+            matrix[v * aag.header.m + x] = 1;
+            matrix[x * aag.header.m + v] = 1;
+        }
+        if (y >= 0) {
+            matrix[v * aag.header.m + y] = 1;
+            matrix[y * aag.header.m + v] = 1;
+        }
+    }
+#if 0
+    printf("Matrix\n");
+    for (unsigned row = 0; row < aag.header.m; row++) {
+        for (unsigned col = 0; col < aag.header.m; col++) {
+            printf("%c", matrix[row * aag.header.m + col] ? '+' : '-');
+        }
+        printf("\n");
+    }
+#endif
+    typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS,
+            boost::property<boost::vertex_color_t, boost::default_color_type,
+                    boost::property<boost::vertex_degree_t, int,
+                            boost::property<boost::vertex_priority_t, double>>>> Graph;
 
-    for (uint64_t o = 0; o < O; o++) {
-        outputs[o] = read_uint();
-        read_wsnl();
+    typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
+
+    Graph g = Graph(aag.header.m);
+
+    for (unsigned row = 0; row < aag.header.m; row++) {
+        for (unsigned col = 0; col < aag.header.m; col++) {
+            if (matrix[row * aag.header.m + col]) boost::add_edge(row, col, g);
+        }
     }
 
-    INFO("Now reading %lu and-gates\n", (size_t)A);
+    std::vector<Vertex> inv_perm(boost::num_vertices(g));
 
-    int gatelhs[A];
-    int gatelft[A];
-    int gatergt[A];
+    boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g),
+                          boost::get(boost::vertex_priority, g), sloan_w1, sloan_w2);
 
-    int lookup[M + 1];
-    for (uint64_t i = 0; i <= M; i++) lookup[i] = -1; // not an and-gate
+    std::vector<int> level_to_var;
 
-    for (uint64_t a = 0; a < A; a++) {
-        gatelhs[a] = read_uint();
-        lookup[gatelhs[a] / 2] = a;
-        read_ws();
-        gatelft[a] = read_uint();
-        read_ws();
-        gatergt[a] = read_uint();
-        read_wsnl();
+    for (uint64_t i = 0; i <= aag.header.m; i++) level_to_var[i] = -1;
+
+    int r = 0;
+#if 0
+    boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
+    for (unsigned long & i : inv_perm) {
+        uint64_t j = index_map[i];
+        printf("%d %zu\n", r++, (size_t)j);
     }
+#endif
+
+    r = 0;
+    for (unsigned long &i: inv_perm) {
+        uint64_t j = i + 1;
+        if (level_to_var[j] != -1) {
+            printf("ERROR: level_to_var of %zu is already %d (%d)\n", (size_t) j, level_to_var[j], r);
+            for (uint64_t k = 1; k <= aag.header.m; k++) {
+                if (level_to_var[k] == -1) printf("%zu is still -1\n", (size_t) k);
+                level_to_var[k] = r++;
+            }
+        } else {
+            level_to_var[j] = r++;
+        }
+    }
+
+    printf("r=%d M=%d\n", r, (int) aag.header.m);
+#if 1
+    for (unsigned m = 0; m < aag.header.m * aag.header.m; m++) matrix[m] = 0;
+
+    for (uint64_t i = 0; i < aag.header.i; i++) {
+        int v = level_to_var[aag.inputs[i] / 2];
+        matrix[v * aag.header.m + v] = 1;
+    }
+
+    for (uint64_t l = 0; l < aag.header.l; l++) {
+        int v = level_to_var[aag.latches[l] / 2];
+        int n = level_to_var[aag.l_next[l] / 2];
+        matrix[v * aag.header.m + v] = 1; // l -> l
+        if (n >= 0) {
+            matrix[v * aag.header.m + n] = 1; // l -> n
+        }
+    }
+
+    for (uint64_t a = 0; a < aag.header.a; a++) {
+        int v = level_to_var[aag.gatelhs[a] / 2];
+        int x = level_to_var[aag.gatelft[a] / 2];
+        int y = level_to_var[aag.gatergt[a] / 2];
+        matrix[v * aag.header.m + v] = 1;
+        if (x >= 0) {
+            matrix[v * aag.header.m + x] = 1;
+        }
+        if (y >= 0) {
+            matrix[v * aag.header.m + y] = 1;
+        }
+    }
+
+    printf("Matrix\n");
+    for (unsigned row = 0; row < aag.header.m; row++) {
+        for (unsigned col = 0; col < aag.header.m; col++) {
+            printf("%c", matrix[row * aag.header.m + col] ? '+' : '-');
+        }
+        printf("\n");
+    }
+#endif
+
+    return level_to_var;
+}
+
+VOID_TASK_1(parse, std::span<uint8_t>, buffer)
+{
+    aag_t aag = read_aag(buffer);
+
+    sylvan_newlevels(aag.header.m + 1);
+
+    std::vector<int> level_to_order;
+    level_to_order.reserve(aag.header.m + 1);
 
     if (static_reorder) {
-        int *matrix = new int[M * M];
-        for (unsigned m = 0; m < M * M; m++) matrix[m] = 0;
-        for (unsigned m = 0; m < M; m++) matrix[m * M + m] = 1;
-
-        for (uint64_t i = 0; i < I; i++) {
-            int v = inputs[i] / 2 - 1;
-            matrix[v * M + v] = 1;
-        }
-
-        for (uint64_t l = 0; l < L; l++) {
-            int v = latches[l] / 2 - 1;
-            int n = l_next[l] / 2 - 1;
-            matrix[v * M + v] = 1; // l -> l
-            if (n >= 0) {
-                matrix[v * M + n] = 1; // l -> n
-                matrix[n * M + v] = 1; // make symmetric
-            }
-        }
-
-        for (uint64_t a = 0; a < A; a++) {
-            int v = gatelhs[a] / 2 - 1;
-            int x = gatelft[a] / 2 - 1;
-            int y = gatergt[a] / 2 - 1;
-            matrix[v * M + v] = 1;
-            if (x >= 0) {
-                matrix[v * M + x] = 1;
-                matrix[x * M + v] = 1;
-            }
-            if (y >= 0) {
-                matrix[v * M + y] = 1;
-                matrix[y * M + v] = 1;
-            }
-        }
-
-        if (0) {
-            printf("Matrix\n");
-            for (unsigned row = 0; row < M; row++) {
-                for (unsigned col = 0; col < M; col++) {
-                    printf("%c", matrix[row * M + col] ? '+' : '-');
-                }
-                printf("\n");
-            }
-        }
-
-        typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS,
-                boost::property<boost::vertex_color_t, boost::default_color_type,
-                        boost::property<boost::vertex_degree_t, int,
-                                boost::property<boost::vertex_priority_t, double>>>> Graph;
-
-        typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
-
-        Graph g = Graph(M);
-
-        for (unsigned row = 0; row < M; row++) {
-            for (unsigned col = 0; col < M; col++) {
-                if (matrix[row * M + col]) boost::add_edge(row, col, g);
-            }
-        }
-
-//        boost::property_map<Graph, boost::vertex_index_t>::type index_map = boost::get(boost::vertex_index, g);
-        std::vector<Vertex> inv_perm(boost::num_vertices(g));
-
-        boost::sloan_ordering(g, inv_perm.begin(), boost::get(boost::vertex_color, g), boost::make_degree_map(g),
-                              boost::get(boost::vertex_priority, g), sloan_w1, sloan_w2);
-
-        level_to_var = new int[M + 1];
-        for (unsigned int i = 0; i <= M; i++) level_to_var[i] = -1;
-
-        int r = 0;
-//        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
-//            int j = index_map[*i];
-//            printf("%d %d\n", r++, j);
-//        }
-
-        r = 0;
-        for (typename std::vector<Vertex>::const_iterator i = inv_perm.begin(); i != inv_perm.end(); ++i) {
-            int j = (*i) + 1;
-            if (level_to_var[j] != -1) {
-                printf("ERROR: level_to_var of %d is already %d (%d)\n", j, level_to_var[j], r);
-                for (unsigned int i = 1; i <= M; i++) {
-                    if (level_to_var[i] == -1) printf("%d is still -1\n", i);
-                    level_to_var[i] = r++;
-                }
-            } else {
-                level_to_var[j] = r++;
-            }
-//            assert(level_to_var[j] == -1);
-        }
-
-        printf("r=%d M=%d\n", r, (int) M);
-
-        if (0) {
-            for (unsigned m = 0; m < M * M; m++) matrix[m] = 0;
-
-            for (uint64_t i = 0; i < I; i++) {
-                int v = level_to_var[inputs[i] / 2];
-                matrix[v * M + v] = 1;
-            }
-
-            for (uint64_t l = 0; l < L; l++) {
-                int v = level_to_var[latches[l] / 2];
-                int n = level_to_var[l_next[l] / 2];
-                matrix[v * M + v] = 1; // l -> l
-                if (n >= 0) {
-                    matrix[v * M + n] = 1; // l -> n
-                }
-            }
-
-            for (uint64_t a = 0; a < A; a++) {
-                int v = level_to_var[gatelhs[a] / 2];
-                int x = level_to_var[gatelft[a] / 2];
-                int y = level_to_var[gatergt[a] / 2];
-                matrix[v * M + v] = 1;
-                if (x >= 0) {
-                    matrix[v * M + x] = 1;
-                }
-                if (y >= 0) {
-                    matrix[v * M + y] = 1;
-                }
-            }
-
-            printf("Matrix\n");
-            for (unsigned row = 0; row < M; row++) {
-                for (unsigned col = 0; col < M; col++) {
-                    printf("%c", matrix[row * M + col] ? '+' : '-');
-                }
-                printf("\n");
-            }
-        }
-
-        delete[] matrix;
+        level_to_order = order_statically(aag);
     } else {
-        level_to_var = new int[M + 1];
-        for (unsigned int i = 0; i <= M; i++) level_to_var[i] = i;
+        for (int i = 0; i <= (int) aag.header.m; i++) {
+            level_to_order[i] = i;
+        }
     }
 
-//    uint32_t perm[M+1];
-//    for (unsigned int i = 0; i < M; i++) {
-//        perm[i] = level_to_var[i]+1;
-//    }
-
-
-    /*
-    // add edges for the bipartite graph
-    for (int i = 0; i < dm_nrows(m); i++) {
-            for (int j = 0; j < dm_ncols(m); j++) {
-                    if (dm_is_set(m, i, j)) add_edge(i, dm_nrows(m) + j, g);
-            }
-    }
-
-
-    for (uint64_t a=0; a<A; a++) {
-        MTBDD lhs = sylvan_ithvar(read_uint()/2);
-        mtbdd_refs_push(lhs);
-        read_ws();
-        int left = read_uint();
-        read_ws();
-        int right = read_uint();
-        read_wsnl();
-        MTBDD lft = left&1 ? sylvan_nithvar(left/2) : sylvan_ithvar(left/2);
-        mtbdd_refs_push(lft);
-        MTBDD rgt = right&1 ? sylvan_nithvar(right/2) : sylvan_ithvar(right/2);
-        mtbdd_refs_push(rgt);
-        MTBDD rhs = sylvan_and(lft, rgt);
-        mtbdd_refs_push(rhs);
-        gates[a] = sylvan_equiv(lhs, rhs);
-        mtbdd_ref(gates[a]);
-    }
-
-     */
-
-
-    MTBDD Xc = sylvan_set_empty(), Xu = sylvan_set_empty();
+    MTBDD Xc = sylvan_set_empty();
+    MTBDD Xu = sylvan_set_empty();
     mtbdd_protect(&Xc);
     mtbdd_protect(&Xu);
 
     // Now read the [[optional]] labels to find controllable vars
-    while (1) {
-        int c = parser_peek();
+    while (true) {
+        int c = parser_peek(buffer);
         if (c != 'l' and c != 'i' and c != 'o') break;
         parser_skip();
-        int pos = read_uint();
-        read_token(" ");
+        int pos_ = (int) read_uint(buffer);
+        read_token(" ", buffer);
         std::string s;
-        read_string(s);
-        read_wsnl();
+        read_string(s, buffer);
+        read_wsnl(buffer);
         if (c == 'i') {
             if (strncmp(s.c_str(), "controllable_", 13) == 0) {
-                Xc = sylvan_set_add(Xc, level_to_var[inputs[pos] / 2]);
+                Xc = sylvan_set_add(Xc, level_to_order[aag.inputs[pos_] / 2]);
             } else {
-                Xu = sylvan_set_add(Xu, level_to_var[inputs[pos] / 2]);
+                Xu = sylvan_set_add(Xu, level_to_order[aag.inputs[pos_] / 2]);
             }
         }
     }
@@ -533,20 +307,14 @@ VOID_TASK_0(parse)
     printf("\n");
 #endif
 
-    INFO("There are %zu controllable and %zu uncontrollable inputs.\n",
-         sylvan_set_count(Xc), sylvan_set_count(Xu));
+    INFO("There are %zu controllable and %zu uncontrollable inputs.\n", sylvan_set_count(Xc), sylvan_set_count(Xu));
 
     INFO("Making the gate BDDs...\n");
 
-    MTBDD gates[A];
-    for (uint64_t a = 0; a < A; a++) gates[a] = sylvan_invalid;
-    for (uint64_t a = 0; a < A; a++) {
-        make_gate(a, gates, gatelhs, gatelft, gatergt, lookup);
-    }
-
-    if (verbose) {
-        INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, A));
-    }
+    MTBDD gates[aag.header.a];
+    for (uint64_t a = 0; a < aag.header.a; a++) gates[a] = sylvan_invalid;
+    for (uint64_t a = 0; a < aag.header.a; a++) make_gate(a, gates, aag, level_to_order);
+    if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(gates, aag.header.a));
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -580,13 +348,11 @@ VOID_TASK_0(parse)
     INFO("done making latches\n");
 #endif
 
-    // And we don't care about comments.
-
     MTBDD Lvars = sylvan_set_empty();
     mtbdd_protect(&Lvars);
 
-    for (uint64_t l = 0; l < L; l++) {
-        Lvars = sylvan_set_add(Lvars, level_to_var[latches[l] / 2]);
+    for (uint64_t l = 0; l < aag.header.l; l++) {
+        Lvars = sylvan_set_add(Lvars, level_to_order[aag.latches[l] / 2]);
     }
 
 #if 0
@@ -600,27 +366,27 @@ VOID_TASK_0(parse)
     MTBDD CV = sylvan_map_empty();
     mtbdd_protect(&CV);
 
-    for (uint64_t l = 0; l < L; l++) {
+    for (uint64_t l = 0; l < aag.header.l; l++) {
         MTBDD nxt;
-        if (lookup[l_next[l] / 2] == -1) {
-            nxt = sylvan_ithlevel(level_to_var[l_next[l] / 2]);
+        if (aag.lookup[aag.l_next[l] / 2] == -1) {
+            nxt = sylvan_ithlevel(level_to_order[aag.l_next[l] / 2]);
         } else {
-            nxt = gates[lookup[l_next[l] / 2]];
+            nxt = gates[aag.lookup[aag.l_next[l] / 2]];
         }
-        if (l_next[l] & 1) nxt = sylvan_not(nxt);
-        CV = sylvan_map_add(CV, level_to_var[latches[l] / 2], nxt);
+        if (aag.l_next[l] & 1) nxt = sylvan_not(nxt);
+        CV = sylvan_map_add(CV, level_to_order[aag.latches[l] / 2], nxt);
     }
 
     // now make output
-    INFO("output is %d (lookup: %d)\n", outputs[0], lookup[outputs[0] / 2]);
+    INFO("output is %zu (lookup: %d)\n", (size_t) aag.outputs[0], aag.lookup[aag.outputs[0] / 2]);
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
-    if (lookup[outputs[0] / 2] == -1) {
-        Unsafe = sylvan_ithlevel(outputs[0] / 2);
+    if (aag.lookup[aag.outputs[0] / 2] == -1) {
+        Unsafe = sylvan_ithlevel(aag.outputs[0] / 2);
     } else {
-        Unsafe = gates[lookup[outputs[0] / 2]];
+        Unsafe = gates[aag.lookup[aag.outputs[0] / 2]];
     }
-    if (outputs[0] & 1) Unsafe = sylvan_not(Unsafe);
+    if (aag.outputs[0] & 1) Unsafe = sylvan_not(Unsafe);
     Unsafe = sylvan_forall(Unsafe, Xc);
     Unsafe = sylvan_exists(Unsafe, Xu);
 
@@ -635,24 +401,14 @@ VOID_TASK_0(parse)
     INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
 #endif
 
-    delete[] level_to_var;
-
     MTBDD OldUnsafe = sylvan_false; // empty set
     MTBDD Step = sylvan_false;
     mtbdd_protect(&OldUnsafe);
     mtbdd_protect(&Step);
 
-//    sylvan_test_reduce_heap();
-
-    int iteration = 0;
-
     while (Unsafe != OldUnsafe) {
         OldUnsafe = Unsafe;
-        iteration++;
-        if (verbose) {
-            INFO("Iteration %d (%.0f unsafe states)...\n", iteration, sylvan_satcount(Unsafe, Lvars));
-        }
-        INFO("Unsafe has %zu size\n", sylvan_nodecount(Unsafe));
+
         Step = sylvan_compose(Unsafe, CV);
         Step = sylvan_forall(Step, Xc);
         Step = sylvan_exists(Step, Xu);
@@ -661,7 +417,7 @@ VOID_TASK_0(parse)
         MTBDD Check = Step;
         while (Check != sylvan_false) {
             if (Check == sylvan_true) {
-                INFO("initial state is Unsafe!\n");
+                INFO("UNREALIZABLE\n");
                 return;
             } else {
                 Check = sylvan_low(Check);
@@ -671,58 +427,39 @@ VOID_TASK_0(parse)
         Unsafe = sylvan_or(Unsafe, Step);
     }
 
-    INFO("Thank you for using me. I realize that.\n");
-
-    // suppress a bunch of errors
-    (void) M;
-    (void) B;
-    (void) C;
-    (void) J;
-    (void) F;
-}
-
-VOID_TASK_0(gc_mark)
-{
-
+    INFO("REALIZABLE\n");
 }
 
 VOID_TASK_0(gc_start)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: str: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
 VOID_TASK_0(gc_end)
 {
-//    size_t used, total;
-//    sylvan_table_usage(&used, &total);
-//    INFO("GC: end: %zu/%zu size\n", used, total);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
-static int prev_size = 0;
 VOID_TASK_0(reordering_start)
 {
-    terminate_reordering = 0;
-    size_t size = llmsset_count_marked(nodes);
-    prev_size = size;
-    INFO("RE: str: %zu size\n", size);
+    size_t table_size = llmsset_count_marked(nodes);
+    INFO("RE: str: %zu size\n", table_size);
 }
 
 VOID_TASK_0(reordering_progress)
 {
-    size_t size = llmsset_count_marked(nodes);
-    // we allow growth of at most 20%
-    if (size >= prev_size * 1.2) terminate_reordering = 1;
-    else prev_size = size;
-    INFO("RE: prg: %zu size\n", size);
+    size_t table_size = llmsset_count_marked(nodes);
+    INFO("RE: prg: %zu size\n", table_size);
 }
 
 VOID_TASK_0(reordering_end)
 {
-    size_t size = llmsset_count_marked(nodes);
-    INFO("RE: end: %zu size\n", size);
-    sylvan_gc();
+    size_t table_size = llmsset_count_marked(nodes);
+    INFO("RE: end: %zu size\n", table_size);
 }
 
 int should_reordering_terminate()
@@ -739,9 +476,9 @@ int main(int argc, char **argv)
     setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    lace_start(8, 0);
+    lace_start(workers, 0);
 
-    sylvan_set_limits(3LL * 1024 * 1024 * 1024, 1, 8);
+    sylvan_set_limits(8LL * 1024 * 1024 * 1024, 1, 8);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
@@ -751,31 +488,31 @@ int main(int argc, char **argv)
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit_sec(30);
 
-//    sylvan_re_hook_prere(TASK(reordering_start));
-//    sylvan_re_hook_postre(TASK(reordering_end));
-//    sylvan_re_hook_progre(TASK(reordering_progress));
-//    sylvan_re_hook_termre(should_reordering_terminate);
-
-    // Set hooks for logging garbage collection
+    // Set hooks for logging garbage collection & dynamic variable reordering
     if (verbose) {
+        sylvan_re_hook_prere(TASK(reordering_start));
+        sylvan_re_hook_postre(TASK(reordering_end));
+        sylvan_re_hook_progre(TASK(reordering_progress));
+        sylvan_re_hook_termre(should_reordering_terminate);
         sylvan_gc_hook_pregc(TASK(gc_start));
         sylvan_gc_hook_postgc(TASK(gc_end));
     }
+
     INFO("Model: %s\n", model_filename);
-    if (model_filename == NULL) {
+    if (model_filename == nullptr) {
         Abort("Invalid file name.\n");
     }
 
     int fd = open(model_filename, O_RDONLY);
 
-    struct stat filestat;
+    struct stat filestat{};
     if (fstat(fd, &filestat) != 0) Abort("cannot stat file\n");
     size = filestat.st_size;
 
-    buf = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+    auto *buf = (uint8_t *) mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0);
     if (buf == MAP_FAILED) Abort("mmap failed\n");
 
-    RUN(parse);
+    RUN(parse, std::span{buf, size});
 
     // Report Sylvan statistics (if SYLVAN_STATS is set)
     if (verbose) sylvan_stats_report(stdout);
