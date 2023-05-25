@@ -344,7 +344,7 @@ VOID_TASK_1(make_gate, int, gate)
 #define solve_game() RUN(solve_game)
 TASK_0(int, solve_game)
 {
-            sylvan_newlevels(aag.header.m + 1);
+    sylvan_newlevels(aag.header.m + 1);
     game.level_to_order = new int[aag.header.m + 1];
 
     if (static_reorder) {
