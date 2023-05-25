@@ -16,7 +16,8 @@ int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
 */
-VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *);
+VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *)
+
 #endif
 
 /*!
@@ -24,19 +25,56 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reord
    @details Handle all trivial cases where no node is created, mark cases that are not trivial.
    @return number of nodes that were marked
 */
-TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
+TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
 
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle the not so trivial cases. (creates new nodes)
 */
-VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *);
+VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
 
 /*!
    \brief Adjacent variable swap phase 3
    \details Recovery phase, restore the nodes that were marked in phase 1.
 */
 VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
+
+TASK_4(int, llmsset_rehash_swap, llmsset_t, dbs, int, var, size_t, first, size_t, count)
+{
+    if (count > 512) {
+        size_t split = count / 2;
+        SPAWN(llmsset_rehash_swap, dbs, var, first, split);
+        int bad = CALL(llmsset_rehash_swap, dbs, var, first + split, count - split);
+        return bad + SYNC(llmsset_rehash_swap);
+    }
+
+    int bad = 0;
+    const size_t end = first + count;
+
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+        if (var < 0) {
+            if (llmsset_rehash_bucket(nodes, first) == 0) bad++;
+        } else {
+            mtbddnode_t node = MTBDD_GETNODE(first);
+            uint32_t nvar = mtbddnode_getvariable(node);
+            if (nvar == (uint32_t) var || nvar == ((uint32_t) var + 1)) {
+                if (llmsset_rehash_bucket(nodes, first) == 0) bad++;
+            }
+        }
+    }
+
+    return bad;
+}
+
+VOID_TASK_1(sylvan_varswap_rehash, uint32_t, var)
+{
+    (void) var;
+    CALL(sylvan_rehash_all);
+    // clear hash array
+//    llmsset_clear_hashes(nodes);
+    // rehash marked nodes
+//    CALL(llmsset_rehash_swap, nodes, var, 0, nodes->table_size);
+}
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
@@ -128,16 +166,14 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     CALL(sylvan_clear_cache);
 
-    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
 #if SYLVAN_USE_LINEAR_PROBING
-        // clear the entire table
-        llmsset_clear_hashes(nodes);
+    // clear the entire table
+    llmsset_clear_hashes(nodes);
 #else
-        // clear hashes of nodes with <var> and <var+1>
-        CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
-        if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
+    // clear hashes of nodes with <var> and <var+1>
+    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
+    if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
-    }
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
@@ -163,12 +199,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     levels->level_to_order[pos] = levels->level_to_order[pos + 1];
     levels->level_to_order[pos + 1] = save;
 
-    if (interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
-        // clear the nodes table (data part) and mark all nodes with the marking mechanisms.
-        CALL(sylvan_clear_and_mark);
-    }
-    // clear the nodes table (hash part) and rehash all marked nodes.
-    CALL(sylvan_rehash_all);
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
 
     return result;
 }

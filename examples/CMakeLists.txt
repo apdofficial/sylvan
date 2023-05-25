@@ -25,7 +25,7 @@ add_example(nqueens nqueens.c)
 add_example(simple simple.cpp)
 
 add_example(aigsynt aigsynt.cpp)
-target_sources(aigsynt PRIVATE aag.hpp)
+target_sources(aigsynt PRIVATE aigsynt.hpp)
 
 # Check if we have Boost
 find_package(Boost 1.81.0)
