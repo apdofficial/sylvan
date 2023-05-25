@@ -49,8 +49,8 @@ MTBDD mtbdd_newlevel(void)
     mtbdd_newlevels(1);
     return levels->table[levels->count - 1];
 }
-int mtbdd_newlevels__(size_t amount);
-int mtbdd_newlevels__(size_t amount)
+
+int mtbdd_newlevels(size_t amount)
 {
     if (levels->count + amount >= levels_size) {
 #if 0
@@ -83,11 +83,6 @@ int mtbdd_newlevels__(size_t amount)
         levels->count++;
     }
     return 1;
-}
-
-TASK_IMPL_1(int, mtbdd_newlevels, size_t, amount)
-{
-    return mtbdd_newlevels__(amount);
 }
 
 int mtbdd_levels_makenode(uint32_t level, MTBDD low, MTBDD high)
