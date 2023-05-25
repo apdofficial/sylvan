@@ -49,8 +49,8 @@ MTBDD mtbdd_newlevel(void)
     mtbdd_newlevels(1);
     return levels->table[levels->count - 1];
 }
-
-int mtbdd_newlevels(size_t amount)
+int mtbdd_newlevels__(size_t amount);
+int mtbdd_newlevels__(size_t amount)
 {
     if (levels->count + amount >= levels_size) {
 #if 0
@@ -83,6 +83,11 @@ int mtbdd_newlevels(size_t amount)
         levels->count++;
     }
     return 1;
+}
+
+TASK_IMPL_1(int, mtbdd_newlevels, size_t, amount)
+{
+    return mtbdd_newlevels__(amount);
 }
 
 int mtbdd_levels_makenode(uint32_t level, MTBDD low, MTBDD high)
@@ -204,6 +209,7 @@ VOID_TASK_IMPL_4(sylvan_count_levelnodes, _Atomic (size_t)*, arr, _Atomic (size_
     const size_t end = first + count;
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         tmp[mtbddnode_getvariable(node)]++; // update the variable
     }
     for (i = 0; i < levels->count; i++)  atomic_fetch_add(&arr[i], tmp[i]);

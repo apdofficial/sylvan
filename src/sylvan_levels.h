@@ -79,7 +79,8 @@ MTBDD mtbdd_newlevel(void);
  * @details The BDDs representing managed levels are always kept during garbage collection. Not currently thread-safe.
  * \param amount number of levels to create
  */
-int mtbdd_newlevels(size_t amount);
+#define mtbdd_newlevels(amount) RUN(mtbdd_newlevels, amount)
+TASK_DECL_1(int, mtbdd_newlevels, size_t)
 
 /**
  * @brief Insert a node at given level with given low and high nodes

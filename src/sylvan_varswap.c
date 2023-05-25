@@ -442,53 +442,32 @@ reorder_result_t swap_node(size_t index)
         f11 = mtbdd_gethigh(f1);
     }
 
-    ref_dec(mtbdd_getvar(f0));
+//    ref_dec(mtbdd_getvar(f0));
 
     if (f10 == f00) {
         newf0 = f00;
-        ref_inc(mtbdd_getvar(newf0));
+//        ref_inc(mtbdd_getvar(newf0));
     } else {
         // Create the low high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
         newf0 = mtbdd_varswap_makenode(var + 1, f00, f10);
         if (f0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        MTBDD newf00 = newf0;
-        MTBDD newf01 = newf0;
-        if (!mtbdd_isleaf(newf0)) {
-            newf00 = mtbdd_getlow(newf0);
-            newf01 = mtbdd_gethigh(newf0);
-        }
-        if (newf01 == f10 && newf00 == f00) {
-            ref_inc(mtbdd_getvar(f0));
-        } else {
-            ref_inc(mtbdd_getvar(f10));
-            ref_inc(mtbdd_getvar(f00));
-        }
+//        ref_inc(mtbdd_getvar(f10));
+//        ref_inc(mtbdd_getvar(f00));
     }
 
-    ref_dec(mtbdd_getvar(f1));
+//    ref_dec(mtbdd_getvar(f1));
 
     if (f11 == f01) {
         newf1 = f11;
-        ref_inc(mtbdd_getvar(newf1));
+//        ref_inc(mtbdd_getvar(newf1));
     } else {
         // Create the new high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
         newf1 = mtbdd_varswap_makenode(var + 1, f01, f11);
         if (f1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        MTBDD newf10 = newf1;
-        MTBDD newf11 = newf1;
-        if (!mtbdd_isleaf(newf0)) {
-            newf10 = mtbdd_getlow(newf1);
-            newf11 = mtbdd_gethigh(newf1);
-        }
-        if (newf10 == f01 && newf11 == f11) {
-            ref_inc(mtbdd_getvar(f1));
-
-        } else {
-            ref_inc(mtbdd_getvar(f01));
-            ref_inc(mtbdd_getvar(f11));
-        }
+//        ref_inc(mtbdd_getvar(f01));
+//        ref_inc(mtbdd_getvar(f11));
     }
 
     // 1. # of nodes is increased at <var+1> level due to only f1 having <var> index

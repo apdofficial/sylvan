@@ -193,6 +193,12 @@ void sylvan_set_reorder_timelimit_ms(double time_limit)
     configs.time_limit_ms = time_limit;
 }
 
+void sylvan_set_reorder_verbose(int is_verbose)
+{
+    assert(is_verbose >= 0);
+    print_reordering_stat = is_verbose;
+}
+
 TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
@@ -731,9 +737,9 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
     double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms && reorder_config->t_start_sifting != 0) {
 #if STATS
-        printf("reordering exit: reached %fms from the time_limit %.2fms\n",
+        printf("reordering exit: reached %fms from the time_limit %.2zums\n",
                t_elapsed,
-               reorder_config->time_limit_ms);
+               (size_t)reorder_config->time_limit_ms);
 #endif
         return 1;
     }
