@@ -239,8 +239,6 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
  */
 #define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
 
-void release_data_bucket(const llmsset_t dbs, uint64_t index);
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
