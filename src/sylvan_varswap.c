@@ -4,9 +4,9 @@
 #include "sylvan_align.h"
 #include "sylvan_interact.h"
 
-reorder_result_t swap_node(size_t index);
+reorder_result_t swap_node(mtbddnode_t node, size_t index);
 
-reorder_result_t swap_mapnode(size_t index);
+reorder_result_t swap_mapnode(mtbddnode_t node, size_t index);
 
 int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
 
@@ -143,6 +143,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
 
+    clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
@@ -178,10 +180,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
-
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
+        CALL(sylvan_varswap_p2, pos, 0, levels->bitmap_p2_size, &result);
         if (sylvan_reorder_issuccess(result) == 0) {
             CALL(sylvan_varswap_p3, pos, &result);
         }
@@ -304,15 +305,6 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             continue; // not <var> or <var+1>
         }
 
-        if (mtbddnode_getflag(node)) {
-            // marked node, remove mark and rehash (we are apparently recovering)
-            mtbddnode_setflag(node, 0);
-            if (llmsset_rehash_bucket(nodes, first) != 1) {
-                atomic_exchange(result, SYLVAN_REORDER_P3_REHASH_FAIL);
-            }
-            continue;
-        }
-
         if (mtbddnode_ismapnode(node)) {
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
@@ -330,14 +322,14 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                     }
                 } else {
                     // mark for phase 2
-                    mtbddnode_setflag(node, 1);
+                    bitmap_atomic_set(levels->bitmap_p2, first);
                     marked++;
                 }
             }
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
-                mtbddnode_setflag(node, 1);
+                bitmap_atomic_set(levels->bitmap_p2, first);
                 marked++;
             } else {
                 mtbddnode_setvariable(node, var + 1);
@@ -395,18 +387,17 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         count = count + first - 2;
         first = 2;
     }
+
     reorder_result_t res;
     const size_t end = first + count;
-    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+
+    for (first = levels_p2_next(first - 1); first < end; first = levels_p2_next(first)) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
-        if (!mtbddnode_getflag(node)) continue; // an unmarked node
-        if (mtbddnode_getvariable(node) >= mtbdd_levelscount()) continue; // not registered <var>
         if (mtbddnode_ismapnode(node)) {
-            res = swap_mapnode(first);
+            res = swap_mapnode(node, first);
         } else {
-            res = swap_node(first);
+            res = swap_node(node, first);
         }
         if (sylvan_reorder_issuccess(res) == 0) { // if we failed let the parent know
             atomic_exchange(result, res);
@@ -419,11 +410,13 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 #define var_dec(level) atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[level]], -1, memory_order_relaxed)
 #define var_inc(level) atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[level]], 1, memory_order_relaxed)
 
-reorder_result_t swap_node(size_t index)
+/* 40 bits for the index, 24 bits for the hash */
+#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
+#define MASK_HASH  ((uint64_t)0xffffff0000000000)
+
+reorder_result_t swap_node(mtbddnode_t node, size_t index)
 {
     MTBDD newf1, newf0, f1, f0, f11, f10, f01, f00;
-
-    mtbddnode_t node = MTBDD_GETNODE(index);
     BDDVAR var = mtbddnode_getvariable(node);
 
     // obtain cofactors
@@ -493,9 +486,8 @@ reorder_result_t swap_node(size_t index)
     return SYLVAN_REORDER_SUCCESS;
 }
 
-reorder_result_t swap_mapnode(size_t index)
+reorder_result_t swap_mapnode(mtbddnode_t node, size_t index)
 {
-    mtbddnode_t node = MTBDD_GETNODE(index);
     BDDVAR var = mtbddnode_getvariable(node);
 
     // it is a map node, swap places with next in chain
@@ -509,7 +501,7 @@ reorder_result_t swap_mapnode(size_t index)
         return SYLVAN_REORDER_P2_CREATE_FAIL;
     } else {
         mtbddnode_makemapnode(node, var, f0, f01);
-        llmsset_rehash_bucket(nodes, var);
+        llmsset_rehash_bucket(nodes, index);
     }
     return SYLVAN_REORDER_SUCCESS;
 }

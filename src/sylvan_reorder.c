@@ -22,6 +22,7 @@
 #include "sylvan_levels.h"
 #include "sylvan_reorder.h"
 #include "sylvan_interact.h"
+#include "sylvan_align.h"
 
 #define STATS 1 // useful information w.r.t. dynamic reordering
 
@@ -391,10 +392,18 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
 {
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
+        if (levels->bitmap_p2_size != nodes->table_size){
+            // table size changed, reallocate bitmap
+            free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+            levels->bitmap_p2_size = nodes->table_size;
+            levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(levels->bitmap_p2_size);
+        }
+
         reorder_result_t result = NEWFRAME(sylvan_plain_sift, 0, 0);
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_print_reorder_res(result);
         }
+
         re = 0;
     } else {
         /* wait for new frame to appear */
