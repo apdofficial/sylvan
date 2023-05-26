@@ -44,7 +44,15 @@ typedef struct levels_db {
 
 #define levels_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
 
-#define levels_p2_next(index) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, index)
+#define levels_p2_next(idx) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, idx)
+
+#define levels_p2_set(idx) bitmap_atomic_set(levels->bitmap_p2, idx)
+
+#define levels_p2_clear(idx) bitmap_atomic_clear(levels->bitmap_p2, idx)
+
+#define levels_p2_is_marked(idx) bitmap_atomic_get(levels->bitmap_p2, idx)
+
+#define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
 
 /**
  * @brief Create a new levels_t object

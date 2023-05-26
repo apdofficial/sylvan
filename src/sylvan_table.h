@@ -221,7 +221,7 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
 
 
 /**
- * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions.
+ * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions. (thread-safe)
  */
 
 /**
@@ -238,6 +238,8 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
  * Index to the next node index relative to the provided node index.
  */
 #define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
+
+void release_data_bucket(const llmsset_t dbs, uint64_t index);
 
 #ifdef __cplusplus
 }
