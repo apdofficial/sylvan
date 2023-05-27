@@ -19,8 +19,6 @@ typedef struct interact_state
      word_t*          bitmap;                 // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
 } interact_t;
 
-// number of variables can be at most number of nodes
-#define interact_alloc_max(dbs) interact_alloc(dbs, nodes->table_size);
 char interact_malloc(levels_t dbs);
 
 void interact_free(levels_t dbs);

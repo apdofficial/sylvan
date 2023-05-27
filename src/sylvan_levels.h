@@ -49,14 +49,14 @@ typedef struct levels_db {
 #define levels_p2_is_marked(idx) bitmap_atomic_get(levels->bitmap_p2, idx)
 #define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
 
-#define levels_is_isolated(idx) (levels_ref_count_load(idx) <= 1)
+#define levels_is_isolated(idx) (levels_ref_count_load(idx) == 1)
 #define levels_ref_count_load(idx) atomic_load_explicit(&levels->ref_count[idx], memory_order_relaxed)
 #define levels_ref_count_dec(idx) atomic_fetch_add_explicit(&levels->ref_count[idx], -1, memory_order_relaxed)
 #define levels_ref_count_inc(idx) atomic_fetch_add_explicit(&levels->ref_count[idx], 1, memory_order_relaxed)
 
+#define levels_var_count_load(idx) atomic_load_explicit(&levels->var_count[idx], memory_order_relaxed)
 #define levels_var_count_dec(idx) atomic_fetch_add_explicit(&levels->var_count[idx], -1, memory_order_relaxed)
 #define levels_var_count_inc(idx) atomic_fetch_add_explicit(&levels->var_count[idx], 1, memory_order_relaxed)
-#define levels_var_count_load(idx) atomic_load_explicit(&levels->var_count[idx],memory_order_relaxed)
 
 /**
  * @brief Create a new levels_t object
