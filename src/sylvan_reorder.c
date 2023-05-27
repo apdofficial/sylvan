@@ -399,7 +399,7 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
             levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(levels->bitmap_p2_size);
         }
 
-        reorder_result_t result = NEWFRAME(sylvan_plain_sift, 0, 0);
+        reorder_result_t result = NEWFRAME(sylvan_sift, 0, 0);
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_print_reorder_res(result);
         }

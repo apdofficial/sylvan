@@ -403,17 +403,18 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
 
     ref_dec(mtbdd_getvar(f0));
 
-    // The new nodes required at level i (i.e., (xi, F11, F01) and (xi, F10, F00)) may be
+    // The new nodes required at level i (i.e., (xi, F01, F11) and (xi, F00, F10)) may be
     // degenerate nodes (e.g., in the case that F11 = F01 or F10 == F00),
     // or may already exist in the DAG as required to implement other functions.
 
     if (f10 == f00) {
-        // (newf0, F10, F00) is degenerate node thus we reuse f00
+        // (newf0, F00, F10) is degenerate node thus we reuse F00
         newf0 = f00;
+        var_dec(var);
         ref_inc(mtbdd_getvar(newf0));
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
-        // if we had subtables wu would have scanned if herr to search for (var, F10, F00) instead of creating newf0
+        // if we had subtables wu would have scanned if here to search for (var, F10, F00) instead of creating newf0
 
         // Create the new low high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
@@ -421,13 +422,15 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
         if (f0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
         ref_inc(mtbdd_getvar(f10));
         ref_inc(mtbdd_getvar(f00));
+        var_inc(var);
     }
 
     ref_dec(mtbdd_getvar(f1));
 
     if (f11 == f01) {
-        // (newf1, F11, F01) is degenerate node thus we reuse f01
+        // (newf1, F01, F11) is degenerate node thus we reuse f11
         newf1 = f11;
+        var_dec(var);
         ref_inc(mtbdd_getvar(newf1));
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
@@ -439,22 +442,7 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
         if (f1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
         ref_inc(mtbdd_getvar(f01));
         ref_inc(mtbdd_getvar(f11));
-    }
-
-    // 1. # of nodes is increased at <var+1> level due to only f1 having <var> index
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) > var) {
-        // we mutate <var> since we did not swap the mapping yet
         var_inc(var);
-    }
-    // 2. # of nodes is increased at <var+1> level due to only f0 having <var> index
-    if (mtbdd_getvar(f0) == var && mtbdd_getvar(f1) > var) {
-        // we mutate <var> since we did not swap the mapping yet
-        var_inc(var);
-    }
-    // 3. # of nodes is decreased at <var+1> level due to f10 and f01 pointing to the same children
-    if (mtbdd_getvar(f1) == var && mtbdd_getvar(f0) == var && f10 == f01) {
-        // we mutate <var> since we did not swap the mapping yet
-        var_dec(var);
     }
 
     // update node, which also removes the mark
