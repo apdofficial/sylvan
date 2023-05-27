@@ -23,7 +23,7 @@ typedef struct levels_db {
     size_t                  count;                   // number of created levels
     atomic_half_word_t*     level_to_order;          // current level wise var permutation (level to variable label)
     atomic_half_word_t*     order_to_level;          // current variable wise level permutation (variable label to level)
-    atomic_half_word_t*     var_count;               // number of nodes per variable (it expects order wise variable index)
+    atomic_half_word_t*     var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
     atomic_half_word_t*     ref_count;               // number of internal references per variable (it expects order wise variable index)
     int                     isolated_count;          // number of isolated projection functions
     atomic_word_t*          bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
@@ -43,16 +43,20 @@ typedef struct levels_db {
 #define levels_nindex npos
 
 #define levels_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
-
 #define levels_p2_next(idx) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, idx)
-
 #define levels_p2_set(idx) bitmap_atomic_set(levels->bitmap_p2, idx)
-
 #define levels_p2_clear(idx) bitmap_atomic_clear(levels->bitmap_p2, idx)
-
 #define levels_p2_is_marked(idx) bitmap_atomic_get(levels->bitmap_p2, idx)
-
 #define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
+
+#define levels_is_isolated(idx) (levels_ref_count_load(idx) <= 1)
+#define levels_ref_count_load(idx) atomic_load_explicit(&levels->ref_count[idx], memory_order_relaxed)
+#define levels_ref_count_dec(idx) atomic_fetch_add_explicit(&levels->ref_count[idx], -1, memory_order_relaxed)
+#define levels_ref_count_inc(idx) atomic_fetch_add_explicit(&levels->ref_count[idx], 1, memory_order_relaxed)
+
+#define levels_var_count_dec(idx) atomic_fetch_add_explicit(&levels->var_count[idx], -1, memory_order_relaxed)
+#define levels_var_count_inc(idx) atomic_fetch_add_explicit(&levels->var_count[idx], 1, memory_order_relaxed)
+#define levels_var_count_load(idx) atomic_load_explicit(&levels->var_count[idx],memory_order_relaxed)
 
 /**
  * @brief Create a new levels_t object

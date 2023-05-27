@@ -517,7 +517,7 @@ int main(int argc, char **argv)
 
     lace_start(workers, 0);
 
-    sylvan_set_limits(8LL * 1024 * 1024 * 1024, 1, 8);
+    sylvan_set_limits(8LL * 1024 * 1024 * 1024, 1, 12);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();

@@ -45,7 +45,7 @@
 #define SYLVAN_REORDER_GROWTH	        1.2f
 #define SYLVAN_REORDER_NODES_THRESHOLD	32
 #define SYLVAN_REORDER_TIME_LIMIT_MS	(1 * 15 * 1000)     // 15 seconds
-#define SYLVAN_REORDER_FIRST_REORDER	2000
+#define SYLVAN_REORDER_FIRST_REORDER	3000
 #define SYLVAN_REORDER_SIZE_RATIO	    2
 #define SYLVAN_REORDER_LIMIT	        20                  // maximum number of reordering calls allowed
  /**

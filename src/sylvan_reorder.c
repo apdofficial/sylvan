@@ -234,8 +234,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
     for (BDDVAR y = s_state->high; y > s_state->pos; y--) {
         yIndex = levels->level_to_order[y];
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) <= 1;
-            R += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+            isolated = levels_is_isolated(yIndex);
+            R += (int) levels_var_count_load(yIndex) - isolated;
         }
     }
 
@@ -243,8 +243,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         //  Update the upper bound on node decrease
         yIndex = levels->level_to_order[s_state->pos + 1];
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[yIndex], memory_order_relaxed) <= 1;
-            R -= (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+            isolated = levels_is_isolated(yIndex);
+            R -= (int) levels_var_count_load(yIndex) - isolated;
         }
         res = CALL(sylvan_varswap, s_state->pos);
         s_state->size = CALL(llmsset_count_marked, nodes);
@@ -297,8 +297,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     for (BDDVAR x = s_state->low + 1; x < s_state->pos; x++) {
         xIndex = levels->level_to_order[x];
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) <= 1;
-            L -= (int) atomic_load_explicit(&levels->var_count[xIndex], memory_order_relaxed) - isolated;
+            isolated = levels_is_isolated(xIndex);
+            L -= (int) levels_var_count_load(xIndex) - isolated;
         }
     }
 
@@ -321,8 +321,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
         // Update the lower bound on DD size
         if (interact_test(levels, xIndex, yIndex)) {
-            isolated = atomic_load_explicit(&levels->ref_count[xIndex], memory_order_relaxed) <= 1;
-            L += (int) atomic_load_explicit(&levels->var_count[yIndex], memory_order_relaxed) - isolated;
+            isolated = levels_is_isolated(xIndex);
+            L += (int) levels_var_count_load(yIndex) - isolated;
         }
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
     }

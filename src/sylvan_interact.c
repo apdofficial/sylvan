@@ -104,12 +104,12 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
     MTBDD f1 = mtbdd_gethigh(f);
     if (visited == 0) {
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f1)]], 1, memory_order_relaxed);
+        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f1)]);
     }
 
     MTBDD f0 = mtbdd_getlow(f);
     if (visited == 0) {
-        atomic_fetch_add_explicit(&levels->ref_count[levels->level_to_order[mtbdd_getvar(f0)]], 1, memory_order_relaxed);
+        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f0)]);
     }
 
     SPAWN(find_support, f1, bitmap_s, bitmap_v, bitmap_l);
@@ -148,7 +148,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         BDDVAR var = mtbddnode_getvariable(f);
         if(var >= mtbdd_levelscount()) continue; // not registered variable
 
-        atomic_fetch_add_explicit(&levels->var_count[levels->level_to_order[var]], 1, memory_order_relaxed);
+        levels_var_count_inc(levels->level_to_order[var]);
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>
@@ -173,7 +173,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < levels->count; i++) {
-        if (atomic_load_explicit(&levels->ref_count[i], memory_order_relaxed) <= 1) {
+        if (levels_ref_count_load(i) <= 1) {
             levels->isolated_count++;
         }
     }
