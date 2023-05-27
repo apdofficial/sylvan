@@ -1086,7 +1086,7 @@ namespace sylvan
             <li> Repeat 2 and 3 for all variables in given range.
             </ol>
         */
-        static void reduceHeap();
+        static void reduceHeap(reordering_type_t type);
 
         /**
           @brief Reorder the variables in the BDDs according to the given permutation.

@@ -1093,9 +1093,9 @@ void Sylvan::setReorderTimeLimit(double time_limit)
     sylvan_set_reorder_timelimit_ms(time_limit);
 }
 
-void Sylvan::reduceHeap()
+void Sylvan::reduceHeap(reordering_type_t type)
 {
-    return sylvan_reduce_heap();
+    return sylvan_reduce_heap(type);
 }
 
 reorder_result_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)

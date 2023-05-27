@@ -7,6 +7,14 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/**
+  @brief Type of reordering algorithm.
+*/
+typedef enum {
+    SYLVAN_REORDER_SIFT,
+    SYLVAN_REORDER_BOUNDED_SIFT,
+} reordering_type_t;
+
 typedef struct sifting_state
 {
     uint32_t pos;
@@ -114,6 +122,12 @@ void sylvan_set_reorder_timelimit_ms(double time_limit);
 void sylvan_set_reorder_verbose(int is_verbose);
 
 /**
+ * @brief Set the the flag to print the progress of the reordering.
+ * @param verbose The flag to print the progress of the reordering.
+ */
+void sylvan_set_reorder_type(reordering_type_t type);
+
+/**
  * @brief Sift given variable up from its current level to the target level.
  * @sideeffect order of variables is changed
  */
@@ -145,7 +159,7 @@ TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
  *
  * @sideeffect order of variables is changed, mappings level -> order and order -> level are updated
  */
-void sylvan_reduce_heap();
+void sylvan_reduce_heap(reordering_type_t type);
 
 /**
  * @brief Maybe reduce the heap size in the entire forest.

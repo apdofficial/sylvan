@@ -48,6 +48,7 @@
 #define SYLVAN_REORDER_FIRST_REORDER	3000
 #define SYLVAN_REORDER_SIZE_RATIO	    2
 #define SYLVAN_REORDER_LIMIT	        20                  // maximum number of reordering calls allowed
+#define SYLVAN_REORDER_TYPE_DEFAULT     SYLVAN_REORDER_BOUNDED_SIFT
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
   *

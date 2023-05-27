@@ -40,6 +40,7 @@ struct sifting_config
     uint32_t max_var;                           // maximum number of vars swapped per sifting
     uint32_t total_num_var;                     // number of vars sifted
     double time_limit_ms;                       // time limit in milliseconds
+    reordering_type_t type;                     // type of reordering algorithm
 };
 
 /// reordering configurations
@@ -51,14 +52,15 @@ static struct sifting_config configs = {
         .total_num_swap = 0,
         .max_var = SYLVAN_REORDER_MAX_VAR,
         .total_num_var = 0,
-        .time_limit_ms = SYLVAN_REORDER_TIME_LIMIT_MS
+        .time_limit_ms = SYLVAN_REORDER_TIME_LIMIT_MS,
+        .type = SYLVAN_REORDER_TYPE_DEFAULT
 };
 
-VOID_TASK_DECL_0(sylvan_reorder_stop_world)
+VOID_TASK_DECL_1(sylvan_reorder_stop_world, reordering_type_t)
 
 TASK_DECL_2(reorder_result_t, sylvan_sift, uint32_t, uint32_t)
 
-TASK_DECL_2(reorder_result_t, sylvan_plain_sift, uint32_t, uint32_t)
+TASK_DECL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, uint32_t)
 
 typedef struct re_term_entry
 {
@@ -200,6 +202,11 @@ void sylvan_set_reorder_verbose(int is_verbose)
     print_reordering_stat = is_verbose;
 }
 
+void sylvan_set_reorder_type(reordering_type_t type)
+{
+    configs.type = type;
+}
+
 TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
@@ -302,6 +309,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
     }
 
+//    isolated = levels_is_isolated(yIndex);
+//    L -= (int) levels_var_count_load(yIndex) - isolated;
+
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
         xIndex = levels->level_to_order[s_state->pos - 1];
         res = CALL(sylvan_varswap, s_state->pos - 1);
@@ -373,13 +383,13 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 void sylvan_test_reduce_heap()
 {
     if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
-        sylvan_reduce_heap();
+        sylvan_reduce_heap(configs.type);
     }
 }
 
-void sylvan_reduce_heap()
+void sylvan_reduce_heap(reordering_type_t type)
 {
-    RUNEX(sylvan_reorder_stop_world);
+    RUNEX(sylvan_reorder_stop_world, type);
 }
 
 /**
@@ -388,7 +398,7 @@ void sylvan_reduce_heap()
  */
 static _Atomic (int) re;
 
-VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
+VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
 {
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
@@ -398,12 +408,18 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
             levels->bitmap_p2_size = nodes->table_size;
             levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(levels->bitmap_p2_size);
         }
-
-        reorder_result_t result = NEWFRAME(sylvan_sift, 0, 0);
+        reorder_result_t result;
+        switch (type) {
+            case SYLVAN_REORDER_SIFT:
+                result = NEWFRAME(sylvan_sift, 0, 0);
+                break;
+            case SYLVAN_REORDER_BOUNDED_SIFT:
+                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
+                break;
+        }
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_print_reorder_res(result);
         }
-
         re = 0;
     } else {
         /* wait for new frame to appear */
@@ -412,7 +428,7 @@ VOID_TASK_IMPL_0(sylvan_reorder_stop_world)
     }
 }
 
-TASK_IMPL_2(reorder_result_t, sylvan_plain_sift, uint32_t, low, uint32_t, high)
+TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
     if (levels->count < 1) return SYLVAN_REORDER_NO_REGISTERED_VARS;
@@ -591,7 +607,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_plain_sift, uint32_t, low, uint32_t, high)
     return res;
 }
 
-TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
+TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
     if (levels->count < 1) return SYLVAN_REORDER_NO_REGISTERED_VARS;
