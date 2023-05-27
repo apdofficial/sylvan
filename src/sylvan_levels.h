@@ -19,29 +19,40 @@ extern "C" {
  * Initially, variables are assigned linearly, starting with 0.
  */
 typedef struct levels_db {
-    _Atomic(uint64_t)*  table;                   // array holding the 1-node BDD for each level
-    size_t              count;                   // number of created levels
-    _Atomic(uint32_t)*  level_to_order;          // current level wise var permutation (level to variable label)
-    _Atomic(uint32_t)*  order_to_level;          // current variable wise level permutation (variable label to level)
-    _Atomic(uint32_t)*  var_count;               // number of nodes per variable (it expects order wise variable index)
-    _Atomic(uint32_t)*  ref_count;               // number of internal references per variable (it expects order wise variable index)
-    int                 isolated_count;          // number of isolated projection functions
-    atomic_word_t*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (it expects level wise variable index)
-    size_t              bitmap_i_nrows;          // number of rows and columns
-    size_t              bitmap_i_size;           // size of the bitmaps
-    size_t              reorder_size_threshold;  // reorder if this size is reached
-    size_t              reorder_count;           // number of reordering calls
+    atomic_word_t*          table;                   // array holding the 1-node BDD for each level
+    size_t                  count;                   // number of created levels
+    atomic_half_word_t*     level_to_order;          // current level wise var permutation (level to variable label)
+    atomic_half_word_t*     order_to_level;          // current variable wise level permutation (variable label to level)
+    atomic_half_word_t*     var_count;               // number of nodes per variable (it expects order wise variable index)
+    atomic_half_word_t*     ref_count;               // number of internal references per variable (it expects order wise variable index)
+    int                     isolated_count;          // number of isolated projection functions
+    atomic_word_t*          bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
+    size_t                  bitmap_i_nrows;          // number of rows/ columns
+    size_t                  bitmap_i_size;           // size of bitmap_i
+    atomic_word_t*          bitmap_p2;               // bitmap used to store reordering phase 2 mark
+    size_t                  bitmap_p2_size;          // size of bitmap_p2
+    size_t                  reorder_size_threshold;  // reorder if this size is reached
+    size_t                  reorder_count;           // number of reordering calls
 } *levels_t;
 
 /**
- * Index to first node in phase 2 mark bitmap
+ * Efficient phase 2 mark iterator implemented using bitmaps and using GCC built-in bit counting functions. (thread-safe)
+ *
+ * Returns node index to the unique table.
  */
-#define bitmap_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
+#define levels_nindex npos
 
-/**
- * Index of the next node relative to the provided index in th phase 2 bitmap.
- */
-#define bitmap_p2_next(index) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, index)
+#define levels_p2_first() bitmap_atomic_first(levels->bitmap_p2, levels->bitmap_p2_size)
+
+#define levels_p2_next(idx) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, idx)
+
+#define levels_p2_set(idx) bitmap_atomic_set(levels->bitmap_p2, idx)
+
+#define levels_p2_clear(idx) bitmap_atomic_clear(levels->bitmap_p2, idx)
+
+#define levels_p2_is_marked(idx) bitmap_atomic_get(levels->bitmap_p2, idx)
+
+#define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
 
 /**
  * @brief Create a new levels_t object

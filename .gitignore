@@ -16,3 +16,5 @@ cmake-build-*/
 CMakeFiles/
 .vscode/
 *.aag
+
+models/

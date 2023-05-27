@@ -39,18 +39,14 @@
 #define SYLVAN_USE_LINEAR_PROBING 0
 #endif
 
-/* Either use chaining or linear implementation as a hash collision strategy */
-#ifndef SYLVAN_LIMIT_PROBE_SEQUENCE
-#define SYLVAN_LIMIT_PROBE_SEQUENCE 0
-
 // Variable ordering default parameter values
 #define SYLVAN_REORDER_MAX_VAR		    1000
 #define SYLVAN_REORDER_MAX_SWAPS	    10000
 #define SYLVAN_REORDER_GROWTH	        1.2f
-#define SYLVAN_REORDER_NODES_THRESHOLD	16
+#define SYLVAN_REORDER_NODES_THRESHOLD	32
 #define SYLVAN_REORDER_TIME_LIMIT_MS	(1 * 15 * 1000)     // 15 seconds
-#define SYLVAN_REORDER_FIRST_REORDER	4002	            // 2 for the constants
-#define SYLVAN_REORDER_SIZE_RATIO	    3
+#define SYLVAN_REORDER_FIRST_REORDER	2000
+#define SYLVAN_REORDER_SIZE_RATIO	    2
 #define SYLVAN_REORDER_LIMIT	        20                  // maximum number of reordering calls allowed
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
@@ -60,6 +56,4 @@
   * too small is bad for the atomic operations, too large is bad for work-stealing
   * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
   */
-#define BLOCKSIZE 4096 //4096
-
-#endif
+#define BLOCKSIZE 4096 //  4096

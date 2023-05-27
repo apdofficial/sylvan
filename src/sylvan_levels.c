@@ -23,6 +23,10 @@ levels_t mtbdd_levels_create()
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
     dbs->bitmap_i_nrows = 0;
+
+    dbs->bitmap_p2 = NULL;
+    dbs->bitmap_p2_size = 0;
+
     dbs->isolated_count = 0;
     dbs->reorder_count = 0;
     dbs->reorder_size_threshold = SYLVAN_REORDER_FIRST_REORDER;
@@ -117,6 +121,9 @@ void mtbdd_resetlevels(void)
         free(levels->ref_count);
         levels->ref_count = NULL;
 
+        free_aligned(levels->bitmap_i, levels->bitmap_i_size);
+        free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+
         levels->count = 0;
         levels_size = 0;
         levels->isolated_count = 0;
@@ -204,6 +211,7 @@ VOID_TASK_IMPL_4(sylvan_count_levelnodes, _Atomic (size_t)*, arr, _Atomic (size_
     const size_t end = first + count;
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         tmp[mtbddnode_getvariable(node)]++; // update the variable
     }
     for (i = 0; i < levels->count; i++)  atomic_fetch_add(&arr[i], tmp[i]);

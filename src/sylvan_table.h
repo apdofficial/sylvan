@@ -221,7 +221,7 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
 
 
 /**
- * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions.
+ * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions. (thread-safe)
  */
 
 /**

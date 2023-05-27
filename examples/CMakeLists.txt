@@ -2,7 +2,7 @@ macro(set_compilation_settings NAME)
     set_target_properties(${NAME} PROPERTIES COMPILE_OPTIONS "-Wno-unused")
     target_include_directories(${NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
     target_link_libraries(${NAME} PRIVATE sylvan::sylvan)
-    target_compile_features(${NAME} PRIVATE c_std_11 cxx_std_11)
+    target_compile_features(${NAME} PRIVATE c_std_11 cxx_std_20)
     target_compile_options(${NAME} PRIVATE -Wall -Wextra -Werror -Wno-deprecated -Wno-unused-parameter)
 endmacro(set_compilation_settings)
 
@@ -25,6 +25,7 @@ add_example(nqueens nqueens.c)
 add_example(simple simple.cpp)
 
 add_example(aigsynt aigsynt.cpp)
+target_sources(aigsynt PRIVATE aag.h)
 
 # Check if we have Boost
 find_package(Boost 1.81.0)

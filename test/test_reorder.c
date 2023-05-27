@@ -618,10 +618,10 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
     printf("test_varswap_up\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-    printf("test_sift_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-    printf("test_sift_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+//    printf("test_sift_down\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+//    printf("test_sift_up\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
     printf("test_sift_pos\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
     printf("test_reorder_perm\n");

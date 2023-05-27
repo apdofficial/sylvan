@@ -1,19 +1,3 @@
-/*
- * Copyright 2016 Tom van Dijk, Johannes Kepler University Linz
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #ifndef SYLVAN_VAR_REORDER_H
 #define SYLVAN_VAR_REORDER_H
 
@@ -124,6 +108,12 @@ void sylvan_set_reorder_timelimit_sec(double time_limit);
 void sylvan_set_reorder_timelimit_ms(double time_limit);
 
 /**
+ * @brief Set the the flag to print the progress of the reordering.
+ * @param verbose The flag to print the progress of the reordering.
+ */
+void sylvan_set_reorder_verbose(int is_verbose);
+
+/**
  * @brief Sift given variable up from its current level to the target level.
  * @sideeffect order of variables is changed
  */
@@ -152,9 +142,6 @@ TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
  * 2. Sift the variable up and down, remembering each time the total size of the bdd size.
  * 3. Select the best permutation.
  * 4. Repeat 2 and 3 for all variables in given range.
- *
- * @param low - the lowest position to sift
- * @param high - the highest position to sift
  *
  * @sideeffect order of variables is changed, mappings level -> order and order -> level are updated
  */

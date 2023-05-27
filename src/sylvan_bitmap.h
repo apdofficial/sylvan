@@ -12,6 +12,9 @@ extern "C" {
 typedef uint64_t word_t;
 typedef _Atomic (word_t) atomic_word_t;
 
+typedef uint32_t half_word_t;
+typedef _Atomic (half_word_t) atomic_half_word_t;
+
 static const size_t npos = (word_t)-1;
 
 #define WORD_OFFSET(b)          ((b) / BITS_PER_WORD)
