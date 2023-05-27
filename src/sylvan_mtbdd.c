@@ -470,7 +470,7 @@ _mtbdd_makenode_exit(void)
 }
 
 MTBDD
-_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
     // Normalization to keep canonicity
     // low will have no mark
@@ -481,8 +481,7 @@ _mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
     struct mtbddnode n;
     mtbddnode_makenode(&n, var, low, high);
 
-    int created;
-    uint64_t index = llmsset_lookup(nodes, n.a, n.b, &created);
+    uint64_t index = llmsset_lookup(nodes, n.a, n.b, created);
     if (index == 0) return mtbdd_invalid;
 
     if (created) sylvan_stats_count(BDD_NODES_CREATED);

@@ -168,10 +168,10 @@ static inline MTBDD mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
   * <var> is a 24-bit integer.
   * Please note that this does NOT check variable ordering!
  */
- MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high);
-static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+ MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high, int* created);
+static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
-    return low == high ? low : _mtbdd_varswap_makenode(var, low, high);
+    return low == high ? low : _mtbdd_varswap_makenode(var, low, high, created);
 }
 
 /**

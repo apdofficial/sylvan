@@ -395,40 +395,52 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
 
     levels_ref_count_dec(levels->level_to_order[mtbdd_getvar(f0)]);
     if (f10 == f00) {
-        // (newf0, F00, F10) is degenerate node thus we reuse F00
+        // (newf0, F00, F10) would be degenerate node thus we reuse F00
         newf0 = f00;
         levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf0)]);
         levels_var_count_dec(levels->level_to_order[var]);
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
         // if we had subtables we would have scanned <var> sub-table here to search for (var, F10, F00) instead of creating newf0
+        // this would speed up a bit the swap, instead what we do is we call makenode will call look up and then create new node if not found
 
         // Create the new low high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
-        newf0 = mtbdd_varswap_makenode(var + 1, f00, f10);
+        int created;
+        newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created);
         if (f0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f10)]);
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f00)]);
         levels_var_count_inc(levels->level_to_order[var]);
+        if (created){
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f10)]);
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f00)]);
+        } else {
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf0)]);
+        }
     }
 
     levels_ref_count_dec(levels->level_to_order[mtbdd_getvar(f1)]);
     if (f11 == f01) {
-        // (newf1, F01, F11) is degenerate node thus we reuse f11
+        // (newf1, F01, F11) would be degenerate node thus we reuse f11
         newf1 = f11;
         levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf1)]);
         levels_var_count_dec(levels->level_to_order[var]);
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
         // if we had subtables wu would have scanned <var> sub-table here to search for (var, F11, F01) instead of creating newf1
+        // this would speed up a bit the swap, instead what we do is we call makenode will call look up and then create new node if not found
 
         // Create the new high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
-        newf1 = mtbdd_varswap_makenode(var + 1, f01, f11);
+        int created;
+        newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created);
         if (f1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f01)]);
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f11)]);
         levels_var_count_inc(levels->level_to_order[var]);
+        if (created){
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f11)]);
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f01)]);
+        } else {
+            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf1)]);
+        }
     }
 
     // update node, which also removes the mark
