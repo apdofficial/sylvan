@@ -246,6 +246,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         }
     }
 
+//    printf("sift down pos: %d\n", s_state->pos);
+
     for (; s_state->pos < s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
         //  Update the upper bound on node decrease
         yIndex = levels->level_to_order[s_state->pos + 1];
@@ -309,8 +311,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
     }
 
-//    isolated = levels_is_isolated(yIndex);
-//    L -= (int) levels_var_count_load(yIndex) - isolated;
+    isolated = levels_is_isolated(yIndex);
+    L -= (int) levels_var_count_load(yIndex) - isolated;
+
+//    printf("sift up pos: %d\n", s_state->pos);
 
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
         xIndex = levels->level_to_order[s_state->pos - 1];
@@ -662,6 +666,8 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         configs.total_num_swap = 0;
         s_state.best_pos = s_state.pos;
         s_state.best_size = s_state.size;
+
+//        printf("sift level: %d\n", lvl);
 
         if ((s_state.pos - s_state.low) > (s_state.high - s_state.pos)) {
             // we are in the lower half, so sift down first and then up

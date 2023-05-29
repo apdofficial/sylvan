@@ -468,7 +468,7 @@ TASK_0(int, test_reorder)
     sylvan_protect(&bdd);
 
     size_t not_optimal_order_size = sylvan_nodecount(bdd);
-    sylvan_reduce_heap();
+    sylvan_reduce_heap(SYLVAN_REORDER_SIFT);
     size_t not_optimal_order_reordered_size = sylvan_nodecount(bdd);
 
     test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
@@ -509,7 +509,7 @@ TASK_0(int, test_map_reorder)
     sylvan_protect(&map);
 
     size_t size_before = sylvan_nodecount(map);
-    sylvan_reduce_heap();
+    sylvan_reduce_heap(SYLVAN_REORDER_SIFT);
     size_t size_after = sylvan_nodecount(map);
 
     test_assert(size_after < size_before);
