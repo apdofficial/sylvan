@@ -87,7 +87,7 @@ void levels_node_ref_count_add(levels_t dbs, size_t idx, int val){
 void levels_var_count_malloc(size_t new_size)
 {
     levels_var_count_free();
-    levels->var_count = (atomic_counter_t *) alloc_aligned(new_size);
+    levels->var_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
     if (levels->var_count != NULL) levels->var_count_size = new_size;
     else levels->var_count_size = 0;
 }
@@ -109,7 +109,7 @@ void levels_var_count_free()
 void levels_ref_count_malloc(size_t new_size)
 {
     levels_ref_count_free();
-    levels->ref_count = (atomic_counter_t *) alloc_aligned(new_size);
+    levels->ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
     if (levels->ref_count != NULL) levels->ref_count_size = new_size;
     else levels->ref_count_size = 0;
 }
@@ -131,7 +131,7 @@ void levels_ref_count_free()
 void levels_node_ref_count_malloc(size_t new_size)
 {
     levels_node_ref_count_free();
-    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(new_size);
+    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
     if (levels->node_ref_count != NULL) levels->node_ref_count_size = new_size;
     else levels->node_ref_count_size = 0;
 }

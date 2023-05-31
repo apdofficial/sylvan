@@ -106,19 +106,15 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
 
-    levels_bitmap_p2_realloc(nodes->table_size);
-    levels_p2_clear_all();
-
-    int isolated = 0;
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
     // two functions again. This is done to eliminate the isolated
     // projection functions from the node count.
-    isolated = -(levels_is_isolated(levels, levels->level_to_order[pos]) +
-                 levels_is_isolated(levels, levels->level_to_order[pos + 1]));
-    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
-
+    int isolated = -(levels_is_isolated(levels, levels->level_to_order[pos]) +
+                     levels_is_isolated(levels, levels->level_to_order[pos + 1]));
+//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
+    levels_bitmap_p2_realloc(nodes->table_size);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (are_interacting == 0) {
@@ -151,6 +147,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         if (sylvan_reorder_issuccess(result) == 0) {
             CALL(sylvan_varswap_p3, pos, &result);
         }
+        levels_p2_clear_all();
     }
 
     if (levels->ref_count_size > 0) {
@@ -167,10 +164,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     levels->level_to_order[pos] = levels->level_to_order[pos + 1];
     levels->level_to_order[pos + 1] = save;
 
-    if (are_interacting) {
-        sylvan_clear_and_mark();
-        sylvan_rehash_all();
-    }
+//    if (are_interacting) {
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+//    }
 
     return result;
 }
