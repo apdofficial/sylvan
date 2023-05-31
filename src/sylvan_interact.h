@@ -12,13 +12,6 @@ extern "C" {
 #include "sylvan_bitmap.h"
 #include "sylvan_reorder.h"
 
-typedef struct interact_state
-{
-     size_t           nrows;                  // size of a row
-     size_t           size;                   // size of the bitmaps
-     word_t*          bitmap;                 // bitmap for "visited node" , as many bits as there are buckets in the table, 1 -> visited, 0 -> not visited
-} interact_t;
-
 char interact_malloc(levels_t dbs);
 
 void interact_free(levels_t dbs);
@@ -35,7 +28,8 @@ static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 
 static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
-    if (dbs->bitmap_i == NULL) return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
+    if (dbs->bitmap_i == NULL)
+        return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
     // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
     if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
     if (x >= dbs->count || y >= dbs->count) return 1;
@@ -56,7 +50,7 @@ static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
   @sideeffect Clears support.
 
 */
-void interact_update(levels_t dbs, atomic_word_t* bitmap_s);
+void interact_update(levels_t dbs, atomic_word_t *bitmap_s);
 
 void interact_print_state(const levels_t dbs);
 

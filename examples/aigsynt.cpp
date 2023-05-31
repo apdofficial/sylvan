@@ -338,7 +338,7 @@ VOID_TASK_1(make_gate, int, gate)
     if (aag.gatergt[gate] & 1) r = sylvan_not(r);
     game.gates[gate] = sylvan_and(l, r);
     mtbdd_protect(&game.gates[gate]);
-//    if (dynamic_reorder) sylvan_test_reduce_heap();
+    if (dynamic_reorder) sylvan_test_reduce_heap();
 }
 
 #define solve_game() RUN(solve_game)
@@ -394,7 +394,7 @@ TASK_0(int, solve_game)
     for (uint64_t gate = 0; gate < aag.header.a; gate++) make_gate(gate);
     if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
 
-    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
+//    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -528,7 +528,7 @@ int main(int argc, char **argv)
     sylvan_set_reorder_nodes_threshold(32);
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit_sec(30);
-    sylvan_set_reorder_type(SYLVAN_REORDER_SIFT);
+    sylvan_set_reorder_type(SYLVAN_REORDER_BOUNDED_SIFT);
 
     // Set hooks for logging garbage collection & dynamic variable reordering
     if (verbose) {

@@ -43,6 +43,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+
+
 /**
  * An MTBDD is a 64-bit value. The low 40 bits are an index into the unique table.
  * The highest 1 bit is the complement edge, indicating negation.
@@ -171,6 +173,7 @@ static inline MTBDD mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
  MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high, int* created);
 static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
+    *created = 0;
     return low == high ? low : _mtbdd_varswap_makenode(var, low, high, created);
 }
 
@@ -1073,6 +1076,11 @@ MTBDDMAP mtbdd_map_removeall(MTBDDMAP map, MTBDD variables);
  */
 VOID_TASK_DECL_1(mtbdd_gc_mark_rec, MTBDD);
 #define mtbdd_gc_mark_rec(mtbdd) RUN(mtbdd_gc_mark_rec, mtbdd)
+
+
+VOID_TASK_DECL_1(mtbdd_re_set_external_refs, atomic_word_t*);
+#define mtbdd_re_set_external_refs(bitmap) RUN(mtbdd_re_set_external_refs, bitmap)
+
 
 /**
  * Infrastructure for external references using a hash table.

@@ -17,12 +17,13 @@ typedef enum {
 
 typedef struct sifting_state
 {
-    uint32_t pos;
-    int size;
-    uint32_t best_pos;
-    int best_size;
-    uint32_t low;
-    uint32_t high;
+    uint32_t    pos;
+    int         size;
+    uint32_t    best_pos;
+    int         best_size;
+    uint32_t    low;
+    uint32_t    high;
+    int         use_bounds;
 } sifting_state_t;
 
 typedef int (*re_term_cb)();
@@ -179,6 +180,12 @@ TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
   currently in use.
  */
 #define sylvan_reorder_perm(permutation)  RUNEX(sylvan_reorder_perm, permutation)
+
+#define sylvan_pre_reorder() RUN(sylvan_pre_reorder)
+VOID_TASK_DECL_0(sylvan_pre_reorder)
+
+#define sylvan_post_reorder(before_size, leaf_count, type) RUN(sylvan_post_reorder, before_size, leaf_count, type)
+VOID_TASK_DECL_3(sylvan_post_reorder, size_t, size_t, reordering_type_t)
 
 #ifdef __cplusplus
 }

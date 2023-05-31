@@ -16,7 +16,6 @@ char interact_malloc(levels_t dbs)
     dbs->bitmap_i_nrows = dbs->count;
     dbs->bitmap_i = NULL;
     dbs->bitmap_i = (atomic_word_t*) alloc_aligned(dbs->bitmap_i_size);
-    dbs->reorder_size_threshold = SYLVAN_REORDER_FIRST_REORDER;
 
     if (dbs->bitmap_i == 0) {
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
@@ -108,13 +107,14 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
     MTBDD f1 = mtbdd_gethigh(f);
     if (visited == 0) {
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f1)]);
-
+        levels_ref_count_add(levels, levels->level_to_order[mtbdd_getvar(f1)], 1);
+        levels_node_ref_count_add(levels, f1 & MASK_INDEX, 1);
     }
 
     MTBDD f0 = mtbdd_getlow(f);
     if (visited == 0) {
-        levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f0)]);
+        levels_ref_count_add(levels, levels->level_to_order[mtbdd_getvar(f0)], 1);
+        levels_node_ref_count_add(levels, f0 & MASK_INDEX, 1);
     }
 
     SPAWN(find_support, f1, bitmap_s, bitmap_v, bitmap_l);
@@ -129,7 +129,6 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
 VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 {
-    interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
 
@@ -147,7 +146,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         BDDVAR var = mtbddnode_getvariable(f);
         if(var >= mtbdd_levelscount()) continue; // not registered variable
 
-        levels_var_count_inc(levels->level_to_order[var]);
+        levels_var_count_add(levels, levels->level_to_order[var], 1);
         if (bitmap_atomic_get(bitmap_v, index) == 1) continue; // already visited node
 
         // set support bitmap, <var> is on the support of <f>
@@ -172,7 +171,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t i = 0; i < levels->count; i++) {
-        if (levels_ref_count_load(i) <= 1) {
+        if (levels_ref_count_load(levels, i) <= 1) {
             levels->isolated_count++;
         }
     }

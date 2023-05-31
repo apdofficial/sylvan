@@ -55,6 +55,7 @@ alloc_aligned(size_t size)
     return res;
 }
 
+
 static inline void
 free_aligned(void* ptr, size_t size)
 {

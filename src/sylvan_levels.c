@@ -3,6 +3,7 @@
 #include <sylvan_align.h>
 #include <errno.h>      // for errno
 #include "sylvan_reorder.h"
+#include "sylvan_interact.h"
 
 static size_t levels_size; // size of the arrays in levels_t used to realloc memory
 
@@ -15,11 +16,18 @@ levels_t mtbdd_levels_create()
     }
 
     dbs->table = NULL;
+
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
+
     dbs->var_count = NULL;
+    dbs->var_count_size = 0;
+
     dbs->ref_count = NULL;
+    dbs->ref_count_size = 0;
+
     dbs->node_ref_count = NULL;
+    dbs->node_ref_count_size = 0;
 
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
@@ -40,6 +48,152 @@ levels_t mtbdd_levels_create()
 
     return dbs;
 }
+
+counter_t levels_ref_count_load(levels_t dbs, size_t idx){
+    if (dbs->ref_count_size == 0) return 0;
+    return atomic_load_explicit(&dbs->ref_count[idx], memory_order_relaxed);
+}
+
+void levels_ref_count_add(levels_t dbs, size_t idx, int val){
+    if (dbs->ref_count_size == 0 || val >= counter_t_max) return;
+    atomic_fetch_add_explicit(&dbs->ref_count[idx], val, memory_order_relaxed);
+}
+
+int levels_is_isolated(levels_t dbs, size_t idx){
+    if (dbs->ref_count_size == 0) return 1;
+    return levels_ref_count_load(dbs, idx) <= 1;
+}
+
+counter_t levels_var_count_load(levels_t dbs, size_t idx){
+    if (dbs->var_count_size == 0) return 0;
+    return atomic_load_explicit(&dbs->var_count[idx], memory_order_relaxed);
+}
+
+void levels_var_count_add(levels_t dbs, size_t idx, int val){
+    if (dbs->var_count_size == 0 || val >= counter_t_max) return;
+    atomic_fetch_add_explicit(&dbs->var_count[idx], val, memory_order_relaxed);
+}
+
+counter_t levels_node_ref_count_load(levels_t dbs, size_t idx){
+    if (dbs->node_ref_count_size == 0) return 0;
+    return atomic_load_explicit(&dbs->node_ref_count[idx], memory_order_relaxed);
+}
+
+void levels_node_ref_count_add(levels_t dbs, size_t idx, int val){
+    if (dbs->node_ref_count_size == 0 || val >= counter_t_max) return;
+    atomic_fetch_add_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
+}
+
+void levels_var_count_malloc(size_t new_size)
+{
+    levels_var_count_free();
+    levels->var_count = (atomic_counter_t *) alloc_aligned(new_size);
+    if (levels->var_count != NULL) levels->var_count_size = new_size;
+    else levels->var_count_size = 0;
+}
+
+void levels_var_count_realloc(size_t new_size)
+{
+    if (levels->var_count_size == new_size) return;
+    levels_var_count_free();
+    levels_var_count_malloc(new_size);
+}
+
+void levels_var_count_free()
+{
+    if (levels->var_count != NULL) free_aligned(levels->var_count, levels->var_count_size);
+    levels->var_count_size = 0;
+    levels->var_count = NULL;
+}
+
+void levels_ref_count_malloc(size_t new_size)
+{
+    levels_ref_count_free();
+    levels->ref_count = (atomic_counter_t *) alloc_aligned(new_size);
+    if (levels->ref_count != NULL) levels->ref_count_size = new_size;
+    else levels->ref_count_size = 0;
+}
+
+void levels_ref_count_realloc(size_t new_size)
+{
+    if (levels->ref_count_size == new_size) return;
+    levels_ref_count_free();
+    levels_ref_count_malloc(new_size);
+}
+
+void levels_ref_count_free()
+{
+    if (levels->ref_count != NULL) free_aligned(levels->ref_count, levels->ref_count_size);
+    levels->ref_count_size = 0;
+    levels->ref_count = NULL;
+}
+
+void levels_node_ref_count_malloc(size_t new_size)
+{
+    levels_node_ref_count_free();
+    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(new_size);
+    if (levels->node_ref_count != NULL) levels->node_ref_count_size = new_size;
+    else levels->node_ref_count_size = 0;
+}
+
+void levels_node_ref_count_realloc(size_t new_size)
+{
+    if (levels->node_ref_count_size == new_size) return;
+    levels_node_ref_count_free();
+    levels_node_ref_count_malloc(new_size);
+}
+
+void levels_node_ref_count_free()
+{
+    if (levels->node_ref_count != NULL) free_aligned(levels->node_ref_count, levels->node_ref_count_size);
+    levels->node_ref_count_size = 0;
+    levels->node_ref_count = NULL;
+}
+
+void levels_bitmap_ext_malloc(size_t new_size)
+{
+    levels_bitmap_ext_free();
+    levels->bitmap_ext = (atomic_word_t *) alloc_aligned(new_size);
+    if (levels->bitmap_ext != NULL) levels->bitmap_ext_size = new_size;
+    else levels->bitmap_ext_size = 0;
+}
+
+void levels_bitmap_ext_realloc(size_t new_size)
+{
+    if (levels->bitmap_ext_size == new_size) return;
+    levels_bitmap_ext_free();
+    levels_bitmap_ext_malloc(new_size);
+}
+
+void levels_bitmap_ext_free()
+{
+    if (levels->bitmap_ext != NULL) free_aligned(levels->bitmap_ext, levels->bitmap_ext_size);
+    levels->bitmap_ext_size = 0;
+    levels->bitmap_ext = NULL;
+}
+
+void levels_bitmap_p2_malloc(size_t new_size)
+{
+    levels_bitmap_p2_free();
+    levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(new_size);
+    if (levels->bitmap_p2 != NULL) levels->bitmap_p2_size = new_size;
+    else levels->bitmap_p2_size = 0;
+}
+
+void levels_bitmap_p2_realloc(size_t new_size)
+{
+    if (levels->bitmap_p2_size == new_size) return;
+    levels_bitmap_p2_free();
+    levels_bitmap_p2_malloc(new_size);
+}
+
+void levels_bitmap_p2_free()
+{
+    if (levels->bitmap_p2 != NULL) free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+    levels->bitmap_p2_size = 0;
+    levels->bitmap_p2 = NULL;
+}
+
 
 void mtbdd_levels_free(levels_t dbs)
 {
@@ -73,13 +227,10 @@ int mtbdd_newlevels(size_t amount)
         levels->table = (atomic_word_t *) realloc(levels->table, sizeof(uint64_t[levels_size]));
         levels->level_to_order = (atomic_half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->order_to_level = (atomic_half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
-        levels->var_count = (atomic_half_word_t *) realloc(levels->var_count, sizeof(uint32_t[levels_size]));
-        levels->ref_count = (atomic_half_word_t *) realloc(levels->ref_count, sizeof(uint32_t[levels_size]));
 
         if (levels->table == 0 ||
             levels->level_to_order == 0 ||
-            levels->order_to_level == 0 ||
-            levels->var_count == 0) {
+            levels->order_to_level == 0) {
             fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
             return 0;
         }
@@ -119,18 +270,14 @@ void mtbdd_resetlevels(void)
         if (!levels->order_to_level) free(levels->order_to_level);
         levels->order_to_level = NULL;
 
-        if (!levels->var_count) free(levels->var_count);
-        levels->var_count = NULL;
+        levels_var_count_free();
+        levels_ref_count_free();
+        levels_node_ref_count_free();
 
-        if (!levels->ref_count) free(levels->ref_count);
-        levels->ref_count = NULL;
+        interact_free(levels);
 
-        if (!levels->node_ref_count) free(levels->node_ref_count);
-        levels->node_ref_count = NULL;
-
-        free_aligned(levels->bitmap_i, levels->bitmap_i_size);
-        free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
-        free_aligned(levels->bitmap_ext, levels->bitmap_ext_size);
+        levels_bitmap_ext_free();
+        levels_bitmap_p2_free();
 
         levels->count = 0;
         levels_size = 0;

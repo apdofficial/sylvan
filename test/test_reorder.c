@@ -251,6 +251,7 @@ TASK_0(int, test_sift_down)
     state.best_pos = 0;
     state.low = 0;
     state.high = 3;
+    state.use_bounds = 0;
 
     interact_var_ref_init(levels);
 
@@ -315,6 +316,7 @@ TASK_0(int, test_sift_up)
     state.best_pos = 0;
     state.low = 0;
     state.high = 3;
+    state.use_bounds = 0;
 
     interact_var_ref_init(levels);
 
@@ -530,6 +532,7 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
+    sylvan_pre_reorder();
     interact_var_ref_init(levels);
 
     interact_print_state(levels);
@@ -569,6 +572,7 @@ TASK_0(int, test_var_count)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
+    sylvan_pre_reorder();
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
@@ -579,6 +583,7 @@ TASK_0(int, test_var_count)
 
     sylvan_unprotect(&bdd1);
     sylvan_unprotect(&bdd2);
+
     return 0;
 }
 
@@ -594,6 +599,7 @@ TASK_0(int, test_ref_count)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
+    sylvan_pre_reorder();
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {

@@ -56,6 +56,7 @@ namespace sylvan {
 #include <sylvan_common.h>
 #include <sylvan_stats.h>
 #include <sylvan_mt.h>
+#include <sylvan_bitmap.h>
 #include <sylvan_mtbdd.h>
 #include <sylvan_bdd.h>
 #include <sylvan_ldd.h>
