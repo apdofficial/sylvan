@@ -132,19 +132,22 @@ void sylvan_set_reorder_type(reordering_type_t type);
  * @sideeffect order of variables is changed
  */
 TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
+#define sylvan_siftdown(state) CALL(sylvan_siftdown, state)
 
 /**
  * @brief Sift given variable down from its current level to the target level.
  * @sideeffect order of variables is changed
  */
 TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
+#define sylvan_siftup(state) CALL(sylvan_siftup, state)
 
 /**
  * @brief Sift a variable to its best level.
- * @param var - variable to sift
- * @param targetPos - target position (w.r.t. dynamic variable reordering)
+ * @param pos - variable to sift
+ * @param target_pos - target position (w.r.t. dynamic variable reordering)
  */
 TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
+#define sylvan_siftpos(pos, target_pos) CALL(sylvan_siftpos, pos, target_pos)
 
 /**
  * @brief Reduce the heap size in the entire forest.

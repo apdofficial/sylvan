@@ -8,7 +8,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-// use uint64_t to advantage the usual 64 bytes per cache line
+// use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
+
 typedef uint64_t word_t;
 typedef _Atomic (word_t) atomic_word_t;
 

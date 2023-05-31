@@ -39,7 +39,6 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_r
 */
 VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
 
-
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
     (void) buf_len;
@@ -108,16 +107,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
 
     levels_p2_clear_all();
+    levels_ext_clear_all();
 
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
     // two functions again. This is done to eliminate the isolated
     // projection functions from the node count.
-    int isolated = -(levels_is_isolated(levels->level_to_order[pos]) + levels_is_isolated(levels->level_to_order[pos + 1]));
+    int isolated = -(levels_is_isolated(levels->level_to_order[pos]) +
+                     levels_is_isolated(levels->level_to_order[pos + 1]));
+    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (!interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1])) {
+//    if (are_interacting == 0) {
 //        levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
 //        levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
 //        uint32_t save = levels->level_to_order[pos];
@@ -159,8 +161,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     levels->level_to_order[pos] = levels->level_to_order[pos + 1];
     levels->level_to_order[pos + 1] = save;
 
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
+    if (are_interacting) {
+        sylvan_clear_and_mark();
+        sylvan_rehash_all();
+    }
 
     return result;
 }
@@ -373,31 +377,32 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
     MTBDD newf1, newf0, f1, f0, f11, f10, f01, f00;
     BDDVAR var = mtbddnode_getvariable(node);
 
+    int created0 = 0;
+    int created1 = 0;
+
     // obtain cofactors
     f0 = mtbddnode_getlow(node);
     f1 = mtbddnode_gethigh(node);
 
     BDDVAR x = var;
     BDDVAR y = var + 1;
+    BDDVAR xIndex = levels->level_to_order[x];
+    BDDVAR yIndex = levels->level_to_order[y];
 
-    // replace level f at <var> with <var+1>
-    levels_var_count_dec(levels->level_to_order[x]);
-    levels_var_count_inc(levels->level_to_order[y]);
+    // remove from <var> and add it to <var+1>
+    levels_var_count_dec(xIndex);
+    levels_var_count_inc(yIndex);
 
     f01 = f00 = f0;
-    if (!mtbdd_isleaf(f0) && mtbdd_getvar(f0) == x) {
+    if (!mtbdd_isleaf(f0) && (mtbdd_getvar(f0) == x)) {
         f00 = mtbdd_getlow(f0);
         f01 = mtbdd_gethigh(f0);
-        // remove f0 at <var+1>
-        levels_var_count_dec(levels->level_to_order[y]);
     }
 
     f11 = f10 = f1;
-    if (!mtbdd_isleaf(f1) && mtbdd_getvar(f1) == x) {
+    if (!mtbdd_isleaf(f1) && (mtbdd_getvar(f1) == x)) {
         f10 = mtbdd_getlow(f1);
         f11 = mtbdd_gethigh(f1);
-        // remove f1 at <var+1>
-        levels_var_count_dec(levels->level_to_order[y]);
     }
 
     // The new nodes required at level i (i.e., (xi, F01, F11) and (xi, F00, F10)) may be
@@ -409,6 +414,7 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
         // (newf0, F00, F10) would be degenerate node thus we reuse F00
         newf0 = f00;
         levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf0)]);
+        levels_var_count_dec(yIndex);
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
         // if we had subtables we would have scanned <var> sub-table here to search for (var, F10, F00) instead of creating newf0
@@ -416,15 +422,14 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
 
         // Create the new low high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
-        int created;
-        newf0 = mtbdd_varswap_makenode(y, f00, f10, &created);
+        newf0 = mtbdd_varswap_makenode(y, f00, f10, &created0);
         if (f0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        levels_var_count_inc(levels->level_to_order[x]);
-        if (created){
+        if (created0) {
+            levels_var_count_inc(xIndex);
             levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f10)]);
             levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f00)]);
         } else {
-            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf0)]);
+            levels_ref_count_inc(yIndex);
         }
     }
 
@@ -433,6 +438,7 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
         // (newf1, F01, F11) would be degenerate node thus we reuse f11
         newf1 = f11;
         levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf1)]);
+        levels_var_count_dec(yIndex);
     } else {
         // newf0 may already exist in the DAG as required to implement other functions.
         // if we had subtables wu would have scanned <var> sub-table here to search for (var, F11, F01) instead of creating newf1
@@ -440,20 +446,19 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
 
         // Create the new high child.
         // since we maintain the invariant that the low child has higher index than the high child we use <var+1> as the index
-        int created;
-        newf1 = mtbdd_varswap_makenode(y, f01, f11, &created);
+        newf1 = mtbdd_varswap_makenode(y, f01, f11, &created1);
         if (f1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-        levels_var_count_inc(levels->level_to_order[x]);
-        if (created){
+        if (created1) {
+            levels_var_count_inc(xIndex);
             levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f11)]);
             levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f01)]);
         } else {
-            levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(newf1)]);
+            levels_ref_count_inc(yIndex);
         }
     }
 
     // update node, which also removes the mark
-    mtbddnode_makenode(node, var, newf0, newf1);
+    mtbddnode_makenode(node, x, newf0, newf1);
     llmsset_rehash_bucket(nodes, index);
 
     return SYLVAN_REORDER_SUCCESS;

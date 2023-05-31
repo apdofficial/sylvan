@@ -70,6 +70,10 @@ void interact_print_state(const levels_t dbs)
     printf("\n");
 }
 
+/* 40 bits for the index, 24 bits for the hash */
+#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
+#define MASK_HASH  ((uint64_t)0xffffff0000000000)
+
 /**
  *
  * @brief Find the support of f. (parallel)
@@ -93,7 +97,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     if (mtbdd_isleaf(f)) return;
 
     // The low 40 bits are an index into the unique table.
-    uint64_t index = f & 0x000000ffffffffff;
+    uint64_t index = f & MASK_INDEX;
     if (bitmap_atomic_get(bitmap_l, index) == 1) return;
 
     BDDVAR var = mtbdd_getvar(f);
@@ -105,6 +109,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     MTBDD f1 = mtbdd_gethigh(f);
     if (visited == 0) {
         levels_ref_count_inc(levels->level_to_order[mtbdd_getvar(f1)]);
+
     }
 
     MTBDD f0 = mtbdd_getlow(f);
@@ -127,12 +132,6 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     interact_malloc(dbs);
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
-    levels->isolated_count = 0;
-
-    // clear all previous data related to interaction matrix/ dynamic lower bounds
-    clear_aligned(levels->ref_count, nodes->table_size);
-    clear_aligned(levels->var_count, levels->count);
-    clear_aligned(levels->bitmap_i, levels->bitmap_i_size);
 
     atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars);  // support bitmap
     atomic_word_t *bitmap_v = (atomic_word_t *) alloc_aligned(nnodes); // visited root nodes bitmap

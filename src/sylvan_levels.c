@@ -19,6 +19,7 @@ levels_t mtbdd_levels_create()
     dbs->order_to_level = NULL;
     dbs->var_count = NULL;
     dbs->ref_count = NULL;
+    dbs->node_ref_count = NULL;
 
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
@@ -26,6 +27,9 @@ levels_t mtbdd_levels_create()
 
     dbs->bitmap_p2 = NULL;
     dbs->bitmap_p2_size = 0;
+
+    dbs->bitmap_ext = NULL;
+    dbs->bitmap_ext_size = 0;
 
     dbs->isolated_count = 0;
     dbs->reorder_count = 0;
@@ -66,11 +70,11 @@ int mtbdd_newlevels(size_t amount)
         levels_size = (levels->count + amount + 63) & (~63LL);
 #endif
 
-        levels->table = (_Atomic (uint64_t) *) realloc(levels->table, sizeof(uint64_t[levels_size]));
-        levels->level_to_order = (_Atomic (uint32_t) *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
-        levels->order_to_level = (_Atomic (uint32_t) *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
-        levels->var_count = (_Atomic (uint32_t) *) realloc(levels->var_count, sizeof(uint32_t[levels_size]));
-        levels->ref_count = (_Atomic (uint32_t) *) realloc(levels->ref_count, sizeof(uint32_t[nodes->table_size]));
+        levels->table = (atomic_word_t *) realloc(levels->table, sizeof(uint64_t[levels_size]));
+        levels->level_to_order = (atomic_half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
+        levels->order_to_level = (atomic_half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+        levels->var_count = (atomic_half_word_t *) realloc(levels->var_count, sizeof(uint32_t[levels_size]));
+        levels->ref_count = (atomic_half_word_t *) realloc(levels->ref_count, sizeof(uint32_t[levels_size]));
 
         if (levels->table == 0 ||
             levels->level_to_order == 0 ||
@@ -106,23 +110,27 @@ void mtbdd_resetlevels(void)
 {
     if (levels_size != 0) {
 
-        free(levels->table);
+        if (!levels->table) free(levels->table);
         levels->table = NULL;
 
-        free(levels->level_to_order);
+        if (!levels->level_to_order) free(levels->level_to_order);
         levels->level_to_order = NULL;
 
-        free(levels->level_to_order);
-        levels->level_to_order = NULL;
+        if (!levels->order_to_level) free(levels->order_to_level);
+        levels->order_to_level = NULL;
 
-        free(levels->var_count);
+        if (!levels->var_count) free(levels->var_count);
         levels->var_count = NULL;
 
-        free(levels->ref_count);
+        if (!levels->ref_count) free(levels->ref_count);
         levels->ref_count = NULL;
+
+        if (!levels->node_ref_count) free(levels->node_ref_count);
+        levels->node_ref_count = NULL;
 
         free_aligned(levels->bitmap_i, levels->bitmap_i_size);
         free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
+        free_aligned(levels->bitmap_ext, levels->bitmap_ext_size);
 
         levels->count = 0;
         levels_size = 0;
