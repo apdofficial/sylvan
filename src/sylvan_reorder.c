@@ -362,13 +362,13 @@ TASK_IMPL_2(reorder_result_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
     for (; pos < target; pos++) {
         reorder_result_t res = CALL(sylvan_varswap, pos);
-        printf("sift pos: \t x: %d \t y: %d\n", pos, pos+1);
+//        printf("sift pos: \t x: %d \t y: %d\n", pos, pos+1);
         if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
     for (; pos > target; pos--) {
         reorder_result_t res = CALL(sylvan_varswap, pos - 1);
-        printf("sift pos: \t x: %d \t y: %d\n", pos-1, pos);
+//        printf("sift pos: \t x: %d \t y: %d\n", pos-1, pos);
         if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
@@ -487,6 +487,8 @@ VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, r
 
 VOID_TASK_0(sylvan_test_sift)
 {
+    interact_var_ref_init(levels);
+
     int perm_add4[208] = {
             5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 3, 2, 1, 0,
             0, 1, 2, 3, 4, 5, 6, 7, 7,
@@ -539,14 +541,15 @@ VOID_TASK_0(sylvan_test_sift)
     };
     (void)perm_add4;
     (void)perm_add8;
-    for (int i = 0; i < 745; i++) {
-        int pos = perm_add8[i];
+    for (int i = 0; i < 208; i++) {
+        int pos = perm_add4[i];
         CALL(sylvan_varswap, pos);
     }
 }
 
 VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
 {
+    printf("sylvan_reorder_stop_world\n");
     reorder_result_t result = SYLVAN_REORDER_SUCCESS;
     if (!reorder_initialized) result = SYLVAN_REORDER_NOT_INITIALISED;
     if (levels->count < 1) result = SYLVAN_REORDER_NO_REGISTERED_VARS;
@@ -559,18 +562,18 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         size_t leaf_count = 0;
         sylvan_pre_reorder();
         size_t before_size = llmsset_count_marked(nodes);
-        CALL(sylvan_test_sift);
-//        switch (type) {
-//            case SYLVAN_REORDER_SIFT:
-//                result = NEWFRAME(sylvan_sift, 0, 0);
-//                break;
-//            case SYLVAN_REORDER_BOUNDED_SIFT:
-//                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
-//                break;
-//        }
-//        if (sylvan_reorder_issuccess(result) == 0) {
-//            sylvan_print_reorder_res(result);
-//        }
+//        CALL(sylvan_test_sift);
+        switch (type) {
+            case SYLVAN_REORDER_SIFT:
+                result = NEWFRAME(sylvan_sift, 0, 0);
+                break;
+            case SYLVAN_REORDER_BOUNDED_SIFT:
+                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
+                break;
+        }
+        if (sylvan_reorder_issuccess(result) == 0) {
+            sylvan_print_reorder_res(result);
+        }
         re = 0;
         sylvan_post_reorder(before_size, leaf_count, type);
     } else {

@@ -34,7 +34,7 @@ void bitmap_clear(word_t *words, size_t pos)
     words[WORD_OFFSET(pos)] &= ~BIT_MASK(pos);
 }
 
-char bitmap_get(word_t *words, size_t pos)
+char bitmap_get(const word_t *words, size_t pos)
 {
     return words[WORD_OFFSET(pos)] & BIT_MASK(pos) ? 1 : 0;
 }

@@ -59,6 +59,8 @@ typedef struct levels_db {
 
 #define levels_p3_next(idx) bitmap_atomic_next(levels->bitmap_p3, levels->bitmap_p3_size, idx)
 #define levels_p3_set(idx) bitmap_atomic_set(levels->bitmap_p3, idx)
+#define levels_p3_clear(idx) bitmap_atomic_clear(levels->bitmap_p3, idx)
+#define levels_p3_is_marked(idx) bitmap_atomic_get(levels->bitmap_p3, idx)
 #define levels_p3_clear_all() clear_aligned(levels->bitmap_p3, levels->bitmap_p3_size)
 
 #define levels_ext_next(idx) bitmap_atomic_next(levels->bitmap_p3, levels->bitmap_p3_size, idx)

@@ -62,6 +62,7 @@ levels_ref_count_load(levels_t dbs, size_t idx)
 void
 levels_ref_count_add(levels_t dbs, size_t idx, int val)
 {
+    if (dbs->ref_count_size == 0) return;
     counter_t curr = levels_ref_count_load(dbs, idx);
     if (curr == 0 && val < 0) return; // avoid underflow
     if (dbs->ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
@@ -71,7 +72,7 @@ levels_ref_count_add(levels_t dbs, size_t idx, int val)
 int
 levels_is_isolated(levels_t dbs, size_t idx)
 {
-    if (dbs->ref_count_size == 0) return 1;
+    if (dbs->ref_count_size == 0) return 0;
     return levels_ref_count_load(dbs, idx) <= 1;
 }
 
@@ -85,6 +86,7 @@ levels_var_count_load(levels_t dbs, size_t idx)
 void
 levels_var_count_add(levels_t dbs, size_t idx, int val)
 {
+    if (dbs->var_count_size == 0) return;
     counter_t curr = levels_var_count_load(dbs, idx);
     if (curr == 0 && val < 0) return; // avoid underflow
     if (dbs->var_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
@@ -94,6 +96,7 @@ levels_var_count_add(levels_t dbs, size_t idx, int val)
 int
 levels_is_node_dead(levels_t dbs, size_t idx)
 {
+    if (dbs->bitmap_ext_size == 0 || dbs->node_ref_count_size == 0) return 0;
     counter_t int_count = levels_node_ref_count_load(dbs, idx);
     counter_t ext_count = bitmap_atomic_get(dbs->bitmap_ext, idx);
     return int_count == 0 && ext_count == 0;
@@ -109,9 +112,10 @@ levels_node_ref_count_load(levels_t dbs, size_t idx)
 void
 levels_node_ref_count_add(levels_t dbs, size_t idx, int val)
 {
+    if (dbs->node_ref_count_size == 0) return;
     counter_t curr = levels_node_ref_count_load(dbs, idx);
     if (curr == 0 && val < 0) return; // avoid underflow
-    if (dbs->node_ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
+    if ((curr + val) >= counter_t_max) return;// avoid overflow
     atomic_fetch_add_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
 }
 

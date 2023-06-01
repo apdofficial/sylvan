@@ -603,7 +603,7 @@ TASK_0(int, test_ref_count)
     interact_var_ref_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
-        size_t ref_count = atomic_load(&levels->ref_count[levels->level_to_order[i]]);
+        size_t ref_count = levels_ref_count_load(levels, levels->level_to_order[i]);
         if (ref_count > 0) {
             printf("var %zu has %zu references\n", i, ref_count);
         }
