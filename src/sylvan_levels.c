@@ -36,6 +36,9 @@ levels_t mtbdd_levels_create()
     dbs->bitmap_p2 = NULL;
     dbs->bitmap_p2_size = 0;
 
+    dbs->bitmap_p3 = NULL;
+    dbs->bitmap_p3_size = 0;
+
     dbs->bitmap_ext = NULL;
     dbs->bitmap_ext_size = 0;
 
@@ -49,108 +52,155 @@ levels_t mtbdd_levels_create()
     return dbs;
 }
 
-counter_t levels_ref_count_load(levels_t dbs, size_t idx){
+counter_t
+levels_ref_count_load(levels_t dbs, size_t idx)
+{
     if (dbs->ref_count_size == 0) return 0;
     return atomic_load_explicit(&dbs->ref_count[idx], memory_order_relaxed);
 }
 
-void levels_ref_count_add(levels_t dbs, size_t idx, int val){
-    if (dbs->ref_count_size == 0 || val >= counter_t_max) return;
+void
+levels_ref_count_add(levels_t dbs, size_t idx, int val)
+{
+    counter_t curr = levels_ref_count_load(dbs, idx);
+    if (curr == 0 && val < 0) return; // avoid underflow
+    if (dbs->ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
     atomic_fetch_add_explicit(&dbs->ref_count[idx], val, memory_order_relaxed);
 }
 
-int levels_is_isolated(levels_t dbs, size_t idx){
+int
+levels_is_isolated(levels_t dbs, size_t idx)
+{
     if (dbs->ref_count_size == 0) return 1;
     return levels_ref_count_load(dbs, idx) <= 1;
 }
 
-counter_t levels_var_count_load(levels_t dbs, size_t idx){
+counter_t
+levels_var_count_load(levels_t dbs, size_t idx)
+{
     if (dbs->var_count_size == 0) return 0;
     return atomic_load_explicit(&dbs->var_count[idx], memory_order_relaxed);
 }
 
-void levels_var_count_add(levels_t dbs, size_t idx, int val){
-    if (dbs->var_count_size == 0 || val >= counter_t_max) return;
+void
+levels_var_count_add(levels_t dbs, size_t idx, int val)
+{
+    counter_t curr = levels_var_count_load(dbs, idx);
+    if (curr == 0 && val < 0) return; // avoid underflow
+    if (dbs->var_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
     atomic_fetch_add_explicit(&dbs->var_count[idx], val, memory_order_relaxed);
 }
 
-counter_t levels_node_ref_count_load(levels_t dbs, size_t idx){
+int
+levels_is_node_dead(levels_t dbs, size_t idx)
+{
+    counter_t int_count = levels_node_ref_count_load(dbs, idx);
+    counter_t ext_count = bitmap_atomic_get(dbs->bitmap_ext, idx);
+    return int_count == 0 && ext_count == 0;
+}
+
+counter_t
+levels_node_ref_count_load(levels_t dbs, size_t idx)
+{
     if (dbs->node_ref_count_size == 0) return 0;
     return atomic_load_explicit(&dbs->node_ref_count[idx], memory_order_relaxed);
 }
 
-void levels_node_ref_count_add(levels_t dbs, size_t idx, int val){
-    if (dbs->node_ref_count_size == 0 || val >= counter_t_max) return;
+void
+levels_node_ref_count_add(levels_t dbs, size_t idx, int val)
+{
+    counter_t curr = levels_node_ref_count_load(dbs, idx);
+    if (curr == 0 && val < 0) return; // avoid underflow
+    if (dbs->node_ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
     atomic_fetch_add_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
 }
 
-void levels_var_count_malloc(size_t new_size)
+void
+levels_node_ref_count_set(levels_t dbs, size_t idx, int val)
+{
+    if (dbs->node_ref_count_size == 0) return;
+    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
+    if (val < 0) exit(-1); // underflow, sorry really not allowed
+    atomic_exchange_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
+}
+
+void
+levels_var_count_malloc(size_t new_size)
 {
     levels_var_count_free();
-    levels->var_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
+    levels->var_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (levels->var_count != NULL) levels->var_count_size = new_size;
     else levels->var_count_size = 0;
 }
 
-void levels_var_count_realloc(size_t new_size)
+void
+levels_var_count_realloc(size_t new_size)
 {
     if (levels->var_count_size == new_size) return;
     levels_var_count_free();
     levels_var_count_malloc(new_size);
 }
 
-void levels_var_count_free()
+void
+levels_var_count_free()
 {
     if (levels->var_count != NULL) free_aligned(levels->var_count, levels->var_count_size);
     levels->var_count_size = 0;
     levels->var_count = NULL;
 }
 
-void levels_ref_count_malloc(size_t new_size)
+void
+levels_ref_count_malloc(size_t new_size)
 {
     levels_ref_count_free();
-    levels->ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
+    levels->ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (levels->ref_count != NULL) levels->ref_count_size = new_size;
     else levels->ref_count_size = 0;
 }
 
-void levels_ref_count_realloc(size_t new_size)
+void
+levels_ref_count_realloc(size_t new_size)
 {
     if (levels->ref_count_size == new_size) return;
     levels_ref_count_free();
     levels_ref_count_malloc(new_size);
 }
 
-void levels_ref_count_free()
+void
+levels_ref_count_free()
 {
     if (levels->ref_count != NULL) free_aligned(levels->ref_count, levels->ref_count_size);
     levels->ref_count_size = 0;
     levels->ref_count = NULL;
 }
 
-void levels_node_ref_count_malloc(size_t new_size)
+void
+levels_node_ref_count_malloc(size_t new_size)
 {
     levels_node_ref_count_free();
-    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t) * new_size);
+    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (levels->node_ref_count != NULL) levels->node_ref_count_size = new_size;
     else levels->node_ref_count_size = 0;
 }
 
-void levels_node_ref_count_realloc(size_t new_size)
+void
+levels_node_ref_count_realloc(size_t new_size)
 {
     if (levels->node_ref_count_size == new_size) return;
     levels_node_ref_count_free();
     levels_node_ref_count_malloc(new_size);
 }
 
-void levels_node_ref_count_free()
+void
+levels_node_ref_count_free()
 {
     if (levels->node_ref_count != NULL) free_aligned(levels->node_ref_count, levels->node_ref_count_size);
     levels->node_ref_count_size = 0;
     levels->node_ref_count = NULL;
 }
 
-void levels_bitmap_ext_malloc(size_t new_size)
+void
+levels_bitmap_ext_malloc(size_t new_size)
 {
     levels_bitmap_ext_free();
     levels->bitmap_ext = (atomic_word_t *) alloc_aligned(new_size);
@@ -158,21 +208,24 @@ void levels_bitmap_ext_malloc(size_t new_size)
     else levels->bitmap_ext_size = 0;
 }
 
-void levels_bitmap_ext_realloc(size_t new_size)
+void
+levels_bitmap_ext_realloc(size_t new_size)
 {
     if (levels->bitmap_ext_size == new_size) return;
     levels_bitmap_ext_free();
     levels_bitmap_ext_malloc(new_size);
 }
 
-void levels_bitmap_ext_free()
+void
+levels_bitmap_ext_free()
 {
     if (levels->bitmap_ext != NULL) free_aligned(levels->bitmap_ext, levels->bitmap_ext_size);
     levels->bitmap_ext_size = 0;
     levels->bitmap_ext = NULL;
 }
 
-void levels_bitmap_p2_malloc(size_t new_size)
+void
+levels_bitmap_p2_malloc(size_t new_size)
 {
     levels_bitmap_p2_free();
     levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(new_size);
@@ -180,33 +233,63 @@ void levels_bitmap_p2_malloc(size_t new_size)
     else levels->bitmap_p2_size = 0;
 }
 
-void levels_bitmap_p2_realloc(size_t new_size)
+void
+levels_bitmap_p2_realloc(size_t new_size)
 {
     if (levels->bitmap_p2_size == new_size) return;
     levels_bitmap_p2_free();
     levels_bitmap_p2_malloc(new_size);
 }
 
-void levels_bitmap_p2_free()
+void
+levels_bitmap_p2_free()
 {
     if (levels->bitmap_p2 != NULL) free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
     levels->bitmap_p2_size = 0;
     levels->bitmap_p2 = NULL;
 }
 
+void
+levels_bitmap_p3_malloc(size_t new_size)
+{
+    levels_bitmap_p2_free();
+    levels->bitmap_p3 = (atomic_word_t *) alloc_aligned(new_size);
+    if (levels->bitmap_p3 != NULL) levels->bitmap_p3_size = new_size;
+    else levels->bitmap_p3_size = 0;
+}
 
-void mtbdd_levels_free(levels_t dbs)
+void
+levels_bitmap_p3_realloc(size_t new_size)
+{
+    if (levels->bitmap_p3_size == new_size) return;
+    levels_bitmap_p2_free();
+    levels_bitmap_p2_malloc(new_size);
+}
+
+void
+levels_bitmap_p3_free()
+{
+    if (levels->bitmap_p3 != NULL) free_aligned(levels->bitmap_p3, levels->bitmap_p3_size);
+    levels->bitmap_p3_size = 0;
+    levels->bitmap_p3 = NULL;
+}
+
+
+void
+mtbdd_levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
     free_aligned(dbs, sizeof(struct levels_db));
 }
 
-size_t mtbdd_levelscount(void)
+size_t
+mtbdd_levelscount(void)
 {
     return levels->count;
 }
 
-MTBDD mtbdd_newlevel(void)
+MTBDD
+mtbdd_newlevel(void)
 {
     mtbdd_newlevels(1);
     return levels->table[levels->count - 1];
@@ -369,7 +452,7 @@ VOID_TASK_IMPL_4(sylvan_count_levelnodes, _Atomic (size_t)*, arr, _Atomic (size_
         if (mtbddnode_isleaf(node)) continue; // a leaf
         tmp[mtbddnode_getvariable(node)]++; // update the variable
     }
-    for (i = 0; i < levels->count; i++)  atomic_fetch_add(&arr[i], tmp[i]);
+    for (i = 0; i < levels->count; i++) atomic_fetch_add(&arr[i], tmp[i]);
 }
 
 TASK_IMPL_3(size_t, sylvan_count_nodes, BDDVAR, var, size_t, first, size_t, count)
@@ -408,12 +491,12 @@ void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first, size_t, count)
+VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap, size_t, first, size_t, count)
 {
     if (count > COUNT_NODES_BLOCK_SIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_init_subtables, bitmap_t, first, split);
-        CALL(sylvan_init_subtables, bitmap_t, first + split, count - split);
+        SPAWN(sylvan_init_subtables, bitmap, first, split);
+        CALL(sylvan_init_subtables, bitmap, first + split, count - split);
         SYNC(sylvan_init_subtables);
         return;
     }
@@ -429,7 +512,7 @@ VOID_TASK_IMPL_3(sylvan_init_subtables, atomic_word_t*, bitmap_t, size_t, first,
         mtbddnode_t node = MTBDD_GETNODE(first);
         BDDVAR var = mtbddnode_getvariable(node);
         if (var < levels->count) {
-            bitmap_atomic_set(bitmap_t, var * levels->count + first);
+            bitmap_atomic_set(bitmap, var * levels->count + first);
         }
     }
 }

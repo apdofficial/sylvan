@@ -220,13 +220,13 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 }
 
 /**
- * Remove a single hash from the table
+ * Clear a single bucket hash.
  * (do not run parallel with lookup!!!)
  * (for dynamic variable reordering)
  * (lock-free, but not wait-free)
  */
 int
-llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
+llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
 {
     // unique table 2 arrays: hashes | data
     _Atomic (uint64_t) *dptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * didx; // first 8 bytes are chaining
@@ -234,10 +234,9 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
     // set d to the next bucket in the chain
     uint64_t d = atomic_load_explicit(dptr, memory_order_relaxed);
     if (d & MASK_INDEX) {
-//        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) {
-//            // setting ptr to not in use(-1)
-//        }
-        atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1); // setting ptr to not in use(-1)
+        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) {
+            // setting ptr to not in use(-1)
+        }
         d &= MASK_INDEX; // <d> now contains the next bucket in the chain
     } else {
         d = 0; // nothing after us, so we don't need to make a -1
@@ -282,6 +281,18 @@ llmsset_clear_one(const llmsset_t dbs, uint64_t didx)
                 idx = v & MASK_INDEX; // next
             }
         }
+    }
+}
+
+/**
+ * Clear a single bucket data.
+ */
+void llmsset_clear_one_data(const llmsset_t dbs, uint64_t index)
+{
+    bitmap_atomic_clear(dbs->bitmap2, index & MASK_INDEX);
+    if (bitmap_get(dbs->bitmapc, index)) {
+        uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
+        dbs->destroy_cb(d_ptr[1], d_ptr[2]);
     }
 }
 

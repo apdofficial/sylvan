@@ -211,7 +211,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
 
-//    printf("\n");
+    printf("\n");
 
     reorder_result_t res;
     int R;  // upper bound on node decrease
@@ -243,15 +243,15 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         yIndex = levels->level_to_order[y];
         if (interact_test(levels, xIndex, yIndex)) {
             R += (int) levels_var_count_load(levels, yIndex) - levels_is_isolated(levels, yIndex);
-//            printf("R: %d, \t xindex: %d, yindex: %d, isolated: %d\n", R, xIndex, yIndex, levels_is_isolated(yIndex));
+            printf("R: %d, \t xindex: %d, yindex: %d, isolated: %d\n", R, xIndex, yIndex, levels_is_isolated(levels, yIndex));
         }
     }
 
-//    printf("sift down pos: \t x: %d \t y: %d \t (R: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
-//           s_state->pos, s_state->pos + 1, R, limitSize,
-//           levels_var_count_load(xIndex),
-//           levels_var_count_load(yIndex)
-//    );
+    printf("sift down pos: \t x: %d \t y: %d \t (R: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
+           s_state->pos, s_state->pos + 1, R, limitSize,
+           levels_var_count_load(levels, xIndex),
+           levels_var_count_load(levels, yIndex)
+    );
     for (; s_state->pos < s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
         //  Update the upper bound on node decrease
         yIndex = levels->level_to_order[s_state->pos + 1];
@@ -274,11 +274,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
             s_state->best_pos = s_state->pos;
         }
         if (s_state->size < limitSize) limitSize = s_state->size;
-//        printf("sift down pos: \t x: %d \t y: %d \t (R: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
-//               s_state->pos, s_state->pos + 1, R, limitSize,
-//               levels_var_count_load(xIndex),
-//               levels_var_count_load(yIndex)
-//        );
+        printf("sift down pos: \t x: %d \t y: %d \t (R: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
+               s_state->pos, s_state->pos + 1, R, limitSize,
+               levels_var_count_load(levels, xIndex),
+               levels_var_count_load(levels, yIndex)
+        );
     }
     return SYLVAN_REORDER_SUCCESS;
 }
@@ -286,6 +286,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+
+    printf("\n");
 
     reorder_result_t res;
     int L;  // lower bound on DD size
@@ -314,17 +316,16 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         xIndex = levels->level_to_order[x];
         if (interact_test(levels, xIndex, yIndex)) {
             L -= (int) levels_var_count_load(levels, xIndex) - levels_is_isolated(levels, xIndex);
-//            printf("L: %d, \t xindex: %d, yindex: %d, isolated: %d\n", L, xIndex, yIndex, levels_is_isolated(xIndex));
+            printf("L: %d, \t xindex: %d, yindex: %d, isolated: %d\n", L, xIndex, yIndex, levels_is_isolated(levels, xIndex));
         }
     }
 
     L -= (int) levels_var_count_load(levels, yIndex) - levels_is_isolated(levels, yIndex);
-//    printf("\n");
-//    printf("sift up pos: \t x: %d \t y: %d \t (L: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
-//           s_state->pos, s_state->pos + 1, L, limitSize,
-//           levels_var_count_load(xIndex),
-//           levels_var_count_load(yIndex)
-//    );
+    printf("sift up pos: \t x: %d \t y: %d \t (L: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
+           s_state->pos, s_state->pos + 1, L, limitSize,
+           levels_var_count_load(levels, xIndex),
+           levels_var_count_load(levels, yIndex)
+    );
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
         xIndex = levels->level_to_order[s_state->pos - 1];
         res = CALL(sylvan_varswap, s_state->pos - 1);
@@ -347,11 +348,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
             L += (int) levels_var_count_load(levels, yIndex) - levels_is_isolated(levels, xIndex);
         }
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
-//        printf("sift up pos: \t x: %d \t y: %d \t (L: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
-//               s_state->pos, s_state->pos + 1, L, limitSize,
-//               levels_var_count_load(xIndex),
-//               levels_var_count_load(yIndex)
-//        );
+        printf("sift up pos: \t x: %d \t y: %d \t (L: %d, \t limitSize: %d) (xNodes: %d,\t yNodes: %d)\n",
+               s_state->pos, s_state->pos + 1, L, limitSize,
+               levels_var_count_load(levels, xIndex),
+               levels_var_count_load(levels, yIndex)
+        );
     }
     return SYLVAN_REORDER_SUCCESS;
 }
@@ -361,11 +362,13 @@ TASK_IMPL_2(reorder_result_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
     for (; pos < target; pos++) {
         reorder_result_t res = CALL(sylvan_varswap, pos);
+        printf("sift pos: \t x: %d \t y: %d\n", pos, pos+1);
         if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
     for (; pos > target; pos--) {
         reorder_result_t res = CALL(sylvan_varswap, pos - 1);
+        printf("sift pos: \t x: %d \t y: %d\n", pos-1, pos);
         if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
     }
@@ -418,14 +421,21 @@ static _Atomic (int) re;
 VOID_TASK_IMPL_0(sylvan_pre_reorder)
 {
     // alloc necessary memory dependent on table_size/ # of variables
-    levels_var_count_malloc(levels->count);             // memory usage: # of variables * 2 bytes
-    levels_ref_count_malloc(levels->count);             // memory usage: # of variables * 2 bytes
-    levels_node_ref_count_malloc(nodes->table_size);    // memory usage: # of nodes * 2 bytes
-    levels_bitmap_p2_malloc(nodes->table_size);         // memory usage: # of nodes * 1 bit
-    levels_bitmap_ext_malloc(nodes->table_size);        // memory usage: # of nodes * 1 bit
+    // let:
+    // v - number of variables
+    // n - number of nodes
 
-    // allocate memory for the interaction matrix
-    interact_malloc(levels);
+    levels_var_count_malloc(levels->count);             // memory usage: # of variables * 16 bits                (16v)
+    levels_ref_count_malloc(levels->count);             // memory usage: # of variables * 16 bits                (16v)
+    levels_node_ref_count_malloc(nodes->table_size);    // memory usage: # of nodes * 16 bits                    (16n)
+    levels_bitmap_p2_malloc(nodes->table_size);         // memory usage: # of nodes * 1 bit                      (n)
+    levels_bitmap_p3_malloc(nodes->table_size);         // memory usage: # of nodes * 1 bit                      (n)
+    levels_bitmap_ext_malloc(nodes->table_size);        // memory usage: # of nodes * 1 bit                      (n)
+    // at the moment unfortunately, interaction matrix requires consecutive variables without **gaps**
+    interact_malloc(levels);                            // memory usage: # of variables * # of variables * 1 bit (v^2)
+
+//    Reordering memory composition in bits is: 32v + 19n + v^2
+//    O(v^2 + n) quadratic space complexity
 
     mtbdd_re_set_external_refs(levels->bitmap_ext);
 
@@ -459,11 +469,13 @@ VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, r
     levels_ref_count_free();
     levels_node_ref_count_free();
     levels_bitmap_p2_free();
+    levels_bitmap_p3_free();
     levels_bitmap_ext_free();
 
     double end = wctime() - configs.t_start_sifting;
     if (print_reordering_stat) {
-        printf("BDD reordering with %d sifting: from %zu to ... %zu nodes in %f sec\n", type, before_size, after_size, end);
+        printf("BDD reordering with %d sifting: from %zu to ... %zu nodes in %f sec\n", type, before_size, after_size,
+               end);
     }
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
@@ -471,6 +483,66 @@ VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, r
     }
 
     sylvan_timer_stop(SYLVAN_RE);
+}
+
+VOID_TASK_0(sylvan_test_sift)
+{
+    int perm_add4[208] = {
+            5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 3, 2, 1, 0,
+            0, 1, 2, 3, 4, 5, 6, 7, 7,
+            6, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 7, 8,
+            8, 7, 6, 5, 4, 3, 2, 1, 0, 0,
+            1, 2, 3, 4, 5, 6, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2,
+            0, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+            8, 7, 6, 5, 0, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 9, 10, 10, 9, 8, 7, 6, 5, 5, 6, 7, 8, 9, 12, 12, 11, 10, 9,
+            8, 7, 6, 5, 4, 3, 2, 1, 0, 10,
+            10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+    };
+    int perm_add8[745] = {
+            14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 21, 20, 19, 18, 17, 16, 15, 14, 14, 15, 16, 17, 18, 19, 20, 15, 16,
+            16, 15, 14, 13, 12, 11, 10, 9,
+            8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9,
+            10, 11, 12, 13, 14, 15, 16, 17,
+            18, 13, 14, 15, 16, 17, 18, 19, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9, 10, 11, 12, 13, 14, 15, 16,
+            11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+            0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 17, 16, 11, 10, 9, 8, 7, 6, 5, 4,
+            3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+            13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 16, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6,
+            7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            16, 15, 14, 13, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 12, 11, 10,
+            9, 8, 7, 6, 5, 4, 9, 8, 7, 6, 5, 4,
+            3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,
+            9, 10, 10, 9, 8, 7, 6, 11, 10, 9,
+            8, 7, 6, 5, 4, 3, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15, 14, 13, 12, 11, 10, 9, 8, 10, 9, 8,
+            7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5,
+            6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1,
+            2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+            14, 15, 16, 17, 18, 19, 19, 18, 17, 16, 15, 14, 11, 10, 9, 8, 7, 6, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            16, 15, 14, 13, 9, 8, 7, 6, 5, 4, 3, 2,
+            1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 8, 7, 6, 5, 4, 3,
+            2, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+            12, 13, 14, 15, 16, 17, 18, 18, 17, 16, 15, 14, 16, 17, 18, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9, 10,
+            11, 12, 13, 14, 6, 5, 4, 3, 2, 1, 1, 2, 3,
+            4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 17, 16, 15, 14, 13, 12, 11, 10, 9, 3, 2, 1, 1, 2, 3, 4, 5,
+            6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 13,
+            12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 20, 20,
+            19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+            10, 11, 12, 13, 14, 14, 13, 12, 11, 10,
+            9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 22, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 8, 9, 10, 11,
+            12, 13, 14, 15, 16, 17, 18, 19, 20, 24,
+            24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 23, 22, 21, 20,
+            19, 18, 17, 16, 15, 14, 13, 12, 11, 10,
+            9, 8, 7, 6, 5, 4, 3, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15,
+            14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4,
+            3, 2, 1, 0
+    };
+    (void)perm_add4;
+    (void)perm_add8;
+    for (int i = 0; i < 745; i++) {
+        int pos = perm_add8[i];
+        CALL(sylvan_varswap, pos);
+    }
 }
 
 VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
@@ -487,17 +559,18 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         size_t leaf_count = 0;
         sylvan_pre_reorder();
         size_t before_size = llmsset_count_marked(nodes);
-        switch (type) {
-            case SYLVAN_REORDER_SIFT:
-                result = NEWFRAME(sylvan_sift, 0, 0);
-                break;
-            case SYLVAN_REORDER_BOUNDED_SIFT:
-                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
-                break;
-        }
-        if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_print_reorder_res(result);
-        }
+        CALL(sylvan_test_sift);
+//        switch (type) {
+//            case SYLVAN_REORDER_SIFT:
+//                result = NEWFRAME(sylvan_sift, 0, 0);
+//                break;
+//            case SYLVAN_REORDER_BOUNDED_SIFT:
+//                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
+//                break;
+//        }
+//        if (sylvan_reorder_issuccess(result) == 0) {
+//            sylvan_print_reorder_res(result);
+//        }
         re = 0;
         sylvan_post_reorder(before_size, leaf_count, type);
     } else {
@@ -668,11 +741,11 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     mtbdd_mark_threshold(ordered_levels, level_counts, 0);
     gnome_sort(ordered_levels, level_counts);
 
-//    for (size_t i = 0; i < levels->count; i++) {
-//        int lvl = ordered_levels[i];
-//        printf("level %d \t has size %zu\n", lvl, level_counts[lvl]);
-//    }
-//    printf("\n");
+    for (size_t i = 0; i < levels->count; i++) {
+        int lvl = ordered_levels[i];
+        printf("level %d \t has size %zu\n", lvl, level_counts[lvl]);
+    }
+    printf("\n");
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
     sifting_state_t s_state;

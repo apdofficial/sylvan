@@ -190,9 +190,14 @@ int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
 #if !SYLVAN_USE_LINEAR_PROBING
 /**
- * Remove a single BDD from the table
+ * Clear a single bucket (hash part).
  */
-int llmsset_clear_one(const llmsset_t dbs, uint64_t index);
+int llmsset_clear_one_hash(llmsset_t dbs, uint64_t index);
+
+/**
+ * Clear a single bucket (data part).
+ */
+void llmsset_clear_one_data(llmsset_t dbs, uint64_t index);
 #endif
 
 /**

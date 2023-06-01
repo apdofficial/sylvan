@@ -106,13 +106,13 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     int visited = bitmap_atomic_get(bitmap_v, index) == 0; // avoid duplicate ref count
 
     MTBDD f1 = mtbdd_gethigh(f);
-    if (visited == 0) {
+    if (visited == 0 && f1 != f) {
         levels_ref_count_add(levels, levels->level_to_order[mtbdd_getvar(f1)], 1);
         levels_node_ref_count_add(levels, f1 & MASK_INDEX, 1);
     }
 
     MTBDD f0 = mtbdd_getlow(f);
-    if (visited == 0) {
+    if (visited == 0 && f0 != f) {
         levels_ref_count_add(levels, levels->level_to_order[mtbdd_getvar(f0)], 1);
         levels_node_ref_count_add(levels, f0 & MASK_INDEX, 1);
     }
