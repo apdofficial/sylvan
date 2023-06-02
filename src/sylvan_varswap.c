@@ -8,11 +8,25 @@
 #define MASK_INDEX ((uint64_t)0x000000ffffffffff)
 #define MASK_HASH  ((uint64_t)0xffffff0000000000)
 
-#define clear_one_rec(f) CALL(clear_one_rec, f)
-VOID_TASK_DECL_1(clear_one_rec, MTBDD)
+#define node_ref_set(dd, v) levels_node_ref_count_set(levels, (dd) & MASK_INDEX, v)
+#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, 1)
+#define node_ref_dec(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, -1)
 
-#define clear_one_internal_rec(idx) CALL(clear_one_internal_rec, idx)
-VOID_TASK_DECL_1(clear_one_internal_rec, size_t)
+#define var_inc(lvl) levels_var_count_add(levels, lvl, 1)
+#define var_dec(lvl) levels_var_count_add(levels, lvl, -1)
+#define var_set(lvl) levels_var_count_add(levels, lvl, 1)
+#define var_get(lvl) levels_var_count_load(levels, lvl)
+
+#define ref_inc(lvl) levels_ref_count_add(levels, lvl, 1)
+#define ref_dec(lvl) levels_ref_count_add(levels, lvl, -1)
+
+#define is_node_dead(dd) levels_is_node_dead(levels, dd & MASK_INDEX)
+
+#define delete_mtbdd_node_rec(f) CALL(delete_mtbdd_node_rec, f)
+VOID_TASK_DECL_1(delete_mtbdd_node_rec, MTBDD)
+
+#define delete_node(idx) CALL(delete_node, idx)
+VOID_TASK_DECL_1(delete_node, size_t)
 
 reorder_result_t swap_node(mtbddnode_t node, size_t index);
 
@@ -130,13 +144,13 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // projection functions from the node count.
     int isolated = -(levels_is_isolated(levels, levels->level_to_order[pos]) +
                      levels_is_isolated(levels, levels->level_to_order[pos + 1]));
-//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
+    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
 
     levels_bitmap_p2_realloc(nodes->table_size);
     levels_bitmap_p3_realloc(nodes->table_size);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (are_interacting == 0) { }
+    if (are_interacting == 0) { }
 
     CALL(sylvan_clear_cache);
 
@@ -169,6 +183,28 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         levels->isolated_count += isolated;
     }
 
+
+
+    size_t index = llmsset_first();
+    while (index != llmsset_nindex) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index); // reserved sylvan nodes
+        if (is_node_dead(index)) {
+//            printf("dead node found: %zu\n", index);
+            delete_node(index);
+        } else {
+//            mtbddnode_t node = MTBDD_GETNODE(index);
+//            BDDVAR var = mtbddnode_getvariable(node);
+//            counter_t int_refs = levels_node_ref_count_load(levels, index);
+//            counter_t has_ext_ref = levels_ext_is_marked(index);
+//            printf("alive node found: %u \t has %hu refs (ext: %hu)\n", var, int_refs, has_ext_ref);
+        }
+        index = llmsset_next(index);
+    }
+
+
+//    CALL(sylvan_varswap_p4, 0, levels->bitmap_p3_size);
+    levels_p3_clear_all();
+
     // swap the mappings
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
     levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
@@ -178,18 +214,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
 //    sylvan_clear_and_mark();
 //    sylvan_rehash_all();
-
-//    CALL(sylvan_varswap_p4, 0, levels->bitmap_p3_size);
-
-
-    size_t index = llmsset_next(0);
-    while (index < nodes->table_size) {
-        if (levels_is_node_dead(levels, index)) {
-            clear_one_internal_rec(index);
-        }
-        index = llmsset_next(index);
-    }
-    levels_p3_clear_all();
 
     return result;
 }
@@ -282,6 +306,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
+            var_inc(var);
+            var_dec(var+1);
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, first) != 1) {
                 atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -312,12 +338,15 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                     marked++;
                 }
             }
+            exit(-1);
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
                 levels_p2_set(first);
                 marked++;
             } else {
+                var_inc(var + 1);
+                var_dec(var);
                 mtbddnode_setvariable(node, var + 1);
                 if (!llmsset_rehash_bucket(nodes, first)) {
                     atomic_exchange(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -391,15 +420,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     }
 }
 
-#define node_ref_set(dd, v) levels_node_ref_count_set(levels, (dd) & MASK_INDEX, v);
-#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, 1);
-#define node_ref_dec(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, -1);
-
-#define var_inc(lvl) levels_var_count_add(levels, levels->level_to_order[lvl], 1);
-#define ref_inc(lvl) levels_ref_count_add(levels, levels->level_to_order[lvl], 1);
-
-#define is_node_dead(dd) levels_is_node_dead(levels, dd & MASK_INDEX)
-
 reorder_result_t swap_node(mtbddnode_t node, size_t index)
 {
     MTBDD newf1, newf0, f1, f0, f11, f10, f01, f00;
@@ -428,29 +448,13 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
     // degenerate nodes (e.g., in the case that F11 = F01 or F10 == F00),
     // or may already exist in the DAG as required to implement other functions.
 
-    node_ref_dec(f0);
-    if (is_node_dead(f0)) {
-        levels_p3_set(f0 & MASK_INDEX);
-    }
-
-    newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
-    if (newf0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
-    if (created0) {
-        node_ref_set(newf0, 1);
-        node_ref_inc(f00);
-        node_ref_inc(f10);
-    } else {
-        node_ref_inc(newf0);
-    }
-
     node_ref_dec(f1);
-    if (is_node_dead(f1)) {
-        levels_p3_set(f1 & MASK_INDEX);
-    }
+    if(is_node_dead(f1)) levels_p3_set(f1 & MASK_INDEX);
 
     newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
     if (newf1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
     if (created1) {
+        var_inc(var + 1);
         node_ref_set(newf1, 1);
         node_ref_inc(f11);
         node_ref_inc(f01);
@@ -458,6 +462,21 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
         node_ref_inc(newf1);
     }
 
+    node_ref_dec(f0);
+    if(is_node_dead(f0)) levels_p3_set(f0 & MASK_INDEX);
+
+    newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
+    if (newf0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
+    if (created0) {
+        var_inc(var + 1);
+        node_ref_set(newf0, 1);
+        node_ref_inc(f00);
+        node_ref_inc(f10);
+    } else {
+        node_ref_inc(newf0);
+    }
+
+//    var_inc(var);
     // update node, which also removes the mark
     mtbddnode_makenode(node, var, newf0, newf1);
     llmsset_rehash_bucket(nodes, index);
@@ -486,7 +505,6 @@ reorder_result_t swap_mapnode(mtbddnode_t node, size_t index)
     return SYLVAN_REORDER_SUCCESS;
 }
 
-
 VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result)
 {
 #if SYLVAN_USE_LINEAR_PROBING
@@ -507,45 +525,41 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     }
 }
 
-VOID_TASK_IMPL_1(clear_one_rec, MTBDD, f)
+VOID_TASK_IMPL_1(delete_mtbdd_node_rec, MTBDD, f)
 {
     size_t f_index = f & MASK_INDEX;
-    llmsset_clear_one_hash(nodes, f_index);
-    llmsset_clear_one_data(nodes, f_index);
+    var_dec(mtbdd_getvar(f));
+    llmsset_delete_node(nodes, f_index);
     if (mtbdd_isleaf(f)) return;
 
     MTBDD f1 = mtbdd_gethigh(f);
-    size_t f1_index = f1 & MASK_INDEX;
-    levels_node_ref_count_add(levels, f1_index, -1);
-    if (levels_is_node_dead(levels, f1_index)) clear_one_rec(f1);
+    node_ref_dec(f1);
+    ref_dec(f1);
 
     MTBDD f0 = mtbdd_getlow(f);
-    size_t f0_index = f0 & MASK_INDEX;
-    levels_node_ref_count_add(levels, f0_index, -1);
-    if (levels_is_node_dead(levels, f0_index)) clear_one_rec(f0);
+    node_ref_dec(f0);
+    ref_dec(f0);
+
+    if (is_node_dead(f1)) delete_mtbdd_node_rec(f1);
+    if (is_node_dead(f0)) delete_mtbdd_node_rec(f0);
 }
 
-VOID_TASK_IMPL_1(clear_one_internal_rec, size_t, index)
+VOID_TASK_IMPL_1(delete_node, size_t, index)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
+    if (mtbddnode_isleaf(f) == 0){
+        // if it was not a leaf, decrease children ref counters
+        MTBDD f1 = mtbddnode_gethigh(f);
+        node_ref_dec(f1);
+        ref_dec(mtbdd_getvar(f1));
 
-    llmsset_clear_one_hash(nodes, index);
-    llmsset_clear_one_data(nodes, index);
-    if (mtbddnode_isleaf(f)) return;
+        MTBDD f0 = mtbddnode_getlow(f);
+        node_ref_dec(f0);
+        ref_dec(mtbdd_getvar(f0));
+    }
 
-    // if it was not a leaf, look at its children and decrease their ref counters
-    // if they become dead too, delete them
-    // repeat recursively
-    MTBDD f1 = mtbddnode_gethigh(f);
-    size_t f1_index = f1 & MASK_INDEX;
-    levels_node_ref_count_add(levels, f1_index, -1);
-
-    MTBDD f0 = mtbddnode_getlow(f);
-    size_t f0_index = f0 & MASK_INDEX;
-    levels_node_ref_count_add(levels, f0_index, -1);
-
-    if (levels_is_node_dead(levels, f1_index)) clear_one_rec(f1);
-    if (levels_is_node_dead(levels, f0_index)) clear_one_rec(f0);
+    var_dec(mtbddnode_getvariable(f));
+    llmsset_delete_node(nodes, index);
 }
 
 VOID_TASK_IMPL_2(sylvan_varswap_p4, size_t, first, size_t, count)
@@ -566,6 +580,7 @@ VOID_TASK_IMPL_2(sylvan_varswap_p4, size_t, first, size_t, count)
 
     const size_t end = first + count;
     for (first = levels_p3_next(first - 1); first < end; first = levels_p3_next(first)) {
-        clear_one_internal_rec(first);
+        if (first == 0 || first == 1) continue; // reserved sylvan nodes
+        delete_node(first);
     }
 }

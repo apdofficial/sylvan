@@ -219,6 +219,13 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     }
 }
 
+void
+llmsset_delete_node(const llmsset_t dbs, uint64_t d_idx)
+{
+    llmsset_clear_one_hash(dbs, d_idx);
+    llmsset_clear_one_data(dbs, d_idx);
+}
+
 /**
  * Clear a single bucket hash.
  * (do not run parallel with lookup!!!)
@@ -226,7 +233,7 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
  * (lock-free, but not wait-free)
  */
 int
-llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
+llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
 {
     // unique table 2 arrays: hashes | data
     _Atomic (uint64_t) *dptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * didx; // first 8 bytes are chaining
@@ -287,11 +294,11 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
 /**
  * Clear a single bucket data.
  */
-void llmsset_clear_one_data(const llmsset_t dbs, uint64_t index)
+void llmsset_clear_one_data(llmsset_t dbs, uint64_t didx)
 {
-    bitmap_atomic_clear(dbs->bitmap2, index & MASK_INDEX);
-    if (bitmap_get(dbs->bitmapc, index)) {
-        uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
+    bitmap_atomic_clear(dbs->bitmap2, didx );
+    if (bitmap_get(dbs->bitmapc, didx)) {
+        uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * didx;
         dbs->destroy_cb(d_ptr[1], d_ptr[2]);
     }
 }

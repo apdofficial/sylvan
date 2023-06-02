@@ -161,13 +161,13 @@ mtbdd_count_protected()
 }
 
 /* Called during dynamic variable reordering */
-VOID_TASK_IMPL_1(mtbdd_re_set_external_refs, atomic_word_t*, bitmap)
+VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, atomic_word_t*, bitmap)
 {
-    // iterate through refs hash table, mark all found
     uint64_t *it = refs_iter(&mtbdd_refs, 0, mtbdd_refs.refs_size);
     while (it != NULL) {
         MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
-        bitmap_atomic_set(bitmap, dd & MASK_INDEX);
+        size_t index = (dd & MASK_INDEX);
+        bitmap_atomic_set(bitmap, index);
     }
 }
 

@@ -82,7 +82,7 @@ void sylvan_print_reorder_res(reorder_result_t result);
   *
   */
 TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t)
-
+#define sylvan_varswap(pos) CALL(sylvan_varswap, pos)
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

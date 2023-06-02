@@ -28,16 +28,20 @@ static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 
 static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
 {
-    if (dbs->bitmap_i == NULL)
-        return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
-    // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
-    if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
-    if (x >= dbs->count || y >= dbs->count) return 1;
-
     // ensure x < y
     // this is because we only keep the upper triangle of the matrix
-    if (x > y) return interact_get(dbs, y, x);
-    else return interact_get(dbs, x, y);
+    if (x > y) {
+        int tmp = x;
+        x = y;
+        y = tmp;
+    }
+
+//    if (dbs->bitmap_i == NULL)
+//        return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
+//    // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
+//    if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
+//    if (x >= dbs->count || y >= dbs->count) return 1;
+    return interact_get(dbs, x, y);
 }
 
 /**

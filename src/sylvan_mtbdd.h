@@ -1078,8 +1078,8 @@ VOID_TASK_DECL_1(mtbdd_gc_mark_rec, MTBDD);
 #define mtbdd_gc_mark_rec(mtbdd) RUN(mtbdd_gc_mark_rec, mtbdd)
 
 
-VOID_TASK_DECL_1(mtbdd_re_set_external_refs, atomic_word_t*);
-#define mtbdd_re_set_external_refs(bitmap) RUN(mtbdd_re_set_external_refs, bitmap)
+VOID_TASK_DECL_1(mtbdd_re_mark_external_refs, atomic_word_t*);
+#define mtbdd_re_mark_external_refs(bitmap) RUN(mtbdd_re_mark_external_refs, bitmap)
 
 
 /**

@@ -88,8 +88,9 @@ levels_var_count_add(levels_t dbs, size_t idx, int val)
 {
     if (dbs->var_count_size == 0) return;
     counter_t curr = levels_var_count_load(dbs, idx);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if (dbs->var_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
+    if (curr == 0 && val < 0)  return; // avoid underflow
+    if ((curr + val) >= counter_t_max) return;// avoid overflow
+    if (idx >= dbs->var_count_size) return;// avoid out of bounds access
     atomic_fetch_add_explicit(&dbs->var_count[idx], val, memory_order_relaxed);
 }
 

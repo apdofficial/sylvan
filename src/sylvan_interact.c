@@ -54,14 +54,18 @@ void interact_update(levels_t dbs, atomic_word_t *bitmap)
 void interact_print_state(const levels_t dbs)
 {
     printf("Interaction matrix: \n");
-    printf("  ");
+    printf("  \t");
     for (size_t i = 0; i < dbs->bitmap_i_nrows; ++i) printf("%zu ", i);
     printf("\n");
 
     for (size_t i = 0; i < dbs->bitmap_i_nrows; ++i) {
-        printf("%zu ", i);
+        printf("%zu \t", i);
         for (size_t j = 0; j < dbs->bitmap_i_nrows; ++j) {
-            printf("%d ", interact_get(dbs, i, j));
+            printf("%d ", interact_test(dbs, i, j));
+            if (j > 9) printf(" ");
+            if (j > 19) printf(" ");
+            if (j > 99) printf(" ");
+            if (j > 999) printf(" ");
         }
         printf("\n");
     }
@@ -73,9 +77,9 @@ void interact_print_state(const levels_t dbs)
 #define MASK_INDEX ((uint64_t)0x000000ffffffffff)
 #define MASK_HASH  ((uint64_t)0xffffff0000000000)
 
-#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, 1);
-#define var_inc(lvl) levels_var_count_add(levels, levels->level_to_order[lvl], 1);
-#define ref_inc(lvl) levels_ref_count_add(levels, levels->level_to_order[lvl], 1);
+#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, 1)
+#define var_inc(lvl) levels_var_count_add(levels, lvl, 1)
+#define ref_inc(lvl) levels_ref_count_add(levels, lvl, 1)
 
 /**
  *
@@ -108,16 +112,6 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     MTBDD f1 = mtbdd_gethigh(f);
     MTBDD f0 = mtbdd_getlow(f);
 
-    if (f0 != f && f0 != mtbdd_true && f0 != mtbdd_false) {
-        ref_inc(mtbdd_getvar(f0));
-        node_ref_inc(f0);
-    }
-    if (f1 != f && f1 != mtbdd_true && f1 != mtbdd_false) {
-        ref_inc(mtbdd_getvar(f1));
-        node_ref_inc(f1);
-    }
-
-
     CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
     SPAWN(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
     SYNC(find_support);
@@ -130,6 +124,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
 VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 {
+
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
 
@@ -142,45 +137,67 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         exit(1);
     }
 
-    for (size_t index = llmsset_next(1); index != llmsset_nindex; index = llmsset_next(index)) {
+    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+        if (index == 0 || index == 1 == sylvan_invalid) continue; // reserved sylvan nodes
+
         mtbddnode_t node = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(node);
-
-        // we iterate over all nodes in the table so just grab var of the node and increment the var counter
         var_inc(var);
 
-        if (bitmap_atomic_get(bitmap_g, index) == 1) {
-            // already visited node, thus can not be a root and we can skip it
-            continue;
+        if (mtbddnode_isleaf(node)) continue;
+
+        MTBDD f1 = mtbddnode_gethigh(node);
+        if (f1 != sylvan_invalid) {
+            ref_inc(mtbdd_getvar(f1));
+            node_ref_inc(f1);
         }
+
+        MTBDD f0 = mtbddnode_getlow(node);
+        if (f0 != sylvan_invalid) {
+            ref_inc(mtbdd_getvar(f0));
+            node_ref_inc(f0);
+        }
+
+    }
+
+    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+        if (levels_node_ref_count_load(levels, index) == 0) {
+            mtbddnode_t node = MTBDD_GETNODE(index);
+            BDDVAR var = mtbddnode_getvariable(node);
+            node_ref_inc(index);
+            ref_inc(var);
+        }
+    }
+
+    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new search from it.
-
-        // set support bitmap, <var> is on the support of <f>
-        bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
-
+        mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) {
             // if the node was a leaf, job done
+            continue;
+        }
+
+        if (bitmap_atomic_get(bitmap_g, index) == 1) {
+            // already visited node, thus can not be a root and we can skip it
             continue;
         }
 
         MTBDD f1 = mtbddnode_gethigh(node);
         MTBDD f0 = mtbddnode_getlow(node);
 
-//        if ((f0 & MASK_INDEX) != index && f0 != mtbdd_true && f0 != mtbdd_false) {
-//            ref_inc(mtbdd_getvar(f0));
-//            node_ref_inc(f0);
-//        }
-//        if ((f1 & MASK_INDEX) != index && f1 != mtbdd_true && f1 != mtbdd_false) {
-//            ref_inc(mtbdd_getvar(f1));
-//            node_ref_inc(f1);
-//        }
-
         // visit all nodes reachable from <f>
         SPAWN(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
         SYNC(find_support);
+
+        BDDVAR var = mtbddnode_getvariable(node);
+        // set support bitmap, <var> contributes to the outcome of <f>
+        bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
 
         // clear locally visited nodes bitmap,
         clear_aligned(bitmap_l, nnodes);

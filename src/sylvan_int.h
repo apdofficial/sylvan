@@ -42,7 +42,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * The levels table usd with dynamic variable reordering.
+ * The levels table used with dynamic variable reordering.
  */
 extern levels_t levels;
 
