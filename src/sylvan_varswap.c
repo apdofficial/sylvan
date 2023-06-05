@@ -536,16 +536,17 @@ VOID_TASK_IMPL_1(delete_mtbdd_node_rec, MTBDD, f)
 VOID_TASK_IMPL_1(delete_node_rec, size_t, index)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
+    BDDVAR var = mtbddnode_getvariable(f);
 
     MTBDD f1 = mtbddnode_gethigh(f);
-    if (mtbdd_isnode(f1)) {
+    if (f1 != sylvan_invalid && mtbdd_getvar(f1) > var && f1 != sylvan_true && f1 != sylvan_false) {
         node_ref_dec(f1);
         ref_dec(mtbdd_getvar(f1));
         if (is_node_dead(f1)) delete_node_rec(f1);
     }
 
     MTBDD f0 = mtbddnode_getlow(f);
-    if (mtbdd_isnode(f0)) {
+    if (f0 != sylvan_invalid && mtbdd_getvar(f0) > var && f0 != sylvan_true && f0 != sylvan_false) {
         node_ref_dec(f0);
         ref_dec(mtbdd_getvar(f0));
         if (is_node_dead(f0)) delete_node_rec(f0);
