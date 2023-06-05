@@ -58,11 +58,17 @@ void interact_update(levels_t dbs, atomic_word_t *bitmap_s);
 
 void interact_print_state(const levels_t dbs);
 
-VOID_TASK_DECL_1(interact_var_ref_init, levels_t)
+VOID_TASK_DECL_1(interaction_matrix_init, levels_t)
 /**
   @brief Initialize the variable interaction matrix, nodes count for each variable, and internal reference count for each variable.
 */
-#define interact_var_ref_init(lvl) RUN(interact_var_ref_init, lvl)
+#define interaction_matrix_init(dbs) RUN(interaction_matrix_init, dbs)
+
+VOID_TASK_DECL_1(var_ref_init, levels_t)
+/**
+  @brief Initialize nodes count for each variable, and internal reference count for each variable.
+*/
+#define var_ref_init(dbs) RUN(var_ref_init, dbs)
 
 #ifdef __cplusplus
 }

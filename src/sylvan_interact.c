@@ -77,9 +77,9 @@ void interact_print_state(const levels_t dbs)
 #define MASK_INDEX ((uint64_t)0x000000ffffffffff)
 #define MASK_HASH  ((uint64_t)0xffffff0000000000)
 
-#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & MASK_INDEX, 1)
-#define var_inc(lvl) levels_var_count_add(levels, lvl, 1)
-#define ref_inc(lvl) levels_ref_count_add(levels, lvl, 1)
+#define node_ref_inc(dbs, dd) levels_node_ref_count_add(dbs, (dd) & MASK_INDEX, 1)
+#define var_inc(dbs, lvl) levels_var_count_add(dbs, lvl, 1)
+#define ref_inc(dbs, lvl) levels_ref_count_add(dbs, lvl, 1)
 
 /**
  *
@@ -122,7 +122,7 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     bitmap_atomic_set(bitmap_g, index);
 }
 
-VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
+VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
 {
 
     size_t nnodes = nodes->table_size; // worst case (if table is full)
@@ -135,42 +135,6 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     if (bitmap_s == 0 || bitmap_g == 0 || bitmap_l == 0) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
-    }
-
-    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
-
-        mtbddnode_t node = MTBDD_GETNODE(index);
-        BDDVAR var = mtbddnode_getvariable(node);
-        var_inc(var);
-
-        if (mtbddnode_isleaf(node)) continue;
-
-        MTBDD f1 = mtbddnode_gethigh(node);
-        if (f1 != sylvan_invalid && mtbdd_getvar(f1) > var) {
-            ref_inc(mtbdd_getvar(f1));
-            node_ref_inc(f1);
-        }
-
-        MTBDD f0 = mtbddnode_getlow(node);
-        if (f0 != sylvan_invalid && mtbdd_getvar(f0) > var) {
-            ref_inc(mtbdd_getvar(f0));
-            node_ref_inc(f0);
-        }
-
-    }
-
-    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
-
-        if (levels_node_ref_count_load(levels, index) == 0) {
-            node_ref_inc(index);
-        }
-        if (levels_ref_count_load(levels, index) == 0) {
-            mtbddnode_t node = MTBDD_GETNODE(index);
-            BDDVAR var = mtbddnode_getvariable(node);
-            ref_inc(var);
-        }
     }
 
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
@@ -200,7 +164,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
-        bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
+        bitmap_atomic_set(bitmap_s, dbs->level_to_order[var]);
 
         // clear locally visited nodes bitmap,
         clear_aligned(bitmap_l, nnodes);
@@ -208,13 +172,52 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         interact_update(dbs, bitmap_s);
     }
 
-    for (size_t i = 0; i < levels->count; i++) {
-        if (levels_ref_count_load(levels, i) <= 1) {
-            levels->isolated_count++;
+    for (size_t i = 0; i < dbs->count; i++) {
+        if (levels_ref_count_load(dbs, i) <= 1) {
+            dbs->isolated_count++;
         }
     }
 
     free_aligned(bitmap_s, nvars);
     free_aligned(bitmap_g, nnodes);
     free_aligned(bitmap_l, nnodes);
+}
+
+VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
+{
+    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        BDDVAR var = mtbddnode_getvariable(node);
+        var_inc(dbs, var);
+
+        if (mtbddnode_isleaf(node)) continue;
+
+        MTBDD f1 = mtbddnode_gethigh(node);
+        if (f1 != sylvan_invalid && mtbdd_getvar(f1) > var) {
+            ref_inc(dbs, mtbdd_getvar(f1));
+            node_ref_inc(dbs, f1);
+        }
+
+        MTBDD f0 = mtbddnode_getlow(node);
+        if (f0 != sylvan_invalid && mtbdd_getvar(f0) > var) {
+            ref_inc(dbs, mtbdd_getvar(f0));
+            node_ref_inc(dbs, f0);
+        }
+
+    }
+
+    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+
+        if (levels_node_ref_count_load(levels, index) == 0) {
+            node_ref_inc(dbs, index);
+        }
+        if (levels_ref_count_load(levels, index) == 0) {
+            mtbddnode_t node = MTBDD_GETNODE(index);
+            BDDVAR var = mtbddnode_getvariable(node);
+            ref_inc(dbs, var);
+        }
+    }
 }

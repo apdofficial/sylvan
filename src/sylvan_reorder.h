@@ -147,8 +147,8 @@ TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
  * @param pos - variable to sift
  * @param target_pos - target position (w.r.t. dynamic variable reordering)
  */
-TASK_DECL_2(reorder_result_t, sylvan_siftpos, uint32_t, uint32_t);
-#define sylvan_siftpos(pos, target_pos) CALL(sylvan_siftpos, pos, target_pos)
+TASK_DECL_1(reorder_result_t, sylvan_siftback, sifting_state_t*);
+#define sylvan_siftback(state) CALL(sylvan_siftback, state)
 
 /**
  * @brief Reduce the heap size in the entire forest.
