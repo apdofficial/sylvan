@@ -257,7 +257,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
     x = s_state->pos;
     y = s_state->pos + 1;
 
-    printf("sift down pos: x: %d (R: %d, size: %d , limitSize: %d) (xNodes: %d, yNodes: %d)\n",
+    printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %d, yNodes: %d)\n",
            x, R, s_state->size, limitSize,
            levels_var_count_load(levels, x),
            levels_var_count_load(levels, y)
@@ -288,7 +288,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         }
 
         if (s_state->size < limitSize) limitSize = s_state->size;
-        printf("sift down pos: x: %d (R: %d, size: %d , limitSize: %d) (xNodes: %d, yNodes: %d)\n",
+        printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %d, yNodes: %d)\n",
                x, R, s_state->size, limitSize,
                levels_var_count_load(levels, x),
                levels_var_count_load(levels, y)
@@ -350,7 +350,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     y = s_state->pos;
 
     L -= (int) levels_var_count_load(levels, yIndex) - levels_is_isolated(levels, yIndex);
-    printf("sift up pos: x: %d (R: %d, size: %d , limitSize: %d) (xNodes: %d, yNodes: %d)\n",
+    printf("sift up pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %d, yNodes: %d)\n",
            x, L, s_state->size, limitSize,
            levels_var_count_load(levels, x),
            levels_var_count_load(levels, y)
@@ -384,7 +384,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
 
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
-        printf("sift up pos: x: %d (R: %d, size: %d , limitSize: %d) (xNodes: %d, yNodes: %d)\n",
+        printf("sift up pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %d, yNodes: %d)\n",
                x, L, s_state->size, limitSize,
                levels_var_count_load(levels, x),
                levels_var_count_load(levels, y)
@@ -557,6 +557,7 @@ VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, r
 VOID_TASK_0(sylvan_test_sift)
 {
     interaction_matrix_init(levels);
+    var_ref_init(levels);
 
     int perm_add4[208] = {
             5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 3, 2, 1, 0,
@@ -610,8 +611,14 @@ VOID_TASK_0(sylvan_test_sift)
     };
     (void) perm_add4;
     (void) perm_add8;
-    for (int i = 0; i < 745; i++) {
-        int pos = perm_add8[i];
+
+    int size_add8 = 745;
+    int size_add4 = 208;
+    (void) size_add8;
+    (void) size_add4;
+
+    for (int i = 0; i < size_add4; i++) {
+        int pos = perm_add4[i];
         CALL(sylvan_varswap, pos);
     }
 }
@@ -799,11 +806,8 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     if (high == 0) high = levels->count - 1;
 
     // parallel
-    SPAWN(var_ref_init, levels);
-    interaction_matrix_init(levels);
-    SYNC(var_ref_init);
-
-    interact_print_state(levels);
+    SPAWN(interaction_matrix_init, levels);
+    var_ref_init(levels);
 
     // count all variable levels (parallel...)
     _Atomic (size_t) level_counts[levels->count];
@@ -814,13 +818,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     int ordered_levels[levels->count];
     mtbdd_mark_threshold(ordered_levels, level_counts, 0);
     gnome_sort(ordered_levels, level_counts);
-#if 1
-    for (size_t i = 0; i < levels->count; i++) {
-        int lvl = ordered_levels[i];
-        printf("level %d \t has %zu nodes and %d refs\n", lvl, level_counts[lvl], levels_ref_count_load(levels, lvl));
-    }
-    printf("\n");
-#endif
+
 #if 0
     for (size_t level = 0; level < sylvan_levelscount(); ++level) {
         size_t index = llmsset_first();
@@ -847,6 +845,21 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     s_state.best_size = s_state.size;
     s_state.low = low;
     s_state.high = high;
+
+    SYNC(interaction_matrix_init);
+
+#if 1
+    interact_print_state(levels);
+
+    for (size_t i = 0; i < levels->count; i++) {
+        int lvl = ordered_levels[i];
+        printf("level %d \t has %zu nodes\n", lvl, level_counts[lvl]);
+    }
+    printf("\n");
+#endif
+
+    s_state.pos = levels->level_to_order[0];
+    s_state.best_pos = s_state.pos;
 
     for (int i = 0; i < (int) levels->count; i++) {
         int lvl = ordered_levels[i];
@@ -903,7 +916,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
         siftingVarFailed:
         fprintf(stderr, "sifting failed for variable %d\n", s_state.pos);
-        return res;
+//        return res;
 
     }
 
