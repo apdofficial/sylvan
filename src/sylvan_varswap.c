@@ -38,6 +38,7 @@ int is_node_dependent_on(mtbddnode_t node, BDDVAR var);
    that will be changed from the hash table.
 */
 VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *)
+
 #endif
 
 /*!
@@ -58,13 +59,6 @@ VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_r
    @details Recovery phase, restore the nodes that were marked in phase 1.
 */
 VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
-
-/*!
-   \brief Adjacent variable swap phase 4
-   \details Delete dead nodes (from both hash and data tables)
-*/
-VOID_TASK_DECL_2(sylvan_varswap_p4, size_t, size_t)
-
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
 {
@@ -129,6 +123,8 @@ void sylvan_print_reorder_res(reorder_result_t result)
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
+    assert(pos != sylvan_invalid);
+    if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
@@ -138,16 +134,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // isolated projection functions are there by checking only these
     // two functions again. This is done to eliminate the isolated
     // projection functions from the node count.
-    int isolated = -(levels_is_isolated(levels, levels->level_to_order[pos]) +
-                     levels_is_isolated(levels, levels->level_to_order[pos + 1]));
-    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
+    BDDVAR x = levels->level_to_order[pos];
+    BDDVAR y = levels->level_to_order[pos + 1];
+    int isolated1 = levels_is_isolated(levels, x);
+    int isolated2 = levels_is_isolated(levels, y);
+    int isolated = -(isolated1 + isolated2);
+//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
 
     levels_bitmap_p2_realloc(nodes->table_size);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-    if (are_interacting == 0) {}
+//    if (are_interacting == 0) {}
 
-    CALL(sylvan_clear_cache);
+    sylvan_clear_cache();
 
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
@@ -181,15 +180,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // gc the dead nodes
     size_t index = llmsset_next(1);
     while (index != llmsset_nindex) {
-        if (index == sylvan_invalid) index = llmsset_next(index);
+        if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
         if (is_node_dead(index)) {
             delete_node(index);
+            llmsset_clear_one_hash(nodes, index);
+            llmsset_clear_one_data(nodes, index);
         }
         index = llmsset_next(index);
     }
 
+//    sylvan_clear_cache();
 //    sylvan_clear_and_mark();
 //    sylvan_rehash_all();
+//    levels_p3_clear_all();
 
     // swap the mappings
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
@@ -508,8 +511,8 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
 
 VOID_TASK_IMPL_1(delete_node, size_t, index)
 {
-    if (index == sylvan_invalid || index == 0 || index == 1) return;
     mtbddnode_t f = MTBDD_GETNODE(index);
+    var_dec(mtbddnode_getvariable(f));
 
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
@@ -524,7 +527,4 @@ VOID_TASK_IMPL_1(delete_node, size_t, index)
             ref_dec(mtbdd_getvar(f0));
         }
     }
-
-    var_dec(mtbddnode_getvariable(f));
-    llmsset_delete_node(nodes, index);
 }
