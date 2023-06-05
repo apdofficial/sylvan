@@ -73,7 +73,7 @@ int
 levels_is_isolated(levels_t dbs, size_t idx)
 {
     if (dbs->ref_count_size == 0) return 0;
-    return levels_ref_count_load(dbs, idx) <= 1;
+    return levels_ref_count_load(dbs, idx) == 1;
 }
 
 counter_t
