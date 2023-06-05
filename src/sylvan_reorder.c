@@ -221,7 +221,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
     BDDVAR x;
     BDDVAR y;
 
-    s_state->size = CALL(llmsset_count_marked, nodes) - 2;
+    s_state->size = CALL(llmsset_count_marked, nodes) + 2;
     xIndex = levels->level_to_order[s_state->pos];
 
     limitSize = s_state->size = s_state->size - levels->isolated_count;
@@ -270,8 +270,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         if (interact_test(levels, xIndex, yIndex)) {
             R -= (int) levels_var_count_load(levels, y) - levels_is_isolated(levels, yIndex);
         }
-        res = CALL(sylvan_varswap, s_state->pos);
-        s_state->size = CALL(llmsset_count_marked, nodes) - 2;
+        res = sylvan_varswap(s_state->pos);
+        s_state->size = llmsset_count_marked(nodes) + 2;
         if (!sylvan_reorder_issuccess(res)) return res;
         configs.total_num_swap++;
         if (should_terminate_sifting(&configs)) break;
@@ -281,7 +281,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
             break;
         }
         // update best position
-        if (s_state->size < s_state->best_size) {
+        if (s_state->size <= s_state->best_size) {
             s_state->best_size = s_state->size;
             s_state->best_pos = s_state->pos;
         }
@@ -365,7 +365,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
 
         // update the best position
-        if (s_state->size < s_state->best_size) {
+        if (s_state->size <= s_state->best_size) {
             s_state->best_size = s_state->size;
             s_state->best_pos = s_state->pos;
         }
@@ -395,7 +395,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 TASK_IMPL_2(reorder_result_t, sylvan_siftpos, uint32_t, pos, uint32_t, target)
 {
     printf("\n");
+    printf("sift pos: \t pos: %d target: %d\n", pos, pos + 1);
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
+    if (pos == target) return SYLVAN_REORDER_SUCCESS;
     for (; pos < target; pos++) {
         reorder_result_t res = CALL(sylvan_varswap, pos);
         printf("sift pos: \t x: %d \t y: %d\n", pos, pos + 1);
@@ -782,7 +784,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #if 1
     for (size_t i = 0; i < levels->count; i++) {
         int lvl = ordered_levels[i];
-        printf("level %d \t has %zu nodes\n", lvl, level_counts[lvl]);
+        printf("level %d \t has %zu nodes and %d refs\n", lvl, level_counts[lvl], levels_ref_count_load(levels, lvl));
     }
     printf("\n");
 #endif
@@ -813,7 +815,6 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     s_state.low = low;
     s_state.high = high;
 
-//    printf("low: %d high: %d\n", s_state.low, s_state.high);
     for (int i = 0; i < (int) levels->count; i++) {
         int lvl = ordered_levels[i];
         if (lvl < 0) break; // done

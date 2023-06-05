@@ -138,7 +138,7 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
     }
 
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 == sylvan_invalid) continue; // reserved sylvan nodes
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
 
         mtbddnode_t node = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(node);
@@ -147,13 +147,13 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
         if (mtbddnode_isleaf(node)) continue;
 
         MTBDD f1 = mtbddnode_gethigh(node);
-        if (f1 != sylvan_invalid) {
+        if (f1 != sylvan_invalid && mtbdd_getvar(f1) > var) {
             ref_inc(mtbdd_getvar(f1));
             node_ref_inc(f1);
         }
 
         MTBDD f0 = mtbddnode_getlow(node);
-        if (f0 != sylvan_invalid) {
+        if (f0 != sylvan_invalid && mtbdd_getvar(f0) > var) {
             ref_inc(mtbdd_getvar(f0));
             node_ref_inc(f0);
         }
@@ -162,10 +162,13 @@ VOID_TASK_IMPL_1(interact_var_ref_init, levels_t, dbs)
 
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
         if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+
         if (levels_node_ref_count_load(levels, index) == 0) {
+            node_ref_inc(index);
+        }
+        if (levels_ref_count_load(levels, index) == 0) {
             mtbddnode_t node = MTBDD_GETNODE(index);
             BDDVAR var = mtbddnode_getvariable(node);
-            node_ref_inc(index);
             ref_inc(var);
         }
     }
