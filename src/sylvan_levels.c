@@ -48,6 +48,7 @@ levels_t mtbdd_levels_create()
 
     levels_size = 0;
     dbs->count = 0;
+    dbs->nodes_count = 0;
 
     return dbs;
 }
@@ -56,7 +57,7 @@ counter_t
 levels_ref_count_load(levels_t dbs, size_t idx)
 {
     if (dbs->ref_count_size == 0) return 0;
-    return atomic_load_explicit(&dbs->ref_count[idx], memory_order_relaxed);
+    return atomic_load(&dbs->ref_count[idx]);
 }
 
 void
@@ -66,7 +67,7 @@ levels_ref_count_add(levels_t dbs, size_t idx, int val)
     counter_t curr = levels_ref_count_load(dbs, idx);
     if (curr == 0 && val < 0) return; // avoid underflow
     if (dbs->ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
-    atomic_fetch_add_explicit(&dbs->ref_count[idx], val, memory_order_relaxed);
+    atomic_fetch_add(&dbs->ref_count[idx], val);
 }
 
 int
@@ -80,7 +81,7 @@ counter_t
 levels_var_count_load(levels_t dbs, size_t idx)
 {
     if (dbs->var_count_size == 0) return 0;
-    return atomic_load_explicit(&dbs->var_count[idx], memory_order_relaxed);
+    return atomic_load(&dbs->var_count[idx]);
 }
 
 void
@@ -91,7 +92,7 @@ levels_var_count_add(levels_t dbs, size_t idx, int val)
     if (curr == 0 && val < 0)  return; // avoid underflow
     if ((curr + val) >= counter_t_max) return;// avoid overflow
     if (idx >= dbs->var_count_size) return;// avoid out of bounds access
-    atomic_fetch_add_explicit(&dbs->var_count[idx], val, memory_order_relaxed);
+    atomic_fetch_add(&dbs->var_count[idx], val);
 }
 
 int
@@ -103,11 +104,36 @@ levels_is_node_dead(levels_t dbs, size_t idx)
     return int_count == 0 && ext_count == 0;
 }
 
+uint64_t
+levels_nodes_count_load(levels_t dbs)
+{
+    return atomic_load_explicit(&dbs->nodes_count, memory_order_relaxed);
+}
+
+void
+levels_nodes_count_add(levels_t dbs, int val)
+{
+    if (dbs->node_ref_count_size == 0) return;
+    uint64_t curr = atomic_load(&dbs->nodes_count);
+    if (curr == 0 && val < 0) return; // avoid underflow
+    if ((curr + val) >= atomic_uint_t_max) return;// avoid overflow
+    atomic_fetch_add(&dbs->nodes_count, val);
+}
+
+void
+levels_nodes_count_set(levels_t dbs, int val)
+{
+    if (dbs->node_ref_count_size == 0) return;
+    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
+    if (val < 0) exit(-1); // underflow, sorry really not allowed
+    atomic_store(&dbs->nodes_count, val);
+}
+
 counter_t
 levels_node_ref_count_load(levels_t dbs, size_t idx)
 {
     if (dbs->node_ref_count_size == 0) return 0;
-    return atomic_load_explicit(&dbs->node_ref_count[idx], memory_order_relaxed);
+    return atomic_load(&dbs->node_ref_count[idx]);
 }
 
 void
@@ -117,7 +143,7 @@ levels_node_ref_count_add(levels_t dbs, size_t idx, int val)
     counter_t curr = levels_node_ref_count_load(dbs, idx);
     if (curr == 0 && val < 0) return; // avoid underflow
     if ((curr + val) >= counter_t_max) return;// avoid overflow
-    atomic_fetch_add_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
+    atomic_fetch_add(&dbs->node_ref_count[idx], val);
 }
 
 void
@@ -126,7 +152,7 @@ levels_node_ref_count_set(levels_t dbs, size_t idx, int val)
     if (dbs->node_ref_count_size == 0) return;
     if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
     if (val < 0) exit(-1); // underflow, sorry really not allowed
-    atomic_exchange_explicit(&dbs->node_ref_count[idx], val, memory_order_relaxed);
+    atomic_store(&dbs->node_ref_count[idx], val);
 }
 
 void

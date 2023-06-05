@@ -239,7 +239,7 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
     _Atomic (uint64_t) *dptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * didx; // first 8 bytes are chaining
 
     // set d to the next bucket in the chain
-    uint64_t d = atomic_load_explicit(dptr, memory_order_relaxed);
+    uint64_t d = atomic_load(dptr);
     if (d & MASK_INDEX) {
         while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) {
             // setting ptr to not in use(-1)
@@ -261,11 +261,11 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
 #endif
 
     for (;;) {
-        uint64_t idx = atomic_load_explicit(fptr, memory_order_relaxed);
+        uint64_t idx = atomic_load(fptr);
 
         if (idx == didx) { // we are head
             // next part of the chain
-            atomic_store_explicit(fptr, d, memory_order_relaxed);
+            atomic_store(fptr, d);
             return 1;
         }
 
@@ -277,7 +277,7 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
             if (idx == 0) return 0; // wasn't in???
 
             _Atomic (uint64_t) *ptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * idx;
-            uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
+            uint64_t v = atomic_load(ptr);
 
             if (v == (uint64_t) -1) break; // found delete-in-progress, restart
 
@@ -296,7 +296,7 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
  */
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t didx)
 {
-    bitmap_atomic_clear(dbs->bitmap2, didx );
+    bitmap_atomic_clear(dbs->bitmap2, didx);
     if (bitmap_get(dbs->bitmapc, didx)) {
         uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * didx;
         dbs->destroy_cb(d_ptr[1], d_ptr[2]);

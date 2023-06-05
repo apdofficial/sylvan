@@ -101,20 +101,24 @@ void interact_print_state(const levels_t dbs)
 #define find_support(f, bitmap_s, bitmap_g, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_g, bitmap_l)
 VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, bitmap_g, atomic_word_t *, bitmap_l)
 {
-    if (f == mtbdd_true || f == mtbdd_false) return;
     uint64_t index = f & MASK_INDEX;
+    if (index == 0 || index == 1) return;
+    if (f == mtbdd_true || f == mtbdd_false) return;
+
     if (bitmap_atomic_get(bitmap_l, index)) return;
 
     BDDVAR var = mtbdd_getvar(f);
     // set support bitmap, <var> contributes to the outcome of <f>
     bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
 
-    MTBDD f1 = mtbdd_gethigh(f);
-    MTBDD f0 = mtbdd_getlow(f);
+    if(!mtbdd_isleaf(f)) {
+        MTBDD f1 = mtbdd_gethigh(f);
+        MTBDD f0 = mtbdd_getlow(f);
 
-    CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
-    SPAWN(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
-    SYNC(find_support);
+        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
+        SPAWN(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
+        SYNC(find_support);
+    }
 
     // locally visited node used to avoid duplicate node visit for a given tree
     bitmap_atomic_set(bitmap_l, index);
@@ -172,11 +176,6 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
         interact_update(dbs, bitmap_s);
     }
 
-    for (size_t i = 0; i < dbs->count; i++) {
-        if (levels_ref_count_load(dbs, i) <= 1) {
-            dbs->isolated_count++;
-        }
-    }
 
     free_aligned(bitmap_s, nvars);
     free_aligned(bitmap_g, nnodes);
@@ -185,8 +184,10 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
 
 VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
 {
+    levels_nodes_count_set(dbs, 4);
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+        if (index == 0 || index == 1) continue;
+        levels_nodes_count_add(dbs, 1);
 
         mtbddnode_t node = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(node);
@@ -195,13 +196,13 @@ VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
         if (mtbddnode_isleaf(node)) continue;
 
         MTBDD f1 = mtbddnode_gethigh(node);
-        if (f1 != sylvan_invalid && mtbdd_getvar(f1) > var) {
+        if (f1 != sylvan_invalid && (f1 & MASK_INDEX) != 0 && (f1 & MASK_INDEX) != 1) {
             ref_inc(dbs, mtbdd_getvar(f1));
             node_ref_inc(dbs, f1);
         }
 
         MTBDD f0 = mtbddnode_getlow(node);
-        if (f0 != sylvan_invalid && mtbdd_getvar(f0) > var) {
+        if (f0 != sylvan_invalid && (f0 & MASK_INDEX) != 0 && (f0 & MASK_INDEX) != 1) {
             ref_inc(dbs, mtbdd_getvar(f0));
             node_ref_inc(dbs, f0);
         }
@@ -209,15 +210,21 @@ VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
     }
 
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+        if (index == 0 || index == 1) continue;
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        BDDVAR var = mtbddnode_getvariable(node);
 
         if (levels_node_ref_count_load(levels, index) == 0) {
             node_ref_inc(dbs, index);
         }
-        if (levels_ref_count_load(levels, index) == 0) {
-            mtbddnode_t node = MTBDD_GETNODE(index);
-            BDDVAR var = mtbddnode_getvariable(node);
+        if (levels_ref_count_load(levels, var) == 0) {
             ref_inc(dbs, var);
+        }
+    }
+
+    for (size_t i = 0; i < dbs->count; i++) {
+        if (levels_is_isolated(levels, i)) {
+            dbs->isolated_count++;
         }
     }
 }

@@ -8,9 +8,11 @@ extern "C" {
 #endif /* __cplusplus */
 
 #define counter_t_max UINT16_MAX
+#define atomic_uint_t_max UINT64_MAX
 
 typedef unsigned short counter_t;
 typedef _Atomic (counter_t) atomic_counter_t;
+typedef _Atomic (uint64_t) atomic_uint64_t;
 
 #define COUNT_NODES_BLOCK_SIZE 4096
 
@@ -26,6 +28,7 @@ typedef struct levels_db {
     size_t                  count;                   // number of created levels
     atomic_half_word_t*     level_to_order;          // current level wise var permutation (level to variable label)
     atomic_half_word_t*     order_to_level;          // current variable wise level permutation (variable label to level)
+    atomic_uint64_t         nodes_count;             // number of nodes all nodes in DD
     atomic_counter_t*       var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
     size_t                  var_count_size;          // size of var_count
     atomic_counter_t*       ref_count;               // number of internal references per variable (it expects order wise variable index)
@@ -86,6 +89,12 @@ int levels_is_node_dead(levels_t dbs, size_t idx);
 void levels_node_ref_count_add(levels_t dbs, size_t idx, int val);
 
 void levels_node_ref_count_set(levels_t dbs, size_t idx, int val);
+
+uint64_t levels_nodes_count_load(levels_t dbs);
+
+void levels_nodes_count_add(levels_t dbs, int val);
+
+void levels_nodes_count_set(levels_t dbs, int val);
 
 /**
  * @brief Create a new levels_t object
