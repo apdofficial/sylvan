@@ -339,8 +339,8 @@ int mtbdd_newlevels(size_t amount)
 #endif
 
         levels->table = (atomic_word_t *) realloc(levels->table, sizeof(uint64_t[levels_size]));
-        levels->level_to_order = (atomic_half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
-        levels->order_to_level = (atomic_half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+        levels->level_to_order = (half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
+        levels->order_to_level = (half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
 
         if (levels->table == 0 ||
             levels->level_to_order == 0 ||

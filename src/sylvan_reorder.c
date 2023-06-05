@@ -460,6 +460,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
     if (s_state->pos == s_state->best_pos) return res;
     for (; s_state->pos <= s_state->best_pos; s_state->pos++) {
         if (s_state->size == s_state->best_size) return res;
+        if (s_state->pos == UINT32_MAX) return res;
 #if STATS
         printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos, s_state->pos + 1, s_state->size);
 #endif
@@ -533,6 +534,7 @@ static _Atomic (int) re;
 
 VOID_TASK_IMPL_0(sylvan_pre_reorder)
 {
+    sylvan_gc_test();
     // alloc necessary memory dependent on table_size/ # of variables
     // let:
     // v - number of variables
@@ -916,34 +918,34 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #endif
         if (s_state.pos == s_state.low) {
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             // at this point pos --> high unless bounding occurred.
             // move backward and stop at best position.
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
         } else if (s_state.pos == s_state.high) {
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             // at this point pos --> low unless bounding occurred.
             // move backward and stop at best position.
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
         } else if ((s_state.pos - s_state.low) > (s_state.high - s_state.pos)) {
             // we are in the lower half, so sift down first and then up
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
         } else {
             // we are in the upper half, so sift up first and then down
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingVarFailed;
+            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
         }
 
         if (should_terminate_reordering(&configs)) break;
@@ -958,10 +960,14 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         configs.total_num_var++;
         continue;
 
-        siftingVarFailed:
-        fprintf(stderr, "sifting failed for variable order %d\n", s_state.pos);
+        siftingOutOfMemory:
+        fprintf(stderr, "Running out of the memory space. (Table resizing if possible.)\n");
         sylvan_print_reorder_res(res);
         sylvan_gc();
+        levels_bitmap_p2_realloc(nodes->table_size);
+        levels_node_ref_count_realloc(nodes->table_size);
+        interaction_matrix_init(levels);
+        var_ref_init(levels);
     }
 
     return res;

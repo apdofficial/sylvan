@@ -26,8 +26,8 @@ typedef _Atomic (uint64_t) atomic_uint64_t;
 typedef struct levels_db {
     atomic_word_t*          table;                   // array holding the 1-node BDD for each level
     size_t                  count;                   // number of created levels
-    atomic_half_word_t*     level_to_order;          // current level wise var permutation (level to variable label)
-    atomic_half_word_t*     order_to_level;          // current variable wise level permutation (variable label to level)
+    half_word_t*            level_to_order;          // current level wise var permutation (level to variable label)
+    half_word_t*            order_to_level;          // current variable wise level permutation (variable label to level)
     atomic_uint64_t         nodes_count;             // number of nodes all nodes in DD
     atomic_counter_t*       var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
     size_t                  var_count_size;          // size of var_count
