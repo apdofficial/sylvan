@@ -139,12 +139,17 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     int isolated1 = levels_is_isolated(levels, x);
     int isolated2 = levels_is_isolated(levels, y);
     int isolated = -(isolated1 + isolated2);
-//    int are_interacting = interact_test(levels, levels->level_to_order[pos], levels->level_to_order[pos + 1]);
 
     levels_bitmap_p2_realloc(nodes->table_size);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (are_interacting == 0) {}
+//    if (interact_test(levels, x, y) == 0) {
+//        levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
+//        levels->order_to_level[levels->level_to_order[pos + 1]] = pos;
+//        uint32_t save = levels->level_to_order[pos];
+//        levels->level_to_order[pos] = levels->level_to_order[pos + 1];
+//        levels->level_to_order[pos + 1] = save;
+//    }
 
     sylvan_clear_cache();
 
@@ -177,22 +182,25 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         levels->isolated_count += isolated;
     }
 
+
     // gc the dead nodes
     size_t index = llmsset_next(1);
     while (index != llmsset_nindex) {
         if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
         if (is_node_dead(index)) {
             delete_node(index);
+#if !SYLVAN_USE_LINEAR_PROBING
             llmsset_clear_one_hash(nodes, index);
             llmsset_clear_one_data(nodes, index);
+#endif
         }
         index = llmsset_next(index);
     }
 
-//    sylvan_clear_cache();
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
-//    levels_p3_clear_all();
+#if SYLVAN_USE_LINEAR_PROBING
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+#endif
 
     // swap the mappings
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;

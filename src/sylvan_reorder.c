@@ -682,6 +682,12 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
         size_t leaf_count = 0;
         sylvan_pre_reorder();
+
+#if SYLVAN_USE_LINEAR_PROBING
+        printf("BDD reordering with %d sifting (probing): from %zu \n", type, llmsset_count_marked(nodes));
+#else
+        printf("BDD reordering with sifting (chaining): from %zu \n",llmsset_count_marked(nodes));
+#endif
         size_t before_size = llmsset_count_marked(nodes) + 2;
         switch (type) {
             case SYLVAN_REORDER_SIFT:

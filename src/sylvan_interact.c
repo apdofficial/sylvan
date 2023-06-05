@@ -63,7 +63,6 @@ void interact_print_state(const levels_t dbs)
         for (size_t j = 0; j < dbs->bitmap_i_nrows; ++j) {
             printf("%d ", interact_test(dbs, i, j));
             if (j > 9) printf(" ");
-            if (j > 19) printf(" ");
             if (j > 99) printf(" ");
             if (j > 999) printf(" ");
         }
