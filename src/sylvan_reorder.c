@@ -26,13 +26,6 @@
 
 #define STATS 0 // useful information w.r.t. dynamic reordering
 
-
-static inline uint64_t get_nodes_count(){
-//    assert((int) levels_nodes_count_load(levels) == llmsset_count_marked(nodes) + 2);
-    return levels_nodes_count_load(levels);
-//    return llmsset_count_marked(nodes) + 2;
-}
-
 static int reorder_initialized = 0;
 static int print_reordering_stat = 1;
 
@@ -85,6 +78,30 @@ typedef struct re_hook_entry
 static re_hook_entry_t prere_list;
 static re_hook_entry_t postre_list;
 static re_hook_entry_t progre_list;
+
+static inline uint64_t get_nodes_count()
+{
+//    assert((int) levels_nodes_count_load(levels) == llmsset_count_marked(nodes) + 2);
+    return levels_nodes_count_load(levels);
+//    return llmsset_count_marked(nodes) + 2;
+}
+
+void resize_reordering();
+
+void sylvan_reorder_type_description(reordering_type_t type, char *buf, size_t buf_len)
+{
+    (void) buf_len;
+    assert(buf_len >= 100);
+    switch (type) {
+        case SYLVAN_REORDER_BOUNDED_SIFT:
+            sprintf(buf, "bounded sifting");
+            break;
+        case SYLVAN_REORDER_SIFT:
+            sprintf(buf, "sifting");
+
+    }
+}
+
 
 void sylvan_re_hook_prere(re_hook_cb callback)
 {
@@ -532,9 +549,17 @@ void sylvan_reduce_heap(reordering_type_t type)
  */
 static _Atomic (int) re;
 
-VOID_TASK_IMPL_0(sylvan_pre_reorder)
+VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
     sylvan_gc_test();
+
+    char buff[100];
+    sylvan_reorder_type_description(type, buff, 100);
+#if SYLVAN_USE_LINEAR_PROBING
+    printf("BDD reordering with %s (probing): from %zu \n", buff, llmsset_count_marked(nodes));
+#else
+    printf("BDD reordering with %s (chaining): from %zu to ... ", buff, llmsset_count_marked(nodes));
+#endif
     // alloc necessary memory dependent on table_size/ # of variables
     // let:
     // v - number of variables
@@ -568,7 +593,7 @@ VOID_TASK_IMPL_0(sylvan_pre_reorder)
     configs.total_num_var = 0;
 }
 
-VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, reordering_type_t, type)
+VOID_TASK_IMPL_1(sylvan_post_reorder, size_t, leaf_count)
 {
     size_t after_size = get_nodes_count();
 
@@ -589,8 +614,7 @@ VOID_TASK_IMPL_3(sylvan_post_reorder, size_t, before_size, size_t, leaf_count, r
 
     double end = wctime() - configs.t_start_sifting;
     if (print_reordering_stat) {
-        printf("BDD reordering with %d sifting: from %zu to ... %zu nodes in %f sec\n", type, before_size, after_size,
-               end);
+        printf("%zu nodes in %f sec\n", after_size, end);
     }
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
@@ -681,14 +705,7 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
     int zero = 0;
     if (atomic_compare_exchange_strong(&re, &zero, 1)) {
         size_t leaf_count = 0;
-        sylvan_pre_reorder();
-
-#if SYLVAN_USE_LINEAR_PROBING
-        printf("BDD reordering with %d sifting (probing): from %zu \n", type, llmsset_count_marked(nodes));
-#else
-        printf("BDD reordering with sifting (chaining): from %zu \n",llmsset_count_marked(nodes));
-#endif
-        size_t before_size = llmsset_count_marked(nodes) + 2;
+        sylvan_pre_reorder(type);
         switch (type) {
             case SYLVAN_REORDER_SIFT:
                 result = NEWFRAME(sylvan_sift, 0, 0);
@@ -701,7 +718,7 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
             sylvan_print_reorder_res(result);
         }
         re = 0;
-        sylvan_post_reorder(before_size, leaf_count, type);
+        sylvan_post_reorder(leaf_count);
     } else {
         /* wait for new frame to appear */
         while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}
@@ -963,20 +980,48 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
             }
         }
 
+//        exit(1);
+
         configs.total_num_var++;
         continue;
 
         siftingOutOfMemory:
-        fprintf(stderr, "Running out of the memory space. (Table resizing if possible.)\n");
-        sylvan_print_reorder_res(res);
+        printf("\nRunning out of memory. (Running GC and table resizing.)\n");
+
+        levels_var_count_free();
+        levels_ref_count_free();
+        levels_node_ref_count_free();
+        levels_bitmap_p2_free();
+        levels_bitmap_p3_free();
+        levels_bitmap_ext_free();
+
         sylvan_gc();
-        levels_bitmap_p2_realloc(nodes->table_size);
-        levels_node_ref_count_realloc(nodes->table_size);
-        interaction_matrix_init(levels);
-        var_ref_init(levels);
+
+        levels_var_count_malloc(levels->count);
+        levels_ref_count_malloc(levels->count);
+        levels_node_ref_count_malloc(nodes->table_size);
+        levels_bitmap_p2_malloc(nodes->table_size);
+        levels_bitmap_p3_malloc(nodes->table_size);
+        levels_bitmap_ext_malloc(nodes->table_size);
+        interact_malloc(levels);
+
+        mtbdd_re_mark_external_refs(levels->bitmap_ext);
+
+        return CALL(sylvan_bounded_sift, low, high);
     }
 
     return res;
+}
+
+void resize_reordering()
+{
+    sylvan_gc();
+
+    levels_node_ref_count_realloc(nodes->table_size);
+    levels_bitmap_p2_realloc(nodes->table_size);
+    levels_bitmap_p3_realloc(nodes->table_size);
+    levels_bitmap_ext_realloc(nodes->table_size);
+
 }
 
 static int should_terminate_sifting(const struct sifting_config *reorder_config)

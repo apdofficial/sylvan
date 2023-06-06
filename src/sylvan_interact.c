@@ -221,9 +221,9 @@ VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
         }
     }
 
-    for (size_t i = 0; i < dbs->count; i++) {
-        if (levels_is_isolated(levels, i)) {
-            dbs->isolated_count++;
-        }
-    }
+//    for (size_t i = 0; i < dbs->count; i++) {
+//        if (levels_is_isolated(levels, i)) {
+//            dbs->isolated_count++;
+//        }
+//    }
 }
