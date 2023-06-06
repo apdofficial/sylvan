@@ -491,7 +491,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
         configs.varswap_count++;
     }
     for (; s_state->pos >= s_state->best_pos; s_state->pos--) {
-        if (s_state->pos) break;
+        if (s_state->pos == 0) break;
         if (s_state->size == s_state->best_size) return res;
 #if STATS
         printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos - 1, s_state->pos, s_state->size);
