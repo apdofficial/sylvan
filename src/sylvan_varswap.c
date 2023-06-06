@@ -187,6 +187,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     size_t index = llmsset_next(1);
     while (index != llmsset_nindex) {
         if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
+//    for (size_t index = 0; index < nodes->table_size; index++) {
+//        if (!llmsset_is_marked(nodes, index)) continue; // an unused bucket
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue;
         if (is_node_dead(index)) {
             delete_node_ref(index);
 #if !SYLVAN_USE_LINEAR_PROBING
@@ -244,8 +247,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
 
 //    for (; first < end; first++) {
 //        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
-
-    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+    for (; first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
@@ -296,7 +298,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
 //    for (; first < end; first++) {
 //        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
-    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+    for (; first < end; first = llmsset_next(first)) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
