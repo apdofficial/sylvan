@@ -155,7 +155,7 @@ size_t bitmap_atomic_next(atomic_word_t *words, size_t size, size_t pos)
     }
 }
 
-size_t bitmap_atomic_last(atomic_word_t *words, size_t size)
+inline size_t bitmap_atomic_last(atomic_word_t *words, size_t size)
 {
     return bitmap_atomic_last_from(words, size);
 }
