@@ -115,8 +115,8 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
         MTBDD f0 = mtbdd_getlow(f);
 
         CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
-        SPAWN(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
-        SYNC(find_support);
+        CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
+//        SYNC(find_support);
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
@@ -161,9 +161,9 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
         MTBDD f0 = mtbddnode_getlow(node);
 
         // visit all nodes reachable from <f>
-        SPAWN(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
+        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
-        SYNC(find_support);
+//        SYNC(find_support);
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
