@@ -339,15 +339,9 @@ mtbdd_newlevel(void)
 int mtbdd_newlevels(size_t amount)
 {
     if (levels->count + amount >= levels_size) {
-#if 0
-        if (levels_size == 0) levels_size = 1; // start here
-        while (levels_count + amount >= levels_size) levels_size *= 2;
-#else
         // just round up to the next multiple of 64 value
         // probably better than doubling anyhow...
         levels_size = (levels->count + amount + 63) & (~63LL);
-#endif
-
         levels->table = (atomic_word_t *) realloc(levels->table, sizeof(uint64_t[levels_size]));
         levels->level_to_order = (half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->order_to_level = (half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
@@ -411,8 +405,13 @@ void mtbdd_resetlevels(void)
 
 MTBDD mtbdd_ithlevel(uint32_t level)
 {
-    if (level < levels->count) return levels->table[levels->level_to_order[level]];
-    else return mtbdd_invalid;
+    if (level < levels->count) {
+        return levels->table[levels->level_to_order[level]];
+    } else {
+        size_t amount = level - levels->count + 1;
+        mtbdd_newlevels(amount);
+        return levels->table[levels->level_to_order[level]];
+    }
 }
 
 uint32_t mtbdd_order_to_level(BDDVAR var)
