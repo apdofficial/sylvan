@@ -127,28 +127,28 @@ int runtests(size_t ntests)
     printf("test_forward_iterator\n");
     for (size_t j = 0; j < ntests; j++) {
         size_t i = _rand();
-        size_t j = i + _rand();
+        j = i + _rand();
         size_t size = j + 10;
         if (test_forward_iterator(i, j, size)) return 1;
     }
     printf("test_backwards_iterator\n");
     for (size_t j = 0; j < ntests; j++) {
         size_t i = _rand();
-        size_t j = i + _rand();
+        j = i + _rand();
         size_t size = j + 10;
         if (test_backwards_iterator(i, j, size)) return 1;
     }
     printf("test_atomic_forward_iterator\n");
     for (size_t j = 0; j < ntests; j++) {
         size_t i = _rand();
-        size_t j = i + _rand();
+        j = i + _rand();
         size_t size = j + 10;
         if (test_atomic_forward_iterator(i, j, size)) return 1;
     }
     printf("test_atomic_backwards_iterator\n");
     for (size_t j = 0; j < ntests; j++) {
         size_t i = _rand();
-        size_t j = i + _rand();
+        j = i + _rand();
         size_t size = j + 10;
         if (test_atomic_backwards_iterator(i, j, size)) return 1;
     }

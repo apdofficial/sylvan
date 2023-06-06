@@ -253,7 +253,8 @@ TASK_0(int, test_sift_down)
     state.high = 3;
     state.use_bounds = 0;
 
-    interact_var_ref_init(levels);
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
 
     // (0), 1, 2, 3
     test_assert(CALL(sylvan_siftdown, &state) == SYLVAN_REORDER_SUCCESS);
@@ -318,7 +319,8 @@ TASK_0(int, test_sift_up)
     state.high = 3;
     state.use_bounds = 0;
 
-    interact_var_ref_init(levels);
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
 
     // 0, 1, 2, (3)
     test_assert(CALL(sylvan_siftup, &state) == SYLVAN_REORDER_SUCCESS);
@@ -370,8 +372,20 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
 
+    sifting_state_t state;
+    state.size = llmsset_count_marked(nodes);
+    state.best_size = state.size;
+    state.pos = 3;
+    state.best_pos = 0;
+    state.low = 0;
+    state.high = 3;
+    state.use_bounds = 0;
+
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
+
     // 0, 1, 2, (3)
-    test_assert(CALL(sylvan_siftpos, 3, 0) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftback, &state) == SYLVAN_REORDER_SUCCESS);
     // (3), 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -395,7 +409,7 @@ TASK_0(int, test_sift_pos)
     test_assert(mtbdd_getvar(three) == 0);
 
     // (3), 0, 1, 2
-    test_assert(CALL(sylvan_siftpos, 0, 3) == SYLVAN_REORDER_SUCCESS);
+    test_assert(CALL(sylvan_siftback, &state) == SYLVAN_REORDER_SUCCESS);
     // 0, 1, 2, (3)
 
     test_assert(zero == sylvan_ithvar(0));
@@ -532,8 +546,8 @@ TASK_0(int, test_interact)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    sylvan_pre_reorder();
-    interact_var_ref_init(levels);
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
 
     interact_print_state(levels);
 
@@ -572,8 +586,8 @@ TASK_0(int, test_var_count)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    sylvan_pre_reorder();
-    interact_var_ref_init(levels);
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
         printf("var %zu has %u nodes\n", i, atomic_load(&levels->ref_count[levels->level_to_order[i]]));
@@ -599,8 +613,8 @@ TASK_0(int, test_ref_count)
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_protect(&bdd2);
 
-    sylvan_pre_reorder();
-    interact_var_ref_init(levels);
+    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+    interaction_matrix_init(levels);
 
     for (size_t i = 0; i < levels->count; ++i) {
         size_t ref_count = levels_ref_count_load(levels, levels->level_to_order[i]);
