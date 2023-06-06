@@ -168,11 +168,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        CALL(sylvan_varswap_p2, pos, 0, levels->bitmap_p2_size, &result);
+        CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
         if (sylvan_reorder_issuccess(result) == 0) {
             CALL(sylvan_varswap_p3, pos, &result);
         }
-        levels_p2_clear_all();
+//        levels_p2_clear_all();
     }
 
     if (levels->ref_count_size > 0) {
@@ -196,9 +196,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         }
         index = llmsset_next(index);
     }
-
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
 
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
@@ -244,6 +241,9 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
     }
 
     const size_t end = first + count;
+
+//    for (; first < end; first++) {
+//        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
 
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
@@ -294,6 +294,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
     const size_t end = first + count;
 
+//    for (; first < end; first++) {
+//        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
     for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
@@ -311,6 +313,14 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
             continue;
         } else if (nvar != var) {
             continue; // not <var> or <var+1>
+        }
+
+        // level = <var>
+        if (mtbddnode_getmark(node)) {
+            // marked node, remove mark and rehash (we are apparently recovering)
+            mtbddnode_setmark(node, 0);
+            llmsset_rehash_bucket(nodes, first);
+            continue;
         }
 
         if (mtbddnode_ismapnode(node)) {
@@ -334,15 +344,18 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
                     }
                 } else {
                     // mark for phase 2
-                    levels_p2_set(first);
+//                    levels_p2_set(first);
+                    // mark for phase 2
+                    mtbddnode_setmark(node, 1);
                     marked++;
                 }
             }
-            exit(-1);
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
-                levels_p2_set(first);
+//                levels_p2_set(first);
+                // mark for phase 2
+                mtbddnode_setmark(node, 1);
                 marked++;
             } else {
                 var_inc(var + 1);
@@ -406,9 +419,14 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     reorder_result_t res;
     const size_t end = first + count;
 
-    for (first = levels_p2_next(first - 1); first < end; first = levels_p2_next(first)) {
-        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
+    for (; first < end; first++) {
         mtbddnode_t node = MTBDD_GETNODE(first);
+        if (!llmsset_is_marked(nodes, first)) continue; // an unused bucket
+        if (!mtbddnode_getmark(node)) continue; // an unmarked node
+//    for (first = levels_p2_next(first - 1); first < end; first = levels_p2_next(first)) {
+//        mtbddnode_t node = MTBDD_GETNODE(first);
+
+        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
         if (mtbddnode_ismapnode(node)) {
             res = swap_mapnode(node, first);
         } else {
@@ -511,6 +529,7 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     // clear hashes of nodes with <var> and <var+1>
     CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result);
 #endif
+    printf("Running recovery after running out of memory...\n");
     // at this point we already have nodes marked from P2 so we will unmark them now in P1
     size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result);
     if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {

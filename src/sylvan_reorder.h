@@ -179,7 +179,7 @@ TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
   of the array should be equal or greater to the number of variables
   currently in use.
  */
-#define sylvan_reorder_perm(permutation)  RUNEX(sylvan_reorder_perm, permutation)
+#define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
 
 #define sylvan_pre_reorder(type) RUN(sylvan_pre_reorder, type)
 VOID_TASK_DECL_1(sylvan_pre_reorder, reordering_type_t)

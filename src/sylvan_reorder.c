@@ -24,7 +24,8 @@
 #include "sylvan_interact.h"
 #include "sylvan_align.h"
 
-#define STATS 0 // useful information w.r.t. dynamic reordering
+#define STATS 0 // useful information w.r.t. dynamic reordering for debugging
+#define INFO 1 // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 static int print_reordering_stat = 1;
@@ -81,13 +82,14 @@ static re_hook_entry_t progre_list;
 
 static inline uint64_t get_nodes_count()
 {
+//    return llmsset_count_marked(nodes) + 2;
 #if STATS
-    assert(levels_nodes_count_load(levels) == (llmsset_count_marked(nodes) + 2));
+    assert(levels_nodes_count_load(levels) == (llmsset_count_marked(nodes)));
 #endif
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
-    return levels_nodes_count_load(levels);
+    return levels_nodes_count_load(levels) + 2;
 #endif
 }
 
@@ -538,14 +540,14 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
 void sylvan_test_reduce_heap()
 {
-    if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
-        sylvan_reduce_heap(configs.type);
-    }
+//    if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
+    sylvan_reduce_heap(configs.type);
+//    }
 }
 
 void sylvan_reduce_heap(reordering_type_t type)
 {
-    RUNEX(sylvan_reorder_stop_world, type);
+    RUN(sylvan_reorder_stop_world, type);
 }
 
 /**
@@ -600,7 +602,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
 VOID_TASK_IMPL_1(sylvan_post_reorder, size_t, leaf_count)
 {
-    size_t after_size = get_nodes_count();
+    size_t after_size = llmsset_count_marked(nodes);
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
     size_t new_size_threshold = (after_size - leaf_count + 1) * SYLVAN_REORDER_SIZE_RATIO + leaf_count;
@@ -707,28 +709,23 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         sylvan_print_reorder_res(result);
         return;
     }
-    int zero = 0;
-    if (atomic_compare_exchange_strong(&re, &zero, 1)) {
-        size_t leaf_count = 0;
-        sylvan_pre_reorder(type);
-        switch (type) {
-            case SYLVAN_REORDER_SIFT:
-                result = NEWFRAME(sylvan_sift, 0, 0);
-                break;
-            case SYLVAN_REORDER_BOUNDED_SIFT:
-                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
-                break;
-        }
-        if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_print_reorder_res(result);
-        }
-        re = 0;
-        sylvan_post_reorder(leaf_count);
-    } else {
-        /* wait for new frame to appear */
-        while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}
-        lace_yield(__lace_worker, __lace_dq_head);
+//    int zero = 0;
+    size_t leaf_count = 0;
+    (void) type;
+    sylvan_pre_reorder(type);
+    switch (type) {
+        case SYLVAN_REORDER_SIFT:
+            result = CALL(sylvan_sift, 0, 0);
+            break;
+        case SYLVAN_REORDER_BOUNDED_SIFT:
+            result = CALL(sylvan_bounded_sift, 0, 0);
+            break;
     }
+    if (sylvan_reorder_issuccess(result) == 0) {
+        sylvan_print_reorder_res(result);
+    }
+    re = 0;
+    sylvan_post_reorder(leaf_count);
 }
 
 TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
@@ -887,7 +884,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     }
     // mark and sort variable levels based on the threshold
     int ordered_levels[levels->count];
-    mtbdd_mark_threshold(ordered_levels, level_counts, 0);
+    mtbdd_mark_threshold(ordered_levels, level_counts, configs.threshold);
     gnome_sort(ordered_levels, level_counts);
 
     atomic_half_word_t level_to_order[levels->count];
@@ -923,6 +920,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     s_state.high = high;
 
 #if STATS
+    printf("\n");
 //    interact_print_state(levels);
 
     for (size_t i = 0; i < levels->count; i++) {
@@ -987,13 +985,15 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
         configs.total_num_var++;
 #if STATS
-        if (configs.total_num_var > 3) exit(1);
+        //        if (i > 4) exit(1);
 #endif
         continue;
 
         siftingFailed:
         if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL) {
+#if INFO
             printf("\nRunning out of memory. (Running GC and table resizing.)\n");
+#endif
             levels_var_count_free();
             levels_ref_count_free();
             levels_node_ref_count_free();
@@ -1015,6 +1015,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
             return CALL(sylvan_bounded_sift, low, high);
         } else {
+#if INFO
+            sylvan_print_reorder_res(res);
+#endif
             return res;
         }
 
@@ -1027,14 +1030,14 @@ static int should_terminate_sifting(const struct sifting_config *reorder_config)
 {
     for (re_term_entry_t e = termre_list; e != NULL; e = e->next) {
         if (e->cb()) {
-#if STATS
+#if INFO
             printf("sifting exit: termination_cb\n");
 #endif
             return 1;
         }
     }
     if (reorder_config->varswap_count > reorder_config->max_swap) {
-#if STATS
+#if INFO
         printf("sifting exit: reached %u from the total_num_swap %u\n",
                reorder_config->varswap_count,
                reorder_config->max_swap);
@@ -1044,7 +1047,7 @@ static int should_terminate_sifting(const struct sifting_config *reorder_config)
 
     double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms && reorder_config->t_start_sifting != 0) {
-#if STATS
+#if INFO
         printf("sifting exit: reached %fms from the time_limit %.2fms\n",
                t_elapsed,
                reorder_config->time_limit_ms);
@@ -1058,7 +1061,7 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
 {
     for (re_term_entry_t e = termre_list; e != NULL; e = e->next) {
         if (e->cb()) {
-#if STATS
+#if INFO
             printf("reordering exit: termination_cb\n");
 #endif
             return 1;
@@ -1066,7 +1069,7 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
     }
 
     if (reorder_config->total_num_var > reorder_config->max_var) {
-#if STATS
+#if INFO
         printf("reordering exit: reached %u from the total_num_var %u\n",
                reorder_config->total_num_var,
                reorder_config->max_var);
@@ -1075,7 +1078,7 @@ static int should_terminate_reordering(const struct sifting_config *reorder_conf
     }
     double t_elapsed = wctime_ms_elapsed(reorder_config->t_start_sifting);
     if (t_elapsed > reorder_config->time_limit_ms && reorder_config->t_start_sifting != 0) {
-#if STATS
+#if INFO
         printf("reordering exit: reached %fms from the time_limit %.2zums\n",
                t_elapsed,
                (size_t) reorder_config->time_limit_ms);

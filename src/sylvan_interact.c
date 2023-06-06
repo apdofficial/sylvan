@@ -183,7 +183,7 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
 
 VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
 {
-    levels_nodes_count_set(dbs, 4);
+    levels_nodes_count_set(dbs, 2);
     for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
         if (index == 0 || index == 1) continue;
         levels_nodes_count_add(dbs, 1);
