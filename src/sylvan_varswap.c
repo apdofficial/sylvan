@@ -22,8 +22,8 @@
 
 #define is_node_dead(dd) levels_is_node_dead(levels, dd & MASK_INDEX)
 
-#define delete_node(idx) CALL(delete_node, idx)
-VOID_TASK_DECL_1(delete_node, size_t)
+#define delete_node_ref(idx) CALL(delete_node_ref, idx)
+VOID_TASK_DECL_1(delete_node_ref, size_t)
 
 reorder_result_t swap_node(mtbddnode_t node, size_t index);
 
@@ -188,7 +188,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     while (index != llmsset_nindex) {
         if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
         if (is_node_dead(index)) {
-            delete_node(index);
+            delete_node_ref(index);
 #if !SYLVAN_USE_LINEAR_PROBING
             llmsset_clear_one_hash(nodes, index);
             llmsset_clear_one_data(nodes, index);
@@ -196,6 +196,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         }
         index = llmsset_next(index);
     }
+
+//    sylvan_clear_and_mark();
+//    sylvan_rehash_all();
 
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
@@ -446,7 +449,6 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
     // or may already exist in the DAG as required to implement other functions.
 
     node_ref_dec(f1);
-
     newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
     if (newf1 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
     if (created1) {
@@ -459,7 +461,6 @@ reorder_result_t swap_node(mtbddnode_t node, size_t index)
     }
 
     node_ref_dec(f0);
-
     newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
     if (newf0 == mtbdd_invalid) return SYLVAN_REORDER_P2_CREATE_FAIL;
     if (created0) {
@@ -489,13 +490,15 @@ reorder_result_t swap_mapnode(mtbddnode_t node, size_t index)
     mtbddnode_t n0 = MTBDD_GETNODE(f0);
     MTBDD f00 = node_getlow(f0, n0);
     MTBDD f01 = node_gethigh(f0, n0);
+
     f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
     if (f0 == mtbdd_invalid) {
         return SYLVAN_REORDER_P2_CREATE_FAIL;
-    } else {
-        mtbddnode_makemapnode(node, var, f0, f01);
-        llmsset_rehash_bucket(nodes, index);
     }
+
+    mtbddnode_makemapnode(node, var, f0, f01);
+    llmsset_rehash_bucket(nodes, index);
+
     return SYLVAN_REORDER_SUCCESS;
 }
 
@@ -514,10 +517,9 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
         // do the not so trivial cases (but won't create new nodes this time)
         CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, result);
     }
-    sylvan_gc();
 }
 
-VOID_TASK_IMPL_1(delete_node, size_t, index)
+VOID_TASK_IMPL_1(delete_node_ref, size_t, index)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
     var_dec(mtbddnode_getvariable(f));

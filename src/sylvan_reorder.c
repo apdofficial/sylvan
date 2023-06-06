@@ -81,12 +81,16 @@ static re_hook_entry_t progre_list;
 
 static inline uint64_t get_nodes_count()
 {
-//    assert((int) levels_nodes_count_load(levels) == llmsset_count_marked(nodes) + 2);
+#if STATS
+    assert(levels_nodes_count_load(levels) == (llmsset_count_marked(nodes) + 2));
+#endif
+#if SYLVAN_USE_LINEAR_PROBING
+    return llmsset_count_marked(nodes) + 2;
+#else
     return levels_nodes_count_load(levels);
-//    return llmsset_count_marked(nodes) + 2;
+#endif
 }
 
-void resize_reordering();
 
 void sylvan_reorder_type_description(reordering_type_t type, char *buf, size_t buf_len)
 {
@@ -487,6 +491,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
         configs.varswap_count++;
     }
     for (; s_state->pos >= s_state->best_pos; s_state->pos--) {
+        if (s_state->pos) break;
         if (s_state->size == s_state->best_size) return res;
 #if STATS
         printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos - 1, s_state->pos, s_state->size);
@@ -556,7 +561,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     char buff[100];
     sylvan_reorder_type_description(type, buff, 100);
 #if SYLVAN_USE_LINEAR_PROBING
-    printf("BDD reordering with %s (probing): from %zu \n", buff, llmsset_count_marked(nodes));
+    printf("BDD reordering with %s (probing): from %zu to ... ", buff, llmsset_count_marked(nodes));
 #else
     printf("BDD reordering with %s (chaining): from %zu to ... ", buff, llmsset_count_marked(nodes));
 #endif
@@ -918,7 +923,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     s_state.high = high;
 
 #if STATS
-    interact_print_state(levels);
+//    interact_print_state(levels);
 
     for (size_t i = 0; i < levels->count; i++) {
         int lvl = ordered_levels[i];
@@ -941,34 +946,34 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #endif
         if (s_state.pos == s_state.low) {
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             // at this point pos --> high unless bounding occurred.
             // move backward and stop at best position.
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
         } else if (s_state.pos == s_state.high) {
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             // at this point pos --> low unless bounding occurred.
             // move backward and stop at best position.
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
         } else if ((s_state.pos - s_state.low) > (s_state.high - s_state.pos)) {
             // we are in the lower half, so sift down first and then up
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
         } else {
             // we are in the upper half, so sift up first and then down
             res = sylvan_siftup(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             res = sylvan_siftdown(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
             res = sylvan_siftback(&s_state);
-            if (!sylvan_reorder_issuccess(res)) goto siftingOutOfMemory;
+            if (!sylvan_reorder_issuccess(res)) goto siftingFailed;
         }
 
         if (should_terminate_reordering(&configs)) break;
@@ -980,48 +985,42 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
             }
         }
 
-//        exit(1);
-
         configs.total_num_var++;
+#if STATS
+        if (configs.total_num_var > 3) exit(1);
+#endif
         continue;
 
-        siftingOutOfMemory:
-        printf("\nRunning out of memory. (Running GC and table resizing.)\n");
+        siftingFailed:
+        if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL) {
+            printf("\nRunning out of memory. (Running GC and table resizing.)\n");
+            levels_var_count_free();
+            levels_ref_count_free();
+            levels_node_ref_count_free();
+            levels_bitmap_p2_free();
+            levels_bitmap_p3_free();
+            levels_bitmap_ext_free();
 
-        levels_var_count_free();
-        levels_ref_count_free();
-        levels_node_ref_count_free();
-        levels_bitmap_p2_free();
-        levels_bitmap_p3_free();
-        levels_bitmap_ext_free();
+            sylvan_gc();
 
-        sylvan_gc();
+            levels_var_count_malloc(levels->count);
+            levels_ref_count_malloc(levels->count);
+            levels_node_ref_count_malloc(nodes->table_size);
+            levels_bitmap_p2_malloc(nodes->table_size);
+            levels_bitmap_p3_malloc(nodes->table_size);
+            levels_bitmap_ext_malloc(nodes->table_size);
+            interact_malloc(levels);
 
-        levels_var_count_malloc(levels->count);
-        levels_ref_count_malloc(levels->count);
-        levels_node_ref_count_malloc(nodes->table_size);
-        levels_bitmap_p2_malloc(nodes->table_size);
-        levels_bitmap_p3_malloc(nodes->table_size);
-        levels_bitmap_ext_malloc(nodes->table_size);
-        interact_malloc(levels);
+            mtbdd_re_mark_external_refs(levels->bitmap_ext);
 
-        mtbdd_re_mark_external_refs(levels->bitmap_ext);
+            return CALL(sylvan_bounded_sift, low, high);
+        } else {
+            return res;
+        }
 
-        return CALL(sylvan_bounded_sift, low, high);
     }
 
     return res;
-}
-
-void resize_reordering()
-{
-    sylvan_gc();
-
-    levels_node_ref_count_realloc(nodes->table_size);
-    levels_bitmap_p2_realloc(nodes->table_size);
-    levels_bitmap_p3_realloc(nodes->table_size);
-    levels_bitmap_ext_realloc(nodes->table_size);
-
 }
 
 static int should_terminate_sifting(const struct sifting_config *reorder_config)

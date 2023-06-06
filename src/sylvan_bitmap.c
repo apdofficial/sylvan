@@ -24,22 +24,22 @@ static inline uint64_t get_first_lsb_one_bit_pos(word_t word, size_t word_idx)
     return BITS_PER_WORD * word_idx + (64 - __builtin_ctzll(word));
 }
 
-void bitmap_set(word_t *words, size_t pos)
+inline void bitmap_set(word_t *words, size_t pos)
 {
     words[WORD_OFFSET(pos)] |= BIT_MASK(pos);
 }
 
-void bitmap_clear(word_t *words, size_t pos)
+inline void bitmap_clear(word_t *words, size_t pos)
 {
     words[WORD_OFFSET(pos)] &= ~BIT_MASK(pos);
 }
 
-char bitmap_get(const word_t *words, size_t pos)
+inline char bitmap_get(const word_t *words, size_t pos)
 {
     return words[WORD_OFFSET(pos)] & BIT_MASK(pos) ? 1 : 0;
 }
 
-size_t bitmap_first(word_t *words, size_t size)
+inline size_t bitmap_first(word_t *words, size_t size)
 {
     return bitmap_first_from(words, 0, size);
 }
@@ -72,7 +72,7 @@ size_t bitmap_next(word_t *words, size_t size, size_t pos)
     }
 }
 
-size_t bitmap_last(word_t *words, size_t size)
+inline size_t bitmap_last(word_t *words, size_t size)
 {
     return bitmap_last_from(words, size);
 }
@@ -110,7 +110,7 @@ size_t bitmap_count(word_t *words, size_t size)
     return popcnt(words, NUMBER_OF_WORDS(size) * 8);
 }
 
-size_t bitmap_atomic_first(atomic_word_t *words, size_t size)
+inline size_t bitmap_atomic_first(atomic_word_t *words, size_t size)
 {
     return bitmap_atomic_first_from(words, 0, size);
 }
