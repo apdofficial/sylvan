@@ -540,9 +540,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
 void sylvan_test_reduce_heap()
 {
-//    if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
-    sylvan_reduce_heap(configs.type);
-//    }
+    if (llmsset_count_marked(nodes) >= levels->reorder_size_threshold && levels->reorder_count < SYLVAN_REORDER_LIMIT) {
+        sylvan_reduce_heap(configs.type);
+    }
 }
 
 void sylvan_reduce_heap(reordering_type_t type)

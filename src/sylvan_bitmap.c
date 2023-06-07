@@ -200,31 +200,29 @@ size_t bitmap_atomic_prev(atomic_word_t *words, size_t pos)
     }
 }
 
-void bitmap_atomic_set(atomic_word_t *words, size_t pos)
+int bitmap_atomic_set(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *ptr = words + WORD_INDEX(pos);
+    uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
     word_t mask = BIT_MASK(pos);
-    for (;;) {
-        word_t v = *ptr;
-        if (v & mask) break; // already set
-        if (atomic_compare_exchange_weak(ptr, &v, v | mask)) break;
-    }
+    if (v & mask) return 0;
+    atomic_fetch_or(ptr, mask);
+    return 1;
 }
 
-void bitmap_atomic_clear(atomic_word_t *words, size_t pos)
+int bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *ptr = words + WORD_INDEX(pos);
+    uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
     word_t mask = BIT_MASK(pos);
-    for (;;) {
-        word_t v = *ptr;
-        if ((v & mask) == 0) break; // already cleared
-        if (atomic_compare_exchange_weak(ptr, &v, v & ~mask)) break;
-    }
+    if ((v & mask) == 0) return 0;
+    atomic_fetch_and(ptr, ~mask);
+    return 1;
 }
 
 int bitmap_atomic_get(atomic_word_t *words, size_t pos)
 {
-    atomic_word_t *word_ptr = words + WORD_INDEX(pos);
-    word_t word = atomic_load_explicit(word_ptr, memory_order_relaxed);
+    atomic_word_t *ptr = words + WORD_INDEX(pos);
+    uint64_t word = atomic_load_explicit(ptr, memory_order_relaxed);
     return word & BIT_MASK(pos) ? 1 : 0;
 }

@@ -108,12 +108,12 @@ size_t bitmap_atomic_prev(atomic_word_t *words, size_t pos);
 /**
  * Set the bit at position n to 1, if it was 0. (Atomic version)
  */
-void bitmap_atomic_set(atomic_word_t *words, size_t pos);
+int bitmap_atomic_set(atomic_word_t *words, size_t pos);
 
 /**
  * Set the bit at position n to 0, if it was 1. (Atomic version)
  */
-void bitmap_atomic_clear(atomic_word_t *words, size_t pos);
+int bitmap_atomic_clear(atomic_word_t *words, size_t pos);
 
 /**
  * Get the bit at position n. (Atomic version)

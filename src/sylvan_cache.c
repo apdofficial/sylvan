@@ -173,7 +173,7 @@ cache_get(uint64_t a, uint64_t b, uint64_t c, uint64_t *res)
     _Atomic(uint32_t) *s_bucket = (_Atomic(uint32_t)*)cache_status + (hash % cache_size);
     cache_entry_t bucket = cache_table + (hash % cache_size);
 #endif
-    const uint32_t s = atomic_load_explicit(s_bucket, memory_order_relaxed);
+    const uint32_t s = atomic_load_explicit(s_bucket, memory_order_acquire);
     // abort if locked or if part of a 2-part cache entry
     if (s & 0xc0000000) return 0;
     // abort if different hash

@@ -101,7 +101,7 @@ void interact_print_state(const levels_t dbs)
 VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, bitmap_g, atomic_word_t *, bitmap_l)
 {
     uint64_t index = f & MASK_INDEX;
-    if (index == 0 || index == 1) return;
+    if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
     if (bitmap_atomic_get(bitmap_l, index)) return;
@@ -112,11 +112,9 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
 
     if(!mtbdd_isleaf(f)) {
         MTBDD f1 = mtbdd_gethigh(f);
-        MTBDD f0 = mtbdd_getlow(f);
-
         CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
+        MTBDD f0 = mtbdd_getlow(f);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
-//        SYNC(find_support);
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
@@ -163,7 +161,6 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
         // visit all nodes reachable from <f>
         CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
-//        SYNC(find_support);
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
