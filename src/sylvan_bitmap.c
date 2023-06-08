@@ -1,6 +1,6 @@
+#include <sylvan_int.h>
 #include <limits.h>     // for CHAR_BIT
 #include <stdatomic.h>
-#include "sylvan_bitmap.h"
 #include <libpopcnt.h>
 
 enum

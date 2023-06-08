@@ -43,6 +43,7 @@ reorder_result_t swap_mapnode(mtbddnode_t node, size_t index);
 */
 VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reorder_result_t) *)
 
+#define sylvan_varswap_p0(pos, result) CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result)
 #endif
 
 /*!
@@ -52,17 +53,31 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, uint64_t, uint64_t, _Atomic (reord
 */
 TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
 
+#define sylvan_varswap_p1(pos, result) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result)
+
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle the not so trivial cases. (creates new nodes)
 */
 VOID_TASK_DECL_4(sylvan_varswap_p2, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
 
+#define sylvan_varswap_p2(pos, result) CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, result)
+
 /*!
    @brief Adjacent variable swap phase 3
    @details Recovery phase, restore the nodes that were marked in phase 1.
 */
 VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
+
+#define sylvan_varswap_p3(pos, result) CALL(sylvan_varswap_p3, pos, result)
+
+/*!
+   @brief Adjacent variable swap phase 4
+   @details Garbage collect dead nodes.
+*/
+VOID_TASK_DECL_0(sylvan_varswap_p4)
+
+#define sylvan_varswap_p4() CALL(sylvan_varswap_p4)
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
@@ -79,9 +94,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // projection functions from the node count.
     BDDVAR x = levels->level_to_order[pos];
     BDDVAR y = levels->level_to_order[pos + 1];
-    int isolated1 = levels_is_isolated(levels, x);
-    int isolated2 = levels_is_isolated(levels, y);
-    int isolated = -(isolated1 + isolated2);
+    int isolated = -(levels_is_isolated(levels, x) + levels_is_isolated(levels, y));
 
     levels_bitmap_p2_realloc(nodes->table_size);
 
@@ -95,50 +108,29 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, &result);
+    sylvan_varswap_p0(pos, &result);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, &result);
+    size_t marked_count = sylvan_varswap_p1(pos, &result);
 
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        CALL(sylvan_varswap_p2, pos, 0, nodes->table_size, &result);
+        sylvan_varswap_p2(pos, &result);
         if (sylvan_reorder_issuccess(result) == 0) {
-            CALL(sylvan_varswap_p3, pos, &result);
+            sylvan_varswap_p3(pos, &result);
         }
         levels_p2_clear_all();
     }
 
+    sylvan_varswap_p4();
+
     if (levels->ref_count_size > 0) {
-        isolated +=
-                levels_is_isolated(levels, levels->level_to_order[pos]) +
-                levels_is_isolated(levels, levels->level_to_order[pos + 1]);
+        isolated += levels_is_isolated(levels, x) + levels_is_isolated(levels, y);
         levels->isolated_count += isolated;
     }
-
-
-    // gc the dead nodes
-    size_t index = llmsset_next(1);
-    while (index != llmsset_nindex) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue;
-        if (is_node_dead(index)) {
-            delete_node_ref(index);
-#if !SYLVAN_USE_LINEAR_PROBING
-            llmsset_clear_one_hash(nodes, index);
-            llmsset_clear_one_data(nodes, index);
-#endif
-        }
-        index = llmsset_next(index);
-    }
-
-#if SYLVAN_USE_LINEAR_PROBING
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
-#endif
 
     // swap the mappings
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
@@ -157,11 +149,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
  *
  * Removes exactly the nodes that will be changed from the hash table.
  */
-VOID_TASK_IMPL_4(sylvan_varswap_p0,
-                 uint32_t, var, /** variable label **/
-                 uint64_t, first, /** index in the unique table **/
-                 uint64_t, count, /** index in the unique table **/
-                 _Atomic (reorder_result_t)*, result)
+VOID_TASK_IMPL_4(sylvan_varswap_p0, uint32_t, var, uint64_t, first, uint64_t, count, _Atomic (reorder_result_t)*,
+                 result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -179,7 +168,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
     }
 
     const size_t end = first + count;
-    for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
@@ -202,11 +191,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0,
  * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
  * nodes are rehashed.
  */
-TASK_IMPL_4(size_t, sylvan_varswap_p1,
-            uint32_t, var, /** variable label **/
-            size_t, first,  /** starting node index in the unique table **/
-            size_t, count, /** number of nodes to visit form the starting index **/
-            _Atomic (reorder_result_t)*, result)
+TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, count, _Atomic (reorder_result_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -228,7 +213,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
 
     const size_t end = first + count;
 
-    for (first = llmsset_next(first-1); first < end; first = llmsset_next(first)) {
+    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
         mtbddnode_t node = MTBDD_GETNODE(first);
         if (mtbddnode_isleaf(node)) continue; // a leaf
@@ -301,11 +286,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1,
  * Returns 0 if there was no error, or 1 if nodes could not be
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
-VOID_TASK_IMPL_4(sylvan_varswap_p2,
-                 uint32_t, var,
-                 size_t, first,
-                 size_t, count,
-                 _Atomic (reorder_result_t)*, result)
+VOID_TASK_IMPL_4(sylvan_varswap_p2, uint32_t, var, size_t, first, size_t, count, _Atomic (reorder_result_t)*, result)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
@@ -324,7 +305,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
     reorder_result_t res;
     const size_t end = first + count;
 
-    for (first = levels_p2_next(first-1); first < end; first = levels_p2_next(first)) {
+    for (first = levels_p2_next(first - 1); first < end; first = levels_p2_next(first)) {
         mtbddnode_t node = MTBDD_GETNODE(first);
 
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
@@ -439,18 +420,40 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     }
 }
 
+VOID_TASK_IMPL_0(sylvan_varswap_p4)
+{
+    // gc the dead nodes
+    size_t index = llmsset_next(1);
+    while (index != llmsset_nindex) {
+        if (index == 0 || index == 1 || index == sylvan_invalid) index = llmsset_next(index);
+        if (index == 0 || index == 1 || index == sylvan_invalid) continue;
+        if (is_node_dead(index)) {
+            delete_node_ref(index);
+#if !SYLVAN_USE_LINEAR_PROBING
+            llmsset_clear_one_hash(nodes, index);
+            llmsset_clear_one_data(nodes, index);
+#endif
+        }
+        index = llmsset_next(index);
+    }
+
+#if SYLVAN_USE_LINEAR_PROBING
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+#endif
+
+}
+
 VOID_TASK_IMPL_1(delete_node_ref, size_t, index)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
     var_dec(mtbddnode_getvariable(f));
-
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
         if (f1 != sylvan_invalid && (f1 & SYLVAN_TABLE_MASK_INDEX) != 0 && (f1 & SYLVAN_TABLE_MASK_INDEX) != 1) {
             node_ref_dec(f1);
             ref_dec(mtbdd_getvar(f1));
         }
-
         MTBDD f0 = mtbddnode_getlow(f);
         if (f0 != sylvan_invalid && (f0 & SYLVAN_TABLE_MASK_INDEX) != 0 && (f0 & SYLVAN_TABLE_MASK_INDEX) != 1) {
             node_ref_dec(f0);
