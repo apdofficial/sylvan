@@ -346,11 +346,9 @@ int mtbdd_newlevels(size_t amount)
         levels->level_to_order = (half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
         levels->order_to_level = (half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
 
-        if (levels->table == 0 ||
-            levels->level_to_order == 0 ||
-            levels->order_to_level == 0) {
-            fprintf(stderr, "mtbdd_newlevels failed to allocate new memory!");
-            return 0;
+        if (levels->table == NULL || levels->level_to_order == NULL || levels->order_to_level == NULL) {
+            fprintf(stderr, "mtbdd_newlevels failed to realloc new memory: %s!\n", strerror(errno));
+            exit(1);
         }
     }
     for (size_t i = 0; i < amount; i++) {
@@ -365,7 +363,7 @@ int mtbdd_newlevels(size_t amount)
 int mtbdd_levels_makenode(uint32_t level, MTBDD low, MTBDD high)
 {
     if (level >= levels->count) {
-        fprintf(stderr, "mtbdd_levels_makenode failed. Out of bounds level.");
+        fprintf(stderr, "mtbdd_levels_makenode failed. Out of level bounds.");
         return 0;
     }
 

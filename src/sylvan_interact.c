@@ -17,7 +17,7 @@ char interact_malloc(levels_t dbs)
     dbs->bitmap_i = NULL;
     dbs->bitmap_i = (atomic_word_t *) alloc_aligned(dbs->bitmap_i_size);
 
-    if (dbs->bitmap_i == 0) {
+    if (dbs->bitmap_i == NULL) {
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
@@ -98,12 +98,14 @@ void interact_print_state(const levels_t dbs)
  *  F00 F01 F10 F11
  */
 #define find_support(f, bitmap_s, bitmap_g, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_g, bitmap_l)
-VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, bitmap_g, atomic_word_t *, bitmap_l)
+VOID_TASK_4(find_support, MTBDD, f, atomic_word_t*, bitmap_s, atomic_word_t*, bitmap_g, atomic_word_t*, bitmap_l)
 {
     uint64_t index = f & MASK_INDEX;
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
+    (void)bitmap_l;
+    (void)index;
     if (bitmap_atomic_get(bitmap_l, index)) return;
 
     BDDVAR var = mtbdd_getvar(f);
@@ -111,9 +113,10 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t *, bitmap_s, atomic_word_t *, 
     bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
 
     if(!mtbdd_isleaf(f)) {
+        // visit all nodes reachable from <f>
         MTBDD f1 = mtbdd_gethigh(f);
-        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         MTBDD f0 = mtbdd_getlow(f);
+        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
     }
 
@@ -133,7 +136,7 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
     atomic_word_t *bitmap_g = (atomic_word_t *) alloc_aligned(nnodes); // globally visited nodes bitmap (forest wise)
     atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap (tree wise)
 
-    if (bitmap_s == 0 || bitmap_g == 0 || bitmap_l == 0) {
+    if (bitmap_s == NULL || bitmap_g == NULL || bitmap_l == NULL) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
         exit(1);
     }
@@ -155,10 +158,9 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
             continue;
         }
 
+        // visit all nodes reachable from <f>
         MTBDD f1 = mtbddnode_gethigh(node);
         MTBDD f0 = mtbddnode_getlow(node);
-
-        // visit all nodes reachable from <f>
         CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
 

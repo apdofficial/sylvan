@@ -428,7 +428,6 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
-    return bitmap_atomic_set(dbs->bitmap2, index);
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {

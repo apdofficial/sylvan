@@ -203,25 +203,27 @@ size_t bitmap_atomic_prev(atomic_word_t *words, size_t pos)
 int bitmap_atomic_set(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *ptr = words + WORD_INDEX(pos);
-    uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
+    uint64_t v = atomic_load_explicit(ptr, memory_order_acquire);
     word_t mask = BIT_MASK(pos);
     if (v & mask) return 0;
-    atomic_fetch_or(ptr, mask);
+    atomic_fetch_or_explicit(ptr, mask, memory_order_release);
     return 1;
 }
 
 int bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 {
     atomic_word_t *ptr = words + WORD_INDEX(pos);
-    uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
+    uint64_t v = atomic_load_explicit(ptr, memory_order_acquire);
     word_t mask = BIT_MASK(pos);
     if ((v & mask) == 0) return 0;
-    atomic_fetch_and(ptr, ~mask);
+    atomic_fetch_and_explicit(ptr, ~mask, memory_order_release);
     return 1;
 }
 
 int bitmap_atomic_get(atomic_word_t *words, size_t pos)
 {
+    (void)pos;
+    (void)words;
     atomic_word_t *ptr = words + WORD_INDEX(pos);
     uint64_t word = atomic_load_explicit(ptr, memory_order_relaxed);
     return word & BIT_MASK(pos) ? 1 : 0;
