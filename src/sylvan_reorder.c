@@ -599,8 +599,6 @@ static _Atomic (int) re;
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
-    sylvan_gc_test();
-
     char buff[100];
     sylvan_reorder_type_description(type, buff, 100);
 #if SYLVAN_USE_LINEAR_PROBING
@@ -702,7 +700,6 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-    interaction_matrix_init(levels);
     var_ref_init(levels);
 
     // count all variable levels (parallel...)
