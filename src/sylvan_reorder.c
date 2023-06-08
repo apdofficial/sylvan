@@ -14,34 +14,16 @@
  * limitations under the License.
  */
 
-#include <sylvan_int.h>
 #include <sys/time.h>
 #include <stdatomic.h>
 
-#include "sylvan_varswap.h"
-#include "sylvan_levels.h"
-#include "sylvan_reorder.h"
-#include "sylvan_interact.h"
-#include "sylvan_align.h"
+#include <sylvan_int.h>
 
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
-#define INFO 1 // useful information w.r.t. dynamic reordering
+#define INFO 1  // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
 static int print_reordering_stat = 1;
-
-struct sifting_config
-{
-    double t_start_sifting;                     // start time of the sifting
-    uint32_t threshold;                         // threshold for number of nodes per level
-    double max_growth;                          // coefficient used to calculate maximum growth
-    uint32_t max_swap;                          // maximum number of swaps per sifting
-    uint32_t varswap_count;                    // number of swaps completed
-    uint32_t max_var;                           // maximum number of vars swapped per sifting
-    uint32_t total_num_var;                     // number of vars sifted
-    double time_limit_ms;                       // time limit in milliseconds
-    reordering_type_t type;                     // type of reordering algorithm
-};
 
 /// reordering configurations
 static struct sifting_config configs = {
@@ -90,6 +72,67 @@ static inline uint64_t get_nodes_count()
 #else
     return levels_nodes_count_load(levels) + 2;
 #endif
+}
+
+void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
+{
+    (void) buf_len;
+    assert(buf_len >= 100);
+    switch (result) {
+        case SYLVAN_REORDER_ROLLBACK:
+            sprintf(buf, "SYLVAN_REORDER: the operation was aborted and rolled back (%d)", result);
+            break;
+        case SYLVAN_REORDER_SUCCESS:
+            sprintf(buf, "SYLVAN_REORDER: success (%d)", result);
+            break;
+        case SYLVAN_REORDER_P0_CLEAR_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 0, no marked nodes remaining (%d)", result);
+            break;
+        case SYLVAN_REORDER_P1_REHASH_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, no marked nodes remaining (%d)", result);
+            break;
+        case SYLVAN_REORDER_P1_REHASH_FAIL_MARKED:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, and marked nodes remaining (%d)", result);
+            break;
+        case SYLVAN_REORDER_P2_REHASH_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 2, no marked nodes remaining (%d)", result);
+            break;
+        case SYLVAN_REORDER_P2_CREATE_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot create node in phase 2 (ergo marked nodes remaining) (%d)", result);
+            break;
+        case SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash and cannot create node in phase 2 (%d)", result);
+            break;
+        case SYLVAN_REORDER_P3_REHASH_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 3, maybe there are marked nodes remaining (%d)",
+                    result);
+            break;
+        case SYLVAN_REORDER_P3_CLEAR_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot clear in phase 3, maybe there are marked nodes remaining (%d)",
+                    result);
+            break;
+        case SYLVAN_REORDER_NO_REGISTERED_VARS:
+            sprintf(buf, "SYLVAN_REORDER: the operation failed fast because there are no registered variables (%d)",
+                    result);
+            break;
+        case SYLVAN_REORDER_NOT_INITIALISED:
+            sprintf(buf, "SYLVAN_REORDER: please make sure you first initialize reordering (%d)", result);
+            break;
+        case SYLVAN_REORDER_ALREADY_RUNNING:
+            sprintf(buf, "SYLVAN_REORDER: cannot start reordering when it is already running (%d)", result);
+            break;
+        default:
+            sprintf(buf, "SYLVAN_REORDER: UNKNOWN ERROR (%d)", result);
+            break;
+    }
+}
+
+void sylvan_print_reorder_res(reorder_result_t result)
+{
+    char buff[100];
+    sylvan_reorder_resdescription(result, buff, 100);
+    if (!sylvan_reorder_issuccess(result)) fprintf(stderr, "%s\n", buff);
+    else fprintf(stdout, "%s\n", buff);
 }
 
 
@@ -234,7 +277,7 @@ void sylvan_set_reorder_type(reordering_type_t type)
     configs.type = type;
 }
 
-TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
+TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 {
     if (!reorder_initialized) return SYLVAN_REORDER_NOT_INITIALISED;
 #if STATS

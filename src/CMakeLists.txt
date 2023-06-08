@@ -20,7 +20,9 @@ target_sources(sylvan
             sylvan_levels.c
             sylvan_reorder.c
             sylvan_interact.c
-        sylvan_bitmap.c
+            sylvan_bitmap.c
+            roaring.c
+            roaring.h
             libpopcnt.h
         PUBLIC
             sylvan.h
@@ -47,6 +49,8 @@ target_sources(sylvan
             sylvan_interact.h
         sylvan_bitmap.h
         )
+
+find_package(roaring REQUIRED)
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
 target_compile_features(sylvan PUBLIC c_std_11 cxx_std_11)
@@ -89,3 +93,5 @@ if (SYLVAN_USE_LINEAR_PROBING)
 else ()
     target_sources(sylvan PRIVATE sylvan_table_chaining.c)
 endif ()
+
+

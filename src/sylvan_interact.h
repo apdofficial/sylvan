@@ -1,16 +1,9 @@
-//
-// Created by Andrej Pistek on 07/04/2023.
-//
-
 #ifndef SYLVAN_SYLVAN_INTERACT_H
 #define SYLVAN_SYLVAN_INTERACT_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#include "sylvan_bitmap.h"
-#include "sylvan_reorder.h"
 
 char interact_malloc(levels_t dbs);
 
@@ -35,12 +28,6 @@ static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
         x = y;
         y = tmp;
     }
-
-//    if (dbs->bitmap_i == NULL)
-//        return 1; // if the bitmap is not allocated, conservatively return 1 (positive interaction)
-//    // fail fast, if the variable is not registered within our interaction matrix, conservatively return 1 (positive interaction)
-//    if (x >= dbs->bitmap_i_nrows || y >= dbs->bitmap_i_nrows) return 1;
-//    if (x >= dbs->count || y >= dbs->count) return 1;
     return interact_get(dbs, x, y);
 }
 

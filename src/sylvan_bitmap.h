@@ -18,7 +18,7 @@ typedef _Atomic (half_word_t) atomic_half_word_t;
 
 static const size_t npos = (word_t)-1;
 
-#define WORD_INDEX(b)          ((b) / BITS_PER_WORD)
+#define WORD_INDEX(b)           ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)           ((b) % BITS_PER_WORD)
 #define BIT_MASK(b)             ((word_t) 0x8000000000000000LL >> (b))
 #define BIT_FWD_ITER_MASK(b)    (~((word_t) 0x0) >> (b))

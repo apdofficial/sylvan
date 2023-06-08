@@ -43,7 +43,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-
+#include <sylvan_levels.h>
 
 /**
  * An MTBDD is a 64-bit value. The low 40 bits are an index into the unique table.

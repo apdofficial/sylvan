@@ -29,10 +29,12 @@ namespace sylvan {
 /**
  * Sylvan internal header files inside the namespace
  */
-
 #include <sylvan_cache.h>
 #include <sylvan_table.h>
 #include <sylvan_hash.h>
+#include <sylvan_levels.h>
+#include <sylvan_interact.h>
+#include <sylvan_varswap.h>
 
 #ifndef SYLVAN_INT_H
 #define SYLVAN_INT_H
@@ -40,6 +42,10 @@ namespace sylvan {
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+/* 40 bits for the index, 24 bits for the hash */
+#define SYLVAN_TABLE_MASK_INDEX ((uint64_t)0x000000ffffffffff)
+#define SYLVAN_TABLE_MASK_HASH  ((uint64_t)0xffffff0000000000)
 
 /**
  * The levels table used with dynamic variable reordering.

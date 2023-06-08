@@ -1,11 +1,16 @@
 #ifndef SYLVAN_VAR_REORDER_H
 #define SYLVAN_VAR_REORDER_H
 
-#include "sylvan_varswap.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+/**
+ * @brief Callback type
+ */
+LACE_TYPEDEF_CB(void, re_hook_cb);
 
 /**
   @brief Type of reordering algorithm.
@@ -23,15 +28,71 @@ typedef struct sifting_state
     int         best_size;
     uint32_t    low;
     uint32_t    high;
-    int         use_bounds;
 } sifting_state_t;
+
+typedef struct sifting_config {
+    double t_start_sifting;                     // start time of the sifting
+    uint32_t threshold;                         // threshold for number of nodes per level
+    double max_growth;                          // coefficient used to calculate maximum growth
+    uint32_t max_swap;                          // maximum number of swaps per sifting
+    uint32_t varswap_count;                     // number of swaps completed
+    uint32_t max_var;                           // maximum number of vars swapped per sifting
+    uint32_t total_num_var;                     // number of vars sifted
+    double time_limit_ms;                       // time limit in milliseconds
+    reordering_type_t type;                     // type of reordering algorithm
+} sifting_config_t;
 
 typedef int (*re_term_cb)();
 
+typedef enum reorder_result {
+    /// the operation was aborted and rolled back
+    SYLVAN_REORDER_ROLLBACK = 1,
+    /// success
+    SYLVAN_REORDER_SUCCESS = 0,
+    //// cannot clear in phase 0, no marked nodes remaining
+    SYLVAN_REORDER_P0_CLEAR_FAIL = -1,
+    //// cannot rehash in phase 1, no marked nodes remaining
+    SYLVAN_REORDER_P1_REHASH_FAIL = -2,
+    /// cannot rehash in phase 1, and marked nodes remaining
+    SYLVAN_REORDER_P1_REHASH_FAIL_MARKED = -3,
+    /// cannot rehash in phase 2, no marked nodes remaining
+    SYLVAN_REORDER_P2_REHASH_FAIL = -4,
+    /// cannot create node in phase 2 (ergo marked nodes remaining)
+    SYLVAN_REORDER_P2_CREATE_FAIL = -5,
+    /// cannot rehash and cannot create node in phase 2
+    SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -6,
+    //// cannot rehash in phase 3, maybe there are marked nodes remaining
+    SYLVAN_REORDER_P3_REHASH_FAIL = -7,
+    //// cannot clear in phase 3, maybe there are marked nodes remaining
+    SYLVAN_REORDER_P3_CLEAR_FAIL = -8,
+    /// the operation failed fast because there are no registered variables
+    SYLVAN_REORDER_NO_REGISTERED_VARS = -9,
+    /// the operation failed fast because the varswap was not initialised
+    SYLVAN_REORDER_NOT_INITIALISED = -10,
+    /// the operation failed fast because the varswap was already running
+    SYLVAN_REORDER_ALREADY_RUNNING = -11,
+} reorder_result_t;
+
 /**
- * @brief Callback type
+ * @brief Provide description for given result.
+ *
+ * @details Requires buffer with length at least equal to 100
+ *
+ * @param tag
+ * @param result based on which the description is determined
+ * @param buf buffer into which the description will be copied
+ * @param buf_len
  */
-LACE_TYPEDEF_CB(void, re_hook_cb);
+void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len);
+
+static inline int sylvan_reorder_issuccess(reorder_result_t result)
+{
+    return result == SYLVAN_REORDER_SUCCESS ||
+    result == SYLVAN_REORDER_NOT_INITIALISED ||
+    result == SYLVAN_REORDER_ROLLBACK;
+}
+
+void sylvan_print_reorder_res(reorder_result_t result);
 
 /**
  * @brief Add a hook that is called before dynamic variable reordering begins.
