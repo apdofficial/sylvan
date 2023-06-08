@@ -104,10 +104,6 @@ VOID_TASK_IMPL_1(mtbdd_gc_mark_rec, MDD, mtbdd)
     }
 }
 
-/* 40 bits for the index, 24 bits for the hash */
-#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
-#define MASK_HASH  ((uint64_t)0xffffff0000000000)
-
 /**
  * External references
  */
@@ -166,7 +162,7 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, atomic_word_t*, bitmap)
     uint64_t *it = refs_iter(&mtbdd_refs, 0, mtbdd_refs.refs_size);
     while (it != NULL) {
         MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
-        size_t index = (dd & MASK_INDEX);
+        size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
         bitmap_atomic_set(bitmap, index);
     }
 }
