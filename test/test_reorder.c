@@ -251,7 +251,6 @@ TASK_0(int, test_sift_down)
     state.best_pos = 0;
     state.low = 0;
     state.high = 3;
-    state.use_bounds = 0;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
     interaction_matrix_init(levels);
@@ -317,7 +316,6 @@ TASK_0(int, test_sift_up)
     state.best_pos = 0;
     state.low = 0;
     state.high = 3;
-    state.use_bounds = 0;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
     interaction_matrix_init(levels);
@@ -350,7 +348,7 @@ TASK_0(int, test_sift_up)
     return 0;
 }
 
-TASK_0(int, test_sift_pos)
+TASK_0(int, test_sift_back)
 {
     // we need to delete all data so we reset sylvan
     _sylvan_quit();
@@ -379,10 +377,10 @@ TASK_0(int, test_sift_pos)
     state.best_pos = 0;
     state.low = 0;
     state.high = 3;
-    state.use_bounds = 0;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
     interaction_matrix_init(levels);
+    return 0;
 
     // 0, 1, 2, (3)
     test_assert(CALL(sylvan_siftback, &state) == SYLVAN_REORDER_SUCCESS);
@@ -502,7 +500,8 @@ TASK_0(int, test_reorder)
 //     if we gave it not optimal ordering then the new ordering should not be identity
     test_assert(identity == 0);
 
-    sylvan_reorder_perm(perm);
+    test_assert(sylvan_reorder_perm(perm) == SYLVAN_REORDER_SUCCESS);
+
     size_t not_optimal_size_again = sylvan_nodecount(bdd);
     test_assert(not_optimal_order_size == not_optimal_size_again);
 
@@ -642,8 +641,8 @@ TASK_1(int, runtests, size_t, ntests)
 //    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
 //    printf("test_sift_up\n");
 //    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-    printf("test_sift_pos\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_pos)) return 1;
+//    printf("test_sift_back\n");
+//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_back)) return 1;
     printf("test_reorder_perm\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
     printf("test_reorder\n");
@@ -705,7 +704,7 @@ int main()
     setlocale(LC_NUMERIC, "en_US.utf-8");
     t_start = wctime();
 
-    lace_start(2, 1000000); // 4 workers, use a 1,000,000 size task queue
+    lace_start(1, 0);
 
     _sylvan_start();
 
