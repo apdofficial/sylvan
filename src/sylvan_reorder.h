@@ -245,8 +245,8 @@ TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
 #define sylvan_pre_reorder(type) RUN(sylvan_pre_reorder, type)
 VOID_TASK_DECL_1(sylvan_pre_reorder, reordering_type_t)
 
-#define sylvan_post_reorder(leaf_count) RUN(sylvan_post_reorder, leaf_count)
-VOID_TASK_DECL_1(sylvan_post_reorder, size_t)
+#define sylvan_post_reorder() RUN(sylvan_post_reorder)
+VOID_TASK_DECL_0(sylvan_post_reorder)
 
 #ifdef __cplusplus
 }

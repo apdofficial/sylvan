@@ -641,12 +641,12 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     configs.total_num_var = 0;
 }
 
-VOID_TASK_IMPL_1(sylvan_post_reorder, size_t, leaf_count)
+VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
     size_t after_size = llmsset_count_marked(nodes);
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
-    size_t new_size_threshold = (after_size - leaf_count + 1) * SYLVAN_REORDER_SIZE_RATIO + leaf_count;
+    size_t new_size_threshold = (after_size + 1) * SYLVAN_REORDER_SIZE_RATIO;
     if (levels->reorder_count < SYLVAN_REORDER_LIMIT || new_size_threshold > levels->reorder_size_threshold) {
         levels->reorder_size_threshold = new_size_threshold;
     } else {
@@ -672,75 +672,6 @@ VOID_TASK_IMPL_1(sylvan_post_reorder, size_t, leaf_count)
     sylvan_timer_stop(SYLVAN_RE);
 }
 
-VOID_TASK_0(sylvan_test_sift)
-{
-    interaction_matrix_init(levels);
-    var_ref_init(levels);
-
-    int perm_add4[208] = {
-            5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 3, 2, 1, 0,
-            0, 1, 2, 3, 4, 5, 6, 7, 7,
-            6, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 7, 8,
-            8, 7, 6, 5, 4, 3, 2, 1, 0, 0,
-            1, 2, 3, 4, 5, 6, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2,
-            0, 0, 1, 2, 3, 4, 5, 6, 7, 8,
-            8, 7, 6, 5, 0, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 9, 10, 10, 9, 8, 7, 6, 5, 5, 6, 7, 8, 9, 12, 12, 11, 10, 9,
-            8, 7, 6, 5, 4, 3, 2, 1, 0, 10,
-            10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
-    };
-    int perm_add8[745] = {
-            14, 15, 16, 17, 18, 19, 20, 21, 22, 22, 21, 20, 19, 18, 17, 16, 15, 14, 14, 15, 16, 17, 18, 19, 20, 15, 16,
-            16, 15, 14, 13, 12, 11, 10, 9,
-            8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9,
-            10, 11, 12, 13, 14, 15, 16, 17,
-            18, 13, 14, 15, 16, 17, 18, 19, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9, 10, 11, 12, 13, 14, 15, 16,
-            11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
-            0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 17, 16, 11, 10, 9, 8, 7, 6, 5, 4,
-            3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-            13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 16, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6,
-            7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-            16, 15, 14, 13, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 12, 11, 10,
-            9, 8, 7, 6, 5, 4, 9, 8, 7, 6, 5, 4,
-            3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8,
-            9, 10, 10, 9, 8, 7, 6, 11, 10, 9,
-            8, 7, 6, 5, 4, 3, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15, 14, 13, 12, 11, 10, 9, 8, 10, 9, 8,
-            7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5,
-            6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1,
-            2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
-            14, 15, 16, 17, 18, 19, 19, 18, 17, 16, 15, 14, 11, 10, 9, 8, 7, 6, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-            16, 15, 14, 13, 9, 8, 7, 6, 5, 4, 3, 2,
-            1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 20, 19, 18, 17, 8, 7, 6, 5, 4, 3,
-            2, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-            12, 13, 14, 15, 16, 17, 18, 18, 17, 16, 15, 14, 16, 17, 18, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 9, 10,
-            11, 12, 13, 14, 6, 5, 4, 3, 2, 1, 1, 2, 3,
-            4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 17, 16, 15, 14, 13, 12, 11, 10, 9, 3, 2, 1, 1, 2, 3, 4, 5,
-            6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-            16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 13,
-            12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 20, 20,
-            19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-            10, 11, 12, 13, 14, 14, 13, 12, 11, 10,
-            9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 22, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 8, 9, 10, 11,
-            12, 13, 14, 15, 16, 17, 18, 19, 20, 24,
-            24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 23, 22, 21, 20,
-            19, 18, 17, 16, 15, 14, 13, 12, 11, 10,
-            9, 8, 7, 6, 5, 4, 3, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15,
-            14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4,
-            3, 2, 1, 0
-    };
-    (void) perm_add4;
-    (void) perm_add8;
-
-    int size_add8 = 745;
-    int size_add4 = 208;
-    (void) size_add8;
-    (void) size_add4;
-
-    for (int i = 0; i < size_add8; i++) {
-        int pos = perm_add8[i];
-        CALL(sylvan_varswap, pos);
-    }
-}
-
 VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
 {
     reorder_result_t result = SYLVAN_REORDER_SUCCESS;
@@ -750,9 +681,6 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         sylvan_print_reorder_res(result);
         return;
     }
-//    int zero = 0;
-    size_t leaf_count = 0;
-    (void) type;
     sylvan_pre_reorder(type);
     switch (type) {
         case SYLVAN_REORDER_SIFT:
@@ -766,7 +694,7 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         sylvan_print_reorder_res(result);
     }
     re = 0;
-    sylvan_post_reorder(leaf_count);
+    sylvan_post_reorder();
 }
 
 TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
