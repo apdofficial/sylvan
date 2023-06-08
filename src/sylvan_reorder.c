@@ -717,7 +717,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
 
-    size_t cursize = llmsset_count_marked(nodes) + 2;
+    size_t cursize = get_nodes_count();
 
     for (int i = 0; i < (int) levels->count; i++) {
         int lvl = ordered_levels[i];
@@ -735,9 +735,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             // we are in the lower half of the levels, so sift down first and then up
             // sifting down
             for (; pos < high; pos++) {
-                res = CALL(sylvan_varswap, pos);
+                res = sylvan_varswap(pos);
                 if (sylvan_reorder_issuccess(res) == 0) break;
-                cursize = llmsset_count_marked(nodes) + 2;
+                cursize = get_nodes_count();
                 configs.varswap_count++;
                 if (should_terminate_sifting(&configs)) break;
                 if ((double) cursize > (double) bestsize * configs.max_growth) {
@@ -752,9 +752,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             if (sylvan_reorder_issuccess(res)) {
                 // sifting up
                 for (; pos > low; pos--) {
-                    res = CALL(sylvan_varswap, pos - 1);
+                    res = sylvan_varswap(pos - 1);
                     if (sylvan_reorder_issuccess(res) == 0) break;
-                    cursize = llmsset_count_marked(nodes) + 2;
+                    cursize = get_nodes_count();
                     configs.varswap_count++;
                     if (should_terminate_sifting(&configs)) break;
                     if ((double) cursize > (double) bestsize * configs.max_growth) {
@@ -771,9 +771,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             // we are in the upper half of the levels, so sift up first and then down
             // sifting up
             for (; pos > low; pos--) {
-                res = CALL(sylvan_varswap, pos - 1);
+                res = sylvan_varswap(pos - 1);
                 if (sylvan_reorder_issuccess(res) == 0) break;
-                cursize = llmsset_count_marked(nodes) + 2;
+                cursize = get_nodes_count();
                 configs.varswap_count++;
                 if (should_terminate_sifting(&configs)) break;
                 if ((double) cursize > (double) bestsize * configs.max_growth) {
@@ -789,9 +789,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             if (sylvan_reorder_issuccess(res)) {
                 // sifting down
                 for (; pos < high; pos++) {
-                    res = CALL(sylvan_varswap, pos);
+                    res = sylvan_varswap(pos);
                     if (sylvan_reorder_issuccess(res) == 0) break;
-                    cursize = llmsset_count_marked(nodes) + 2;
+                    cursize = get_nodes_count();
                     configs.varswap_count++;
                     if (should_terminate_sifting(&configs)) break;
                     if ((double) cursize > (double) bestsize * configs.max_growth) {
@@ -809,17 +809,17 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 
         // optimum variable position restoration
         for (; pos < bestpos; pos++) {
-            res = CALL(sylvan_varswap, pos);
+            res = sylvan_varswap(pos);
             if (sylvan_reorder_issuccess(res) == 0) break;
             configs.varswap_count++;
         }
         for (; pos > bestpos; pos--) {
-            res = CALL(sylvan_varswap, pos - 1);
+            res = sylvan_varswap(pos - 1);
             if (sylvan_reorder_issuccess(res) == 0) break;
             configs.varswap_count++;
         }
 
-        cursize = llmsset_count_marked(nodes) + 2;
+        cursize = get_nodes_count();
 
         if (!sylvan_reorder_issuccess(res) || !sylvan_reorder_issuccess(old_res)) break;
         configs.total_num_var++;
