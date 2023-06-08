@@ -104,7 +104,7 @@ levels_t mtbdd_levels_create();
 /**
  * @brief Free a levels_t object
  */
-void mtbdd_levels_free(levels_t dbs);
+void levels_free(levels_t dbs);
 
 void levels_var_count_malloc(size_t new_size);
 

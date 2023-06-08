@@ -317,7 +317,7 @@ levels_bitmap_p3_free()
 
 
 void
-mtbdd_levels_free(levels_t dbs)
+levels_free(levels_t dbs)
 {
     mtbdd_resetlevels();
     free_aligned(dbs, sizeof(struct levels_db));

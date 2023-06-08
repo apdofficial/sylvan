@@ -82,7 +82,6 @@ static re_hook_entry_t progre_list;
 
 static inline uint64_t get_nodes_count()
 {
-//    return llmsset_count_marked(nodes) + 2;
 #if STATS
     assert(levels_nodes_count_load(levels) == (llmsset_count_marked(nodes)));
 #endif
@@ -104,7 +103,6 @@ void sylvan_reorder_type_description(reordering_type_t type, char *buf, size_t b
             break;
         case SYLVAN_REORDER_SIFT:
             sprintf(buf, "sifting");
-
     }
 }
 
@@ -746,7 +744,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
     mtbdd_mark_threshold(ordered_levels, level_counts, 0);
     gnome_sort(ordered_levels, level_counts);
 
-    reorder_result_t res;
+    reorder_result_t res = SYLVAN_REORDER_SUCCESS;
 
     size_t cursize = llmsset_count_marked(nodes) + 2;
 

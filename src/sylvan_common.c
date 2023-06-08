@@ -431,6 +431,7 @@ sylvan_quit()
 
     cache_free();
     llmsset_free(nodes);
+    levels_free(levels);
 }
 
 /**

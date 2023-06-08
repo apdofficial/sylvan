@@ -409,7 +409,7 @@ mtbdd_quit()
         mtbdd_protected_created = 0;
     }
 
-    mtbdd_levels_free(levels);
+    levels_free(levels);
 
     mtbdd_initialized = 0;
 }
