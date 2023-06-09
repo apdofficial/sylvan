@@ -19,8 +19,8 @@
  * Sylvan: parallel MTBDD/ListDD package.
  * Include this file for access to internals.
  */
-
 #include <sylvan.h>
+#include <sylvan_reorder_int.h> // roaring.h conflicts in sylvan namespace
 
 #ifdef __cplusplus
 namespace sylvan {
@@ -46,6 +46,11 @@ extern "C" {
 /* 40 bits for the index, 24 bits for the hash */
 #define SYLVAN_TABLE_MASK_INDEX ((uint64_t)0x000000ffffffffff)
 #define SYLVAN_TABLE_MASK_HASH  ((uint64_t)0xffffff0000000000)
+
+/**
+ * The reorder table used with dynamic variable reordering.
+ */
+extern reorder_db_t reorder_db;
 
 /**
  * The levels table used with dynamic variable reordering.

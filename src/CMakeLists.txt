@@ -24,6 +24,7 @@ target_sources(sylvan
             roaring.c
             roaring.h
             libpopcnt.h
+            sylvan_reorder_int.c
         PUBLIC
             sylvan.h
             sylvan_bdd.h
@@ -47,10 +48,9 @@ target_sources(sylvan
             sylvan_reorder.h
             sylvan_table.h
             sylvan_interact.h
-        sylvan_bitmap.h
+            sylvan_bitmap.h
+            sylvan_reorder_int.h
         )
-
-find_package(roaring REQUIRED)
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
 target_compile_features(sylvan PUBLIC c_std_11 cxx_std_11)

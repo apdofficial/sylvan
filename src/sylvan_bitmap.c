@@ -222,8 +222,6 @@ int bitmap_atomic_clear(atomic_word_t *words, size_t pos)
 
 int bitmap_atomic_get(atomic_word_t *words, size_t pos)
 {
-    (void)pos;
-    (void)words;
     atomic_word_t *ptr = words + WORD_INDEX(pos);
     uint64_t word = atomic_load_explicit(ptr, memory_order_relaxed);
     return word & BIT_MASK(pos) ? 1 : 0;
