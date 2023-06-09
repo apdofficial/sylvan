@@ -57,7 +57,7 @@ TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorde
 */
 VOID_TASK_DECL_3(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *)
 
-#define sylvan_varswap_p2(result) CALL(sylvan_varswap_p2, 0, levels->bitmap_p2_size, result)
+#define sylvan_varswap_p2(result) CALL(sylvan_varswap_p2, 0, nodes->table_size, result)
 
 /*!
    @brief Adjacent variable swap phase 3
@@ -91,8 +91,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     BDDVAR x = levels->level_to_order[pos];
     BDDVAR y = levels->level_to_order[pos + 1];
     int isolated = -(levels_is_isolated(levels, x) + levels_is_isolated(levels, y));
-
-    levels_bitmap_p2_realloc(nodes->table_size);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(levels, x, y) == 0) { }
@@ -242,6 +240,14 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
             continue; // not <var> or <var+1>
         }
 
+        // level = <var>
+        if (mtbddnode_getmark(node)) {
+            // marked node, remove mark and rehash (we are apparently recovering)
+            mtbddnode_setmark(node, 0);
+            llmsset_rehash_bucket(nodes, first);
+            continue;
+        }
+
         if (mtbddnode_ismapnode(node)) {
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
@@ -264,14 +270,16 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                     }
                 } else {
                     // mark for phase 2
-                    levels_p2_set(it->current_value);
+//                    levels_p2_set(it->current_value);
+                    mtbddnode_setmark(node, 1);
                     marked++;
                 }
             }
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
-                levels_p2_set(it->current_value);
+//                levels_p2_set(it->current_value);
+                mtbddnode_setmark(node, 1);
                 marked++;
             } else {
                 var_inc(var + 1);
@@ -317,9 +325,19 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
 
     const size_t end = first + count;
 
-    for (first = levels_p2_next(first - 1); first < end; first = levels_p2_next(first)) {
+    roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->node_ids);
+    nodes_iterator_t *it = roaring_create_iterator(tmp);
+    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
+
+    while (it->has_value && it->current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
-        mtbddnode_t node = MTBDD_GETNODE(first);
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        if (mtbddnode_isleaf(node)) continue; // a leaf
+        if (!mtbddnode_getmark(node)) continue; // an unmarked node
+
         BDDVAR var = mtbddnode_getvariable(node);
         if (mtbddnode_ismapnode(node)) {
             // it is a map node, swap places with next in chain
@@ -336,7 +354,7 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);
-            llmsset_rehash_bucket(nodes, first);
+            llmsset_rehash_bucket(nodes, index);
         } else {
             MTBDD newf1, newf0, f1, f0, f11, f10, f01, f00;
             int created0, created1 = 0;
@@ -394,7 +412,7 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
 
             // update node, which also removes the mark
             mtbddnode_makenode(node, var, newf0, newf1);
-            llmsset_rehash_bucket(nodes, first);
+            llmsset_rehash_bucket(nodes, index);
         }
     }
 }
