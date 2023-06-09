@@ -230,7 +230,7 @@ reorder_config_t sylvan_get_reorder_config()
 
 void sylvan_set_reorder_nodes_threshold(uint32_t threshold)
 {
-    assert(threshold > 1);
+    assert(threshold > 0);
     configs.threshold = threshold;
 }
 
@@ -843,11 +843,10 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-    // parallel
     interaction_matrix_init(levels);
     var_ref_init(levels);
 
-    // count all variable levels (parallel...)
+    // count all variable levels
     _Atomic (size_t) level_counts[levels->count];
     for (size_t i = 0; i < levels->count; i++) {
         level_counts[i] = levels_var_count_load(levels, levels->level_to_order[i]);
@@ -955,7 +954,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
         configs.total_num_var++;
 #if STATS
-        //        if (i > 4) exit(1);
+        if (i > 3) exit(1);
 #endif
         continue;
 
