@@ -115,7 +115,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_varswap_p3(pos, &result);
         }
-        levels_p2_clear_all();
     }
 
     sylvan_varswap_p4();
@@ -270,7 +269,6 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                     }
                 } else {
                     // mark for phase 2
-//                    levels_p2_set(it->current_value);
                     mtbddnode_setmark(node, 1);
                     marked++;
                 }
@@ -278,7 +276,6 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
-//                levels_p2_set(it->current_value);
                 mtbddnode_setmark(node, 1);
                 marked++;
             } else {
@@ -437,6 +434,7 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
 
 VOID_TASK_IMPL_0(sylvan_varswap_p4)
 {
+    // we will be removing items from the bitmap so we copy the current one first and use that one instead
     roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->node_ids);
     nodes_iterator_t *it = roaring_create_iterator(tmp);
     roaring_move_uint32_iterator_equalorlarger(it, 2);

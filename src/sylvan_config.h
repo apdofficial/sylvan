@@ -57,4 +57,4 @@
   * too small is bad for the atomic operations, too large is bad for work-stealing
   * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
   */
-#define BLOCKSIZE (4096 * 100)
+#define BLOCKSIZE 4096

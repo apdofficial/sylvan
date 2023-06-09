@@ -96,8 +96,6 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t*, bitmap_s, atomic_word_t*, bi
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
-    (void)bitmap_l;
-    (void)index;
     if (bitmap_atomic_get(bitmap_l, index)) return;
 
     BDDVAR var = mtbdd_getvar(f);
@@ -108,8 +106,9 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t*, bitmap_s, atomic_word_t*, bi
         // visit all nodes reachable from <f>
         MTBDD f1 = mtbdd_gethigh(f);
         MTBDD f0 = mtbdd_getlow(f);
-        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
+        SPAWN(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
+        SYNC(find_support);
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
@@ -136,37 +135,38 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
     while (it->has_value && it->current_value < nodes->table_size) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new search from it.
-        mtbddnode_t node = MTBDD_GETNODE(it->current_value);
+        mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) {
             // if the node was a leaf, job done
-            roaring_advance_uint32_iterator(it);
             continue;
         }
 
-        if (bitmap_atomic_get(bitmap_g, it->current_value) == 1) {
+        if (bitmap_atomic_get(bitmap_g, index) == 1) {
             // already visited node, thus can not be a root and we can skip it
-            roaring_advance_uint32_iterator(it);
             continue;
         }
 
         // visit all nodes reachable from <f>
         MTBDD f1 = mtbddnode_gethigh(node);
         MTBDD f0 = mtbddnode_getlow(node);
-        CALL(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
+        SPAWN(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
         CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
+        SYNC(find_support);
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
         bitmap_atomic_set(bitmap_s, dbs->level_to_order[var]);
 
         // clear locally visited nodes bitmap,
+        // TODO: investigate: it is a hotspot of this function takes cca 10 - 20% of the runtime aand it scales with the table size :(
         clear_aligned(bitmap_l, nnodes);
         // update interaction matrix
         interact_update(dbs, bitmap_s);
-        roaring_advance_uint32_iterator(it);
     }
 
 
@@ -178,7 +178,13 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
 VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
 {
     levels_nodes_count_set(dbs, 2);
-    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+
+    nodes_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value && it->current_value < nodes->table_size) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
         if (index == 0 || index == 1) continue;
         levels_nodes_count_add(dbs, 1);
 
@@ -201,7 +207,12 @@ VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
         }
     }
 
-    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
+    it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value && it->current_value < nodes->table_size) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
         if (index == 0 || index == 1) continue;
         mtbddnode_t node = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(node);

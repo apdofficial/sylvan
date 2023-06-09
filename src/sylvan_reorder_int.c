@@ -23,6 +23,6 @@ reorder_db_t reorder_db_create()
 
 void reorder_db_destroy()
 {
-    assert(is_db_available());
+    if (!is_db_available()) return;
     roaring_bitmap_free(reorder_db->node_ids);
 }
