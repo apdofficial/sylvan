@@ -86,10 +86,10 @@ levels_var_count_add(levels_t dbs, size_t idx, int val)
 {
     if (dbs->var_count_size == 0) return;
     counter_t curr = levels_var_count_load(dbs, idx);
-    if (curr == 0 && val < 0)  return; // avoid underflow
+    if (curr == 0 && val < 0) return; // avoid underflow
     if ((curr + val) >= counter_t_max) return;// avoid overflow
     if (idx >= dbs->var_count_size) return;// avoid out of bounds access
-    atomic_counter_t* ptr = &dbs->var_count[idx];
+    atomic_counter_t *ptr = &dbs->var_count[idx];
     atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
 }
 
@@ -134,8 +134,7 @@ levels_node_ref_count_load(levels_t dbs, size_t idx)
 {
     if (dbs->node_ref_count_size == 0) {
         return 0;
-    }
-    else {
+    } else {
         atomic_counter_t *ptr = &dbs->node_ref_count[idx];
         return atomic_load_explicit(ptr, memory_order_relaxed);
     }
@@ -316,7 +315,13 @@ levels_bitmap_p3_free()
 void
 levels_free(levels_t dbs)
 {
-    mtbdd_resetlevels();
+    levels_var_count_free();
+    levels_ref_count_free();
+    levels_node_ref_count_free();
+    interact_free(levels);
+    levels_bitmap_ext_free();
+    levels_bitmap_p2_free();
+
     free_aligned(dbs, sizeof(struct levels_db));
 }
 
