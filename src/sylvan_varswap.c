@@ -96,7 +96,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(levels, x, y) == 0) { }
-
     sylvan_clear_cache();
 
 #if SYLVAN_USE_LINEAR_PROBING
@@ -161,14 +160,22 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count,
         count = count + first - 2;
         first = 2;
     }
+
     const size_t end = first + count;
-    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
-        mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
+    nodes_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, first);
+
+    while (it->has_value && it->current_value < end) {
+        mtbddnode_t node = MTBDD_GETNODE(it->current_value);
+        if (mtbddnode_isleaf(node)) {
+            roaring_advance_uint32_iterator(it);
+            continue; // a leaf
+        }
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            llmsset_clear_one_hash(nodes, first);
+            llmsset_clear_one_hash(nodes, it->current_value);
         }
+        roaring_advance_uint32_iterator(it);
     }
 }
 
@@ -207,10 +214,16 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
 
     const size_t end = first + count;
 
-    for (first = llmsset_next(first - 1); first < end; first = llmsset_next(first)) {
+    nodes_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return marked;
+
+    while (it->has_value && it->current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
-        mtbddnode_t node = MTBDD_GETNODE(first);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
+        mtbddnode_t node = MTBDD_GETNODE(it->current_value);
+        if (mtbddnode_isleaf(node)) {
+            roaring_advance_uint32_iterator(it);
+            continue; // a leaf
+        }
         uint32_t nvar = mtbddnode_getvariable(node);
 
         if (nvar == (var + 1)) {
@@ -218,12 +231,14 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
             var_inc(var);
             var_dec(var + 1);
             mtbddnode_setvariable(node, var);
-            if (llmsset_rehash_bucket(nodes, first) != 1) {
+            if (llmsset_rehash_bucket(nodes, it->current_value) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                 return marked;
             }
+            roaring_advance_uint32_iterator(it);
             continue;
         } else if (nvar != var) {
+            roaring_advance_uint32_iterator(it);
             continue; // not <var> or <var+1>
         }
 
@@ -234,7 +249,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                 var_inc(var + 1);
                 var_dec(var);
                 mtbddnode_setvariable(node, var + 1);
-                llmsset_rehash_bucket(nodes, first);
+                llmsset_rehash_bucket(nodes, it->current_value);
             } else {
                 // not the end of a chain, so f0 is the next in chain
                 uint32_t vf0 = mtbdd_getvar(f0);
@@ -243,31 +258,32 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                     var_inc(var + 1);
                     var_dec(var);
                     mtbddnode_setvariable(node, var + 1);
-                    if (!llmsset_rehash_bucket(nodes, first)) {
+                    if (!llmsset_rehash_bucket(nodes, it->current_value)) {
                         atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                         return marked;
                     }
                 } else {
                     // mark for phase 2
-                    levels_p2_set(first);
+                    levels_p2_set(it->current_value);
                     marked++;
                 }
             }
         } else {
             if (is_node_dependent_on(node, var)) {
                 // mark for phase 2
-                levels_p2_set(first);
+                levels_p2_set(it->current_value);
                 marked++;
             } else {
                 var_inc(var + 1);
                 var_dec(var);
                 mtbddnode_setvariable(node, var + 1);
-                if (!llmsset_rehash_bucket(nodes, first)) {
+                if (!llmsset_rehash_bucket(nodes, it->current_value)) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
                     return marked;
                 }
             }
         }
+        roaring_advance_uint32_iterator(it);
     }
     return marked;
 }
@@ -403,21 +419,23 @@ VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
 
 VOID_TASK_IMPL_0(sylvan_varswap_p4)
 {
-    // gc the dead nodes
-    size_t index = llmsset_next(1);
-    while (index != llmsset_nindex) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) {
-            index = llmsset_next(index);
-        }
+    roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->node_ids);
+    nodes_iterator_t *it = roaring_create_iterator(tmp);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value && it->current_value < nodes->table_size) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
         if (is_node_dead(index)) {
             delete_node_ref(index);
 #if !SYLVAN_USE_LINEAR_PROBING
             llmsset_clear_one_hash(nodes, index);
             llmsset_clear_one_data(nodes, index);
+            roaring_bitmap_remove(reorder_db->node_ids, index);
 #endif
         }
-        index = llmsset_next(index);
     }
+    roaring_bitmap_free(tmp);
 
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();

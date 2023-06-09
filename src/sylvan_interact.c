@@ -132,20 +132,23 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
         exit(1);
     }
 
-    for (size_t index = llmsset_first(); index < nodes->table_size; index = llmsset_next(index)) {
-        if (index == 0 || index == 1 || index == sylvan_invalid) continue; // reserved sylvan nodes
+    nodes_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
 
+    while (it->has_value && it->current_value < nodes->table_size) {
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new search from it.
-        mtbddnode_t node = MTBDD_GETNODE(index);
+        mtbddnode_t node = MTBDD_GETNODE(it->current_value);
         if (mtbddnode_isleaf(node)) {
             // if the node was a leaf, job done
+            roaring_advance_uint32_iterator(it);
             continue;
         }
 
-        if (bitmap_atomic_get(bitmap_g, index) == 1) {
+        if (bitmap_atomic_get(bitmap_g, it->current_value) == 1) {
             // already visited node, thus can not be a root and we can skip it
+            roaring_advance_uint32_iterator(it);
             continue;
         }
 
@@ -163,6 +166,7 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
         clear_aligned(bitmap_l, nnodes);
         // update interaction matrix
         interact_update(dbs, bitmap_s);
+        roaring_advance_uint32_iterator(it);
     }
 
 

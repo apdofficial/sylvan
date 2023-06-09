@@ -46,7 +46,9 @@ claim_data_bucket(const llmsset_t dbs)
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
-                    return (8 * my_region + i) * 64 + j;
+                    size_t index = (8 * my_region + i) * 64 + j;
+                    roaring_bitmap_add(reorder_db->node_ids, index);
+                    return index;
                 }
                 i++;
                 ptr++;
@@ -407,6 +409,7 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
 
     // forbid first two positions (index 0 and 1)
     dbs->bitmap2[0] = 0xc000000000000000LL;
+    roaring_bitmap_clear(reorder_db->node_ids);
 
     TOGETHER(llmsset_reset_region);
 }
@@ -428,6 +431,7 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
+    roaring_bitmap_add(reorder_db->node_ids, index);
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {
