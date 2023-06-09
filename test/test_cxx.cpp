@@ -120,7 +120,7 @@ TASK_0(int, runtests)
 int main()
 {
     // Standard Lace initialization with 4 workers
-    lace_start(4, 0);
+    lace_start(1, 0);
 
     // Simple Sylvan initialization, also initialize BDD support
     Sylvan::initPackage(1LL<<16, 1LL<<16, 1LL<<16, 1LL<<16);

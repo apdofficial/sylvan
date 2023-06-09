@@ -458,7 +458,6 @@ int main()
     // Simple Sylvan initialization, also initialize BDD, MTBDD and LDD support
     sylvan_set_sizes(1LL<<20, 1LL<<20, 1LL<<16, 1LL<<16);
     sylvan_init_package();
-    sylvan_init_bdd();
     sylvan_init_mtbdd();
     sylvan_init_ldd();
 
