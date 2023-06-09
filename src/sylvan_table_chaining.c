@@ -47,7 +47,9 @@ claim_data_bucket(const llmsset_t dbs)
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
                     size_t index = (8 * my_region + i) * 64 + j;
-                    roaring_bitmap_add(reorder_db->node_ids, index);
+                    if (reorder_db != NULL && reorder_db->node_ids != NULL){
+                        roaring_bitmap_add(reorder_db->node_ids, index);
+                    }
                     return index;
                 }
                 i++;
