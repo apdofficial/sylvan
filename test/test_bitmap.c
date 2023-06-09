@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include "test_assert.h"
-#include "sylvan_int.h"
-#include "sylvan_levels.h"
 #include "common.h"
 #include <sylvan_align.h>
 

@@ -4,12 +4,7 @@
 
 #include "sylvan.h"
 #include "test_assert.h"
-#include "sylvan_int.h"
-#include "sylvan_varswap.h"
-#include "sylvan_reorder.h"
-#include "sylvan_levels.h"
 #include "common.h"
-#include "sylvan_interact.h"
 
 /* Obtain current wallclock time */
 static double
@@ -695,7 +690,6 @@ void _sylvan_start(){
 
 void _sylvan_quit(){
     sylvan_quit();
-    sylvan_quit_reorder();
 }
 
 

@@ -9,9 +9,7 @@
 #include <sys/time.h>
 #include <inttypes.h>
 
-#include "sylvan.h"
 #include "test_assert.h"
-#include "sylvan_int.h"
 #include "common.h"
 
 static int
