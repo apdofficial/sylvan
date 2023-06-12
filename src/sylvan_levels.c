@@ -74,11 +74,7 @@ MTBDD
 mtbdd_newlevel(void)
 {
     mtbdd_newlevels(1);
-    atomic_bitmap_t bitmap = {
-        .container = levels->table,
-        .size = levels->count
-    };
-    return atomic_bitmap_get(&bitmap, levels->count - 1);
+    return levels->table[levels->count - 1];
 }
 
 int mtbdd_newlevels(size_t amount)
