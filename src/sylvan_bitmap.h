@@ -9,19 +9,22 @@
 extern "C" {
 #endif /* __cplusplus */
 
+// use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
+typedef uint64_t bitmap_container_t;
+
 typedef struct bitmap_s {
-    uint64_t *container; // use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
+    bitmap_container_t *container;
     size_t size;
 } bitmap_t;
 
 typedef struct atomic_bitmap_s {
-    _Atomic (uint64_t) *container; // use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
+    _Atomic (bitmap_container_t) *container;
     size_t size;
 } atomic_bitmap_t;
 
 enum
 {
-    BITS_PER_WORD = sizeof(bitmap_t) * CHAR_BIT,
+    BITS_PER_WORD = sizeof(bitmap_container_t) * CHAR_BIT,
 };
 
 static const size_t npos = (uint64_t)-1;

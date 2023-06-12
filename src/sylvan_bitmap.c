@@ -24,7 +24,7 @@ static inline uint64_t get_first_lsb_one_bit_pos(uint64_t word,  size_t word_idx
 void bitmap_init(bitmap_t* bitmap, size_t new_size)
 {
     bitmap_deinit(bitmap);
-    bitmap->container = (uint64_t *) alloc_aligned(new_size);
+    bitmap->container = (bitmap_container_t *) alloc_aligned(new_size);
     if (bitmap != NULL) bitmap->size = new_size;
     else bitmap->size = 0;
 }
@@ -120,7 +120,7 @@ size_t bitmap_prev(bitmap_t *bitmap, size_t pos)
 
 size_t bitmap_count(bitmap_t *bitmap)
 {
-    return popcnt(bitmap, NUMBER_OF_WORDS(bitmap->size) * 8);
+    return popcnt(bitmap->container, NUMBER_OF_WORDS(bitmap->size) * 8);
 }
 
 inline size_t atomic_bitmap_first(atomic_bitmap_t *bitmap)
@@ -131,7 +131,7 @@ inline size_t atomic_bitmap_first(atomic_bitmap_t *bitmap)
 void atomic_bitmap_init(atomic_bitmap_t* bitmap, size_t new_size)
 {
     atomic_bitmap_deinit(bitmap);
-    bitmap->container = (_Atomic(uint64_t) *) alloc_aligned(new_size);
+    bitmap->container = (_Atomic(bitmap_container_t) *) alloc_aligned(new_size);
     if (bitmap != NULL) bitmap->size = new_size;
     else bitmap->size = 0;
 }
@@ -196,7 +196,7 @@ size_t atomic_bitmap_next(atomic_bitmap_t *bitmap, size_t pos)
 
 inline size_t atomic_bitmap_last(atomic_bitmap_t *bitmap)
 {
-    return atomic_bitmap_last_from(bitmap, 0);
+    return atomic_bitmap_last_from(bitmap, bitmap->size - 1);
 }
 
 size_t atomic_bitmap_last_from(atomic_bitmap_t *bitmap, size_t pos)

@@ -122,31 +122,31 @@ void interact_print_state(const levels_t dbs)
  *  F00 F01 F10 F11
  */
 #define find_support(f, bitmap_s, bitmap_g, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_g, bitmap_l)
-VOID_TASK_4(find_support, MTBDD, f, atomic_bitmap_t*, bitmap_s, atomic_bitmap_t*, bitmap_g, atomic_bitmap_t*, bitmap_l)
+VOID_TASK_4(find_support, MTBDD, f, atomic_bitmap_t*, support, atomic_bitmap_t*, global, atomic_bitmap_t*, local)
 {
     uint64_t index = f & SYLVAN_TABLE_MASK_INDEX;
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
-    if (atomic_bitmap_get(bitmap_l, index)) return;
+    if (atomic_bitmap_get(local, index)) return;
 
     BDDVAR var = mtbdd_getvar(f);
     // set support bitmap, <var> contributes to the outcome of <f>
-    atomic_bitmap_set(bitmap_s, levels->level_to_order[var]);
+    atomic_bitmap_set(support, levels->level_to_order[var]);
 
     if(!mtbdd_isleaf(f)) {
         // visit all nodes reachable from <f>
         MTBDD f1 = mtbdd_gethigh(f);
         MTBDD f0 = mtbdd_getlow(f);
-        SPAWN(find_support, f1, bitmap_s, bitmap_g, bitmap_l);
-        CALL(find_support, f0, bitmap_s, bitmap_g, bitmap_l);
+        SPAWN(find_support, f1, support, global, local);
+        CALL(find_support, f0, support, global, local);
         SYNC(find_support);
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
-    atomic_bitmap_set(bitmap_l, index);
+    atomic_bitmap_set(local, index);
     // globally visited node used to determining root nodes
-    atomic_bitmap_set(bitmap_g, index);
+    atomic_bitmap_set(global, index);
 }
 
 VOID_TASK_IMPL_1(interaction_matrix_init, size_t, nnodes)
