@@ -1,8 +1,6 @@
 #ifndef SYLVAN_VAR_REORDER_H
 #define SYLVAN_VAR_REORDER_H
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */

@@ -157,13 +157,17 @@ mtbdd_count_protected()
 }
 
 /* Called during dynamic variable reordering */
-VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, atomic_bitmap_t*, bitmap)
+VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
 {
     uint64_t *it = refs_iter(&mtbdd_refs, 0, mtbdd_refs.refs_size);
     while (it != NULL) {
         MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
         size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
-        atomic_bitmap_set(bitmap, index);
+        _Atomic(uint64_t) *ptr = bitmap + WORD_INDEX(index);
+        uint64_t v = atomic_load_explicit(ptr, memory_order_acquire);
+        uint64_t mask = BIT_MASK(index);
+        if (v & mask) continue;
+        atomic_fetch_or_explicit(ptr, mask, memory_order_release);
     }
 }
 

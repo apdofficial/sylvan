@@ -1,12 +1,11 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#define counter_t_max UINT16_MAX
-#define atomic_uint_t_max UINT64_MAX
 
 /**
  * When using dynamic variable reordering, it is strongly recommended to use
@@ -20,25 +19,11 @@ typedef struct levels_db {
     size_t                  count;                   // number of created levels
     _Atomic(uint32_t)*      level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*      order_to_level;          // current variable wise level permutation (variable label to level)
-//    atomic_uint64_t         nodes_count;             // number of nodes all nodes in DD
-//    atomic_counter_t*       var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
-//    size_t                  var_count_size;          // size of var_count
-//    atomic_counter_t*       ref_count;               // number of internal references per variable (it expects order wise variable index)
-//    size_t                  ref_count_size;          // size of ref_count
-//    atomic_counter_t*       node_ref_count;          // number of internal references per node (it expects order wise variable index)
-//    size_t                  node_ref_count_size;     // size of node_ref_count
-//    int                     isolated_count;          // number of isolated projection functions
-    _Atomic(uint64_t)*        bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
+    _Atomic(uint64_t)*      bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
     size_t                  bitmap_i_nrows;          // number of rows/ columns
     size_t                  bitmap_i_size;           // size of bitmap_i
-    _Atomic(uint64_t)*        bitmap_p2;               // bitmap used to store reordering phase 2 mark
+    _Atomic(uint64_t)*      bitmap_p2;               // bitmap used to store reordering phase 2 mark
     size_t                  bitmap_p2_size;          // size of bitmap_p2
-    _Atomic(uint64_t)*        bitmap_p3;               // bitmap used to store reordering phase 3 mark
-    size_t                  bitmap_p3_size;          // size of bitmap_p3
-    _Atomic(uint64_t)*        bitmap_ext;              // bitmap used to store external references
-    size_t                  bitmap_ext_size;         // size of bitmap_ext
-    size_t                  reorder_size_threshold;  // reorder if this size is reached
-    size_t                  reorder_count;           // number of reordering calls
 } *levels_t;
 
 /**
@@ -52,42 +37,6 @@ typedef struct levels_db {
 #define levels_p2_set(idx) bitmap_atomic_set(levels->bitmap_p2, idx)
 #define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
 
-#define levels_p3_next(idx) bitmap_atomic_next(levels->bitmap_p3, levels->bitmap_p3_size, idx)
-#define levels_p3_set(idx) bitmap_atomic_set(levels->bitmap_p3, idx)
-#define levels_p3_clear(idx) bitmap_atomic_clear(levels->bitmap_p3, idx)
-#define levels_p3_is_marked(idx) bitmap_atomic_get(levels->bitmap_p3, idx)
-#define levels_p3_clear_all() clear_aligned(levels->bitmap_p3, levels->bitmap_p3_size)
-
-#define levels_ext_first() bitmap_atomic_first(levels->bitmap_ext, levels->bitmap_ext_size)
-#define levels_ext_next(idx) bitmap_atomic_next(levels->bitmap_ext, levels->bitmap_ext_size, idx)
-#define levels_ext_set(idx) bitmap_atomic_set(levels->bitmap_ext, idx)
-#define levels_ext_is_marked(idx) bitmap_atomic_get(levels->bitmap_ext, idx)
-#define levels_ext_clear_all() clear_aligned(levels->bitmap_ext, levels->bitmap_ext_size)
-
-//counter_t levels_ref_count_load(levels_t dbs, size_t idx);
-//
-//void levels_ref_count_add(levels_t dbs, size_t idx, int val);
-//
-//int levels_is_isolated(levels_t dbs, size_t idx);
-//
-//counter_t levels_var_count_load(levels_t dbs, size_t idx);
-//
-//void levels_var_count_add(levels_t dbs, size_t idx, int val);
-//
-//counter_t levels_node_ref_count_load(levels_t dbs, size_t idx);
-//
-//int levels_is_node_dead(levels_t dbs, size_t idx);
-//
-//void levels_node_ref_count_add(levels_t dbs, size_t idx, int val);
-//
-//void levels_node_ref_count_set(levels_t dbs, size_t idx, int val);
-//
-//uint64_t levels_nodes_count_load(levels_t dbs);
-//
-//void levels_nodes_count_add(levels_t dbs, int val);
-//
-//void levels_nodes_count_set(levels_t dbs, int val);
-
 /**
  * @brief Create a new levels_t object
  */
@@ -97,52 +46,12 @@ levels_t mtbdd_levels_create();
  * @brief Free a levels_t object
  */
 void levels_free(levels_t dbs);
-//
-//void levels_var_count_malloc(size_t new_size);
-//
-//void levels_var_count_realloc(size_t new_size);
-//
-//void levels_var_count_free();
-//
-//void levels_ref_count_malloc(size_t new_size);
-//
-//void levels_ref_count_realloc(size_t new_size);
-//
-//void levels_ref_count_free();
-//
-//void levels_node_ref_count_malloc(size_t new_size);
-//
-//void levels_node_ref_count_realloc(size_t new_size);
-//
-//void levels_node_ref_count_free();
-
-void levels_bitmap_ext_malloc(size_t new_size);
-
-void levels_bitmap_ext_realloc(size_t new_size);
-
-void levels_bitmap_ext_free();
 
 void levels_bitmap_p2_malloc(size_t new_size);
 
 void levels_bitmap_p2_realloc(size_t new_size);
 
 void levels_bitmap_p2_free();
-
-void levels_bitmap_p3_malloc(size_t new_size);
-
-void levels_bitmap_p3_realloc(size_t new_size);
-
-void levels_bitmap_p3_free();
-
-VOID_TASK_DECL_3(sylvan_count_nodes, _Atomic(size_t)*, size_t, size_t);
-/**
- * @brief Count the number of nodes per real variable level in parallel.
- * @details Results are stored atomically in arr. To make this somewhat scalable, we use a
- * standard binary reduction pattern with local arrays...
- * Fortunately, we only do this once per call to dynamic variable reordering.
- * \param level_counts array into which the result is stored
- */
-#define sylvan_count_nodes(level_counts) CALL(sylvan_count_levelnodes, level_counts, 0, nodes->table_size)
 
 /**
  * @brief Get the number of levels

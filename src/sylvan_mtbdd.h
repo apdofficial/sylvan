@@ -43,7 +43,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#include <sylvan_levels.h>
+//#include <sylvan_bitmap.h>
 
 /**
  * An MTBDD is a 64-bit value. The low 40 bits are an index into the unique table.
@@ -1078,7 +1078,7 @@ VOID_TASK_DECL_1(mtbdd_gc_mark_rec, MTBDD);
 #define mtbdd_gc_mark_rec(mtbdd) RUN(mtbdd_gc_mark_rec, mtbdd)
 
 
-VOID_TASK_DECL_1(mtbdd_re_mark_external_refs, atomic_bitmap_t*);
+VOID_TASK_DECL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*);
 #define mtbdd_re_mark_external_refs(bitmap) RUN(mtbdd_re_mark_external_refs, bitmap)
 
 

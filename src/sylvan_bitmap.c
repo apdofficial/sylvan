@@ -1,13 +1,9 @@
-#include <sylvan_int.h>
-#include <limits.h>     // for CHAR_BIT
+#include <sylvan_bitmap.h>
+#include <lace.h>
+#include <sylvan_align.h>
+
 #include <stdatomic.h>
 #include <libpopcnt.h>
-#include "sylvan_align.h"
-
-enum
-{
-    BITS_PER_WORD = sizeof(bitmap_t) * CHAR_BIT,
-};
 
 /**
  * @brief Return position of the first most significant 1-bit
@@ -25,16 +21,16 @@ static inline uint64_t get_first_lsb_one_bit_pos(uint64_t word,  size_t word_idx
     return BITS_PER_WORD * word_idx + (64 - __builtin_ctzll(word));
 }
 
-void bitmap_realloc(bitmap_t* bitmap, size_t new_size)
+void bitmap_init(bitmap_t* bitmap, size_t new_size)
 {
-    bitmap_free(bitmap);
+    bitmap_deinit(bitmap);
     bitmap->container = (uint64_t *) alloc_aligned(new_size);
     if (bitmap != NULL) bitmap->size = new_size;
     else bitmap->size = 0;
 }
 
 
-void bitmap_free(bitmap_t *bitmap)
+void bitmap_deinit(bitmap_t *bitmap)
 {
     if (bitmap->container != NULL) free_aligned(bitmap->container, bitmap->size);
     bitmap->size = 0;
@@ -127,12 +123,38 @@ size_t bitmap_count(bitmap_t *bitmap)
     return popcnt(bitmap, NUMBER_OF_WORDS(bitmap->size) * 8);
 }
 
-inline size_t bitmap_atomic_first(atomic_bitmap_t *bitmap)
+inline size_t atomic_bitmap_first(atomic_bitmap_t *bitmap)
 {
     return atomic_bitmap_first_from(bitmap, 0);
 }
 
-size_t bitmap_atomic_first_from(atomic_bitmap_t *bitmap, size_t word_idx)
+void atomic_bitmap_init(atomic_bitmap_t* bitmap, size_t new_size)
+{
+    atomic_bitmap_deinit(bitmap);
+    bitmap->container = (_Atomic(uint64_t) *) alloc_aligned(new_size);
+    if (bitmap != NULL) bitmap->size = new_size;
+    else bitmap->size = 0;
+}
+
+
+void atomic_bitmap_deinit(atomic_bitmap_t *bitmap)
+{
+    if (bitmap->container != NULL) free_aligned(bitmap->container, bitmap->size);
+    bitmap->size = 0;
+    bitmap->container = NULL;
+}
+
+void atomic_bitmap_clear_all(atomic_bitmap_t *bitmap)
+{
+    if (bitmap->container == NULL) {
+        bitmap->size = 0;
+        return;
+    }
+    if (bitmap->size == 0) return;
+    clear_aligned(bitmap->container, bitmap->size);
+}
+
+size_t atomic_bitmap_first_from(atomic_bitmap_t *bitmap, size_t word_idx)
 {
     size_t nwords = NUMBER_OF_WORDS(bitmap->size);
     _Atomic(uint64_t) *ptr = bitmap->container + word_idx;
@@ -152,7 +174,7 @@ size_t bitmap_atomic_first_from(atomic_bitmap_t *bitmap, size_t word_idx)
     }
 }
 
-size_t bitmap_atomic_next(atomic_bitmap_t *bitmap, size_t pos)
+size_t atomic_bitmap_next(atomic_bitmap_t *bitmap, size_t pos)
 {
     if (pos == npos || (pos + 1) >= bitmap->size) return npos;
     pos++;
@@ -172,12 +194,12 @@ size_t bitmap_atomic_next(atomic_bitmap_t *bitmap, size_t pos)
     }
 }
 
-inline size_t bitmap_atomic_last(atomic_bitmap_t *bitmap)
+inline size_t atomic_bitmap_last(atomic_bitmap_t *bitmap)
 {
     return atomic_bitmap_last_from(bitmap, 0);
 }
 
-size_t bitmap_atomic_last_from(atomic_bitmap_t *bitmap, size_t pos)
+size_t atomic_bitmap_last_from(atomic_bitmap_t *bitmap, size_t pos)
 {
     size_t word_idx = WORD_INDEX(pos);
     if (word_idx == 0 || word_idx == npos) return npos;
@@ -198,7 +220,7 @@ size_t bitmap_atomic_last_from(atomic_bitmap_t *bitmap, size_t pos)
     }
 }
 
-size_t bitmap_atomic_prev(atomic_bitmap_t *bitmap, size_t pos)
+size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos)
 {
     if (pos == 0 || pos == npos) return npos;
     pos--;
@@ -217,7 +239,7 @@ size_t bitmap_atomic_prev(atomic_bitmap_t *bitmap, size_t pos)
     }
 }
 
-int bitmap_atomic_set(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
 {
     _Atomic(uint64_t) *ptr = bitmap->container + WORD_INDEX(pos);
     uint64_t v = atomic_load_explicit(ptr, memory_order_acquire);
@@ -227,7 +249,7 @@ int bitmap_atomic_set(atomic_bitmap_t *bitmap, size_t pos)
     return 1;
 }
 
-int bitmap_atomic_clear(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
 {
     _Atomic(uint64_t) *ptr = bitmap->container + WORD_INDEX(pos);
     uint64_t v = atomic_load_explicit(ptr, memory_order_acquire);
@@ -237,7 +259,7 @@ int bitmap_atomic_clear(atomic_bitmap_t *bitmap, size_t pos)
     return 1;
 }
 
-int bitmap_atomic_get(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_get(atomic_bitmap_t *bitmap, size_t pos)
 {
     _Atomic(uint64_t) *ptr = bitmap->container + WORD_INDEX(pos);
     uint64_t word = atomic_load_explicit(ptr, memory_order_relaxed);

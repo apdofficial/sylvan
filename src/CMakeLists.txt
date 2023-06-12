@@ -16,16 +16,16 @@ target_sources(sylvan
             sylvan_sl.c
             sylvan_stats.c
             sylvan_zdd.c
+
+            roaring.c
+            libpopcnt.h
+            sylvan_bitmap.c
+            sylvan_mrc.c
+            sylvan_reorder_db.c
             sylvan_varswap.c
             sylvan_levels.c
             sylvan_reorder.c
             sylvan_interact.c
-            sylvan_bitmap.c
-            roaring.c
-            roaring.h
-            libpopcnt.h
-            sylvan_reorder_int.c
-            sylvan_mrc.c
         PUBLIC
             sylvan.h
             sylvan_bdd.h
@@ -44,14 +44,16 @@ target_sources(sylvan
             sylvan_tls.h
             sylvan_zdd.h
             sylvan_zdd_int.h
+            sylvan_table.h
+            roaring.c
+
+            sylvan_bitmap.h
+            sylvan_mrc.h
+            sylvan_reorder_db.h
             sylvan_varswap.h
             sylvan_levels.h
             sylvan_reorder.h
-            sylvan_table.h
             sylvan_interact.h
-            sylvan_bitmap.h
-            sylvan_reorder_int.h
-            sylvan_mrc.h
         )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})

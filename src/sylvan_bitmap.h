@@ -1,24 +1,28 @@
 #ifndef SYLVAN_BITMAP_H
 #define SYLVAN_BITMAP_H
 
+#include <stddef.h>
+#include <stdint.h>
+#include <limits.h>     // for CHAR_BIT
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-#include <stddef.h>
-#include <stdint.h>
-
-// use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
-
 typedef struct bitmap_s {
-    uint64_t *container;
+    uint64_t *container; // use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
     size_t size;
 } bitmap_t;
 
 typedef struct atomic_bitmap_s {
-    _Atomic (uint64_t) *container;
+    _Atomic (uint64_t) *container; // use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
     size_t size;
 } atomic_bitmap_t;
+
+enum
+{
+    BITS_PER_WORD = sizeof(bitmap_t) * CHAR_BIT,
+};
 
 static const size_t npos = (uint64_t)-1;
 
@@ -32,12 +36,12 @@ static const size_t npos = (uint64_t)-1;
 /*
  * Allocate a new bitmap with the given size
  */
-void bitmap_realloc(bitmap_t* bitmap, size_t new_size);
+void bitmap_init(bitmap_t* bitmap, size_t new_size);
 
 /*
  * Free the bitmap
  */
-void bitmap_free(bitmap_t *counter);
+void bitmap_deinit(bitmap_t *bitmap);
 
 /**
  * Set the bit at position n to 1, if it was 0.
@@ -89,10 +93,25 @@ size_t bitmap_prev(bitmap_t *bitmap, size_t pos);
  */
 size_t bitmap_count(bitmap_t *bitmap);
 
+/*
+ * Allocate a new bitmap with the given size
+ */
+void atomic_bitmap_init(atomic_bitmap_t* bitmap, size_t new_size);
+
+/*
+ * Free the bitmap
+ */
+void atomic_bitmap_deinit(atomic_bitmap_t *bitmap);
+
+/**
+ * Set all bits to 0
+ */
+void atomic_bitmap_clear_all(atomic_bitmap_t *bitmap);
+
 /**
  * Get the first bit set to 1 (atomic version)
  */
-size_t bitmap_atomic_first(atomic_bitmap_t *bitmap);
+size_t atomic_bitmap_first(atomic_bitmap_t *bitmap);
 
 /**
  * Get the first 1-bit position from the given word index (atomic version)
@@ -112,7 +131,7 @@ size_t atomic_bitmap_last_from(atomic_bitmap_t *bitmap, size_t pos);
 /**
  * Get the next bit set to 1 (atomic version)
  */
-size_t bitmap_atomic_next(atomic_bitmap_t *bitmap, size_t pos);
+size_t atomic_bitmap_next(atomic_bitmap_t *bitmap, size_t pos);
 
 /**
  * Get the previous bit set to 1

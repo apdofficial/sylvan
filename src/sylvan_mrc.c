@@ -1,95 +1,265 @@
-#include <sylvan_mrc.h>
-#include <assert.h>
-#include <stdatomic.h>
-#include <stdlib.h>
+#include <sylvan_int.h>
+#include <sylvan_align.h>
 
-void atomic_counters_add(atomic_counters_t* self, size_t idx, int val)
+#include <errno.h>
+
+/**
+ * Atomic counters
+ */
+void atomic_counters_init(atomic_counters_t* self, size_t new_size)
 {
-    assert(self->container != NULL);
-    assert(self->size != 0);
-    assert(val < UINT8_MAX);
-    _Atomic(uint8_t) *ptr = self->container + idx;
-    uint64_t curr = atomic_load_explicit(ptr, memory_order_relaxed);
-    if (curr == 0 && val < 0) return; // underflow
-    if ((curr + val) >= UINT8_MAX) return; // overflow
-    atomic_fetch_add(ptr, val);
+    assert(self != NULL);
+    atomic_counters_deinit(self);
+    self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
+    if (self->container == NULL) {
+        fprintf(stderr, "atomic_counter_realloc: Unable to allocate memory: %s!\n", strerror(errno));
+        exit(1);
+    }
+    self->size = new_size;
 }
 
-void atomic_counters_set(atomic_counters_t* self, size_t idx, uint8_t val)
+void atomic_counters_deinit(atomic_counters_t *self)
+{
+    if (self->container != NULL && self->size > 0) {
+        free_aligned(self->container, self->size);
+    }
+    self->size = 0;
+    self->container = NULL;
+}
+
+void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
     assert(self->container != NULL);
     assert(self->size != 0);
-    if (val >= UINT8_MAX) exit(-1); // overflow, sorry really not allowed
-    _Atomic(uint8_t) *ptr = self->container + idx;
+    counter_t curr = atomic_counters_get(self, idx);
+    if (curr == 0 && val < 0) return;               // underflow
+    if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
+    if (idx >= self->size) return;                  // out of bounds
+    atomic_counter_t *ptr = self->container + idx;
+    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
+}
+
+void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
+{
+    assert(self->container != NULL);
+    assert(self->size != 0);
+    if (val >= COUNTER_T_MAX) return;               // overflow
+    if (idx >= self->size) return;                  // out of bounds
+    atomic_counter_t *ptr = self->container + idx;
     atomic_store(ptr, val);
 }
 
-uint8_t atomic_counters_get(atomic_counters_t* self, size_t idx)
+counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
     assert(self->container != NULL);
     assert(self->size != 0);
-    _Atomic(uint8_t) *ptr = self->container + idx;
+    atomic_counter_t *ptr = self->container + idx;
     return atomic_load_explicit(ptr, memory_order_relaxed);
 }
 
-void mrc_isolated_count_set(mrc_t* self, int val)
+/**
+ * @brief MRC initialization.
+ *
+ * @details Traverse the forest and count the number of nodes and variables and their internal and external references.
+ *
+ * @preconditions
+ * - The forest must be initialized.
+ * - The MRC counters must be freshly initialized.
+ */
+void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_ids)
+{
+    atomic_counters_init(&self->ref_nodes, nnodes);     // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
+    atomic_counters_init(&self->ref_vars, nvars);       // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_counters_init(&self->var_nnodes, nvars);     // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_bitmap_init(&self->ext_ref_nodes, nnodes);   // memory usage: # of nodes * 1 bit                         (n)
+
+    mrc_nnodes_set(self, 2);
+
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+        if (index == 0 || index == 1) continue;
+        mrc_nnodes_add(self, 1);
+
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        BDDVAR var = mtbddnode_getvariable(node);
+        mrc_var_nnodes_add(self, var, 1);
+
+        if (mtbddnode_isleaf(node)) continue;
+
+        MTBDD f1 = mtbddnode_gethigh(node);
+        size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1) {
+            mrc_ref_vars_add(self, mtbdd_getvar(f1), 1);
+            mrc_ref_nodes_add(self, f1_index, 1);
+        }
+
+        MTBDD f0 = mtbddnode_getlow(node);
+        size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1) {
+            mrc_ref_vars_add(self, mtbdd_getvar(f0), 1);
+            mrc_ref_nodes_add(self, f0_index, 1);
+        }
+    }
+
+    it = roaring_create_iterator(node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+        if (index == 0 || index == 1) continue;
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        BDDVAR var = mtbddnode_getvariable(node);
+        if (mrc_ref_nodes_get(self, index) == 0) {
+            mrc_ref_nodes_add(self, index, 1);
+        }
+        if (mrc_ref_vars_get(self, var) == 0) {
+            mrc_ref_vars_add(self, var, 1);
+        }
+    }
+
+    mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
+}
+
+void mrc_deinit(mrc_t* self)
+{
+    atomic_counters_deinit(&self->ref_nodes);
+    atomic_counters_deinit(&self->ref_vars);
+    atomic_counters_deinit(&self->var_nnodes);
+    atomic_bitmap_deinit(&self->ext_ref_nodes);
+}
+
+void mrc_isolated_count_set(mrc_t *self, int val)
 {
     self->isolated_count = val;
 }
 
-void mrc_ref_nodes_add(mrc_t* self, size_t idx, int val)
+void mrc_ref_nodes_set(mrc_t* self, size_t idx, int val)
+{
+    atomic_counters_set(&self->ref_nodes, idx, val);
+}
+
+void mrc_ref_vars_set(mrc_t* self, size_t idx, int val)
+{
+    atomic_counters_set(&self->ref_vars, idx, val);
+}
+
+void mrc_var_nodes_set(mrc_t* self, size_t idx, int val)
+{
+    atomic_counters_set(&self->var_nnodes, idx, val);
+}
+
+void mrc_nnodes_set(mrc_t* self, int val)
+{
+    self->nnodes = val;
+}
+
+void mrc_ref_nodes_add(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_add(&self->ref_nodes, idx, val);
 }
 
-void mrc_ref_vars_add(mrc_t* self, size_t idx, int val)
+void mrc_ref_vars_add(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_add(&self->ref_vars, idx, val);
 }
 
-void mrc_var_nodes_add(mrc_t* self, size_t idx, int val)
+void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_add(&self->var_nnodes, idx, val);
 }
 
-void mrc_nnodes_add(mrc_t* self, int val)
+void mrc_nnodes_add(mrc_t *self, int val)
 {
-    assert(val < UINT8_MAX);
-    assert(self->nnodes != 0);
-    uint64_t curr = mrc_nnodes_get(self);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if ((curr + val) >= UINT8_MAX) return;// avoid overflow
     self->nnodes += val;
 }
 
-uint8_t mrc_ref_nodes_get(mrc_t* self, size_t idx)
+counter_t mrc_ref_nodes_get(const mrc_t *self, size_t idx)
 {
     return atomic_counters_get(&self->ref_nodes, idx);
 }
 
-uint8_t mrc_ref_vars_get(mrc_t* self, size_t idx)
+counter_t mrc_ref_vars_get(const mrc_t *self, size_t idx)
 {
     return atomic_counters_get(&self->ref_vars, idx);
 }
 
-uint8_t mrc_var_nodes_get(mrc_t* self, size_t idx)
+counter_t mrc_var_nnodes_get(const mrc_t *self, size_t idx)
 {
     return atomic_counters_get(&self->var_nnodes, idx);
 }
 
-int mrc_node_count_get(mrc_t* self)
+size_t mrc_nnodes_get(const mrc_t *self)
+{
+    return self->nnodes;
+}
+
+int mrc_node_count_get(const mrc_t *self)
 {
     return self->isolated_count;
 }
 
-int mrc_is_var_isolated(mrc_t* self, size_t idx)
+int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 {
     if (self->ref_vars.size == 0) return 0;
     return mrc_ref_vars_get(self, idx) == 1;
 }
 
-int mrc_is_node_dead(mrc_t* self, size_t idx)
+int mrc_is_node_dead(const mrc_t *self, size_t idx)
 {
     if (self->ext_ref_nodes.size == 0 || self->ref_nodes.size == 0) return 0;
-    return mrc_var_nodes_get(self, idx) == 0;
+    return mrc_var_nnodes_get(self, idx) == 0;
+}
+
+void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
+{
+    // we will be removing items from the bitmap so we copy the current one first and
+    // use that one instead
+    roaring_bitmap_t *tmp = roaring_bitmap_copy(node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
+    roaring_move_uint32_iterator_equalorlarger(it, 2);
+
+    while (it->has_value) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+        if (mrc_is_node_dead(self, index)) {
+            mrc_delete_node(self, index);
+        }
+    }
+    roaring_bitmap_free(tmp);
+
+#if SYLVAN_USE_LINEAR_PROBING
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+#endif
+}
+
+void mrc_delete_node(mrc_t *self, size_t index)
+{
+    assert(!SYLVAN_USE_LINEAR_PROBING);
+    mtbddnode_t f = MTBDD_GETNODE(index);
+    mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
+    if (!mtbddnode_isleaf(f)) {
+        MTBDD f1 = mtbddnode_gethigh(f);
+        size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1) {
+            mrc_ref_nodes_add(self, f1_index, -1);
+            mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
+        }
+        MTBDD f0 = mtbddnode_getlow(f);
+        size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1) {
+            mrc_ref_nodes_add(self, f0_index, -1);
+            mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
+        }
+    }
+#if !SYLVAN_USE_LINEAR_PROBING
+    llmsset_clear_one_hash(nodes, index);
+    llmsset_clear_one_data(nodes, index);
+    roaring_bitmap_remove(reorder_db->node_ids, index);
+#endif
 }
