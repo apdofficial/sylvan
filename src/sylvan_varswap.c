@@ -203,7 +203,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
             mrc_ref_vars_add(&reorder_db->mrc, var, 1);
-            mrc_ref_vars_add(&reorder_db->mrc, var+1, -1);
+            mrc_ref_vars_add(&reorder_db->mrc, var + 1, -1);
 
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, it->current_value) != 1) {

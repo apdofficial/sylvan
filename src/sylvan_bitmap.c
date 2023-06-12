@@ -260,7 +260,7 @@ int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
     return 1;
 }
 
-int atomic_bitmap_get(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);

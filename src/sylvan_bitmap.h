@@ -154,7 +154,7 @@ int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos);
 /**
  * Get the bit at position n. (Atomic version)
  */
-int atomic_bitmap_get(atomic_bitmap_t *bitmap, size_t pos);
+int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos);
 
 
 #ifdef __cplusplus

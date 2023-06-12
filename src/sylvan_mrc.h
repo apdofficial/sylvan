@@ -86,6 +86,8 @@ void mrc_nnodes_add(mrc_t* self, int val);
  */
 counter_t mrc_isolated_count_get(const mrc_t* self);
 
+counter_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx);
+
 counter_t mrc_ref_nodes_get(const mrc_t* self, size_t idx);
 
 counter_t mrc_ref_vars_get(const mrc_t* self, size_t idx);

@@ -178,6 +178,11 @@ void mrc_nnodes_add(mrc_t *self, int val)
     self->nnodes += val;
 }
 
+counter_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx)
+{
+    return atomic_bitmap_get(&self->ext_ref_nodes, idx);
+}
+
 counter_t mrc_ref_nodes_get(const mrc_t *self, size_t idx)
 {
     return atomic_counters_get(&self->ref_nodes, idx);
@@ -212,7 +217,9 @@ int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 int mrc_is_node_dead(const mrc_t *self, size_t idx)
 {
     if (self->ext_ref_nodes.size == 0 || self->ref_nodes.size == 0) return 0;
-    return mrc_var_nnodes_get(self, idx) == 0;
+    counter_t int_count = mrc_ref_nodes_get(self, idx);
+    counter_t ext_count = mrc_ext_ref_nodes_get(self, idx);
+    return int_count == 0 && ext_count == 0;
 }
 
 void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
