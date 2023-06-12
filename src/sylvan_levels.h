@@ -8,10 +8,6 @@ extern "C" {
 #define counter_t_max UINT16_MAX
 #define atomic_uint_t_max UINT64_MAX
 
-typedef unsigned short counter_t;
-typedef _Atomic (counter_t) atomic_counter_t;
-typedef _Atomic (uint64_t)  atomic_uint64_t;
-
 /**
  * When using dynamic variable reordering, it is strongly recommended to use
  * "levels" instead of working directly with the internal variables.
@@ -20,26 +16,26 @@ typedef _Atomic (uint64_t)  atomic_uint64_t;
  * Initially, variables are assigned linearly, starting with 0.
  */
 typedef struct levels_db {
-    atomic_word_t*          table;                   // array holding the 1-node BDD for each level
+    _Atomic(uint64_t)*      table;                   // array holding the 1-node BDD for each level
     size_t                  count;                   // number of created levels
-    half_word_t*            level_to_order;          // current level wise var permutation (level to variable label)
-    half_word_t*            order_to_level;          // current variable wise level permutation (variable label to level)
-    atomic_uint64_t         nodes_count;             // number of nodes all nodes in DD
-    atomic_counter_t*       var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
-    size_t                  var_count_size;          // size of var_count
-    atomic_counter_t*       ref_count;               // number of internal references per variable (it expects order wise variable index)
-    size_t                  ref_count_size;          // size of ref_count
-    atomic_counter_t*       node_ref_count;          // number of internal references per node (it expects order wise variable index)
-    size_t                  node_ref_count_size;     // size of node_ref_count
-    int                     isolated_count;          // number of isolated projection functions
-    atomic_word_t*          bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
+    _Atomic(uint32_t)*      level_to_order;          // current level wise var permutation (level to variable label)
+    _Atomic(uint32_t)*      order_to_level;          // current variable wise level permutation (variable label to level)
+//    atomic_uint64_t         nodes_count;             // number of nodes all nodes in DD
+//    atomic_counter_t*       var_count;               // number of nodes per variable (it expects order wise variable index) needs to be initialized before every use
+//    size_t                  var_count_size;          // size of var_count
+//    atomic_counter_t*       ref_count;               // number of internal references per variable (it expects order wise variable index)
+//    size_t                  ref_count_size;          // size of ref_count
+//    atomic_counter_t*       node_ref_count;          // number of internal references per node (it expects order wise variable index)
+//    size_t                  node_ref_count_size;     // size of node_ref_count
+//    int                     isolated_count;          // number of isolated projection functions
+    _Atomic(uint64_t)*        bitmap_i;                // bitmap used for storing the square variable interaction matrix (use variable order)
     size_t                  bitmap_i_nrows;          // number of rows/ columns
     size_t                  bitmap_i_size;           // size of bitmap_i
-    atomic_word_t*          bitmap_p2;               // bitmap used to store reordering phase 2 mark
+    _Atomic(uint64_t)*        bitmap_p2;               // bitmap used to store reordering phase 2 mark
     size_t                  bitmap_p2_size;          // size of bitmap_p2
-    atomic_word_t*          bitmap_p3;               // bitmap used to store reordering phase 3 mark
+    _Atomic(uint64_t)*        bitmap_p3;               // bitmap used to store reordering phase 3 mark
     size_t                  bitmap_p3_size;          // size of bitmap_p3
-    atomic_word_t*          bitmap_ext;              // bitmap used to store external references
+    _Atomic(uint64_t)*        bitmap_ext;              // bitmap used to store external references
     size_t                  bitmap_ext_size;         // size of bitmap_ext
     size_t                  reorder_size_threshold;  // reorder if this size is reached
     size_t                  reorder_count;           // number of reordering calls
@@ -68,29 +64,29 @@ typedef struct levels_db {
 #define levels_ext_is_marked(idx) bitmap_atomic_get(levels->bitmap_ext, idx)
 #define levels_ext_clear_all() clear_aligned(levels->bitmap_ext, levels->bitmap_ext_size)
 
-counter_t levels_ref_count_load(levels_t dbs, size_t idx);
-
-void levels_ref_count_add(levels_t dbs, size_t idx, int val);
-
-int levels_is_isolated(levels_t dbs, size_t idx);
-
-counter_t levels_var_count_load(levels_t dbs, size_t idx);
-
-void levels_var_count_add(levels_t dbs, size_t idx, int val);
-
-counter_t levels_node_ref_count_load(levels_t dbs, size_t idx);
-
-int levels_is_node_dead(levels_t dbs, size_t idx);
-
-void levels_node_ref_count_add(levels_t dbs, size_t idx, int val);
-
-void levels_node_ref_count_set(levels_t dbs, size_t idx, int val);
-
-uint64_t levels_nodes_count_load(levels_t dbs);
-
-void levels_nodes_count_add(levels_t dbs, int val);
-
-void levels_nodes_count_set(levels_t dbs, int val);
+//counter_t levels_ref_count_load(levels_t dbs, size_t idx);
+//
+//void levels_ref_count_add(levels_t dbs, size_t idx, int val);
+//
+//int levels_is_isolated(levels_t dbs, size_t idx);
+//
+//counter_t levels_var_count_load(levels_t dbs, size_t idx);
+//
+//void levels_var_count_add(levels_t dbs, size_t idx, int val);
+//
+//counter_t levels_node_ref_count_load(levels_t dbs, size_t idx);
+//
+//int levels_is_node_dead(levels_t dbs, size_t idx);
+//
+//void levels_node_ref_count_add(levels_t dbs, size_t idx, int val);
+//
+//void levels_node_ref_count_set(levels_t dbs, size_t idx, int val);
+//
+//uint64_t levels_nodes_count_load(levels_t dbs);
+//
+//void levels_nodes_count_add(levels_t dbs, int val);
+//
+//void levels_nodes_count_set(levels_t dbs, int val);
 
 /**
  * @brief Create a new levels_t object
@@ -101,24 +97,24 @@ levels_t mtbdd_levels_create();
  * @brief Free a levels_t object
  */
 void levels_free(levels_t dbs);
-
-void levels_var_count_malloc(size_t new_size);
-
-void levels_var_count_realloc(size_t new_size);
-
-void levels_var_count_free();
-
-void levels_ref_count_malloc(size_t new_size);
-
-void levels_ref_count_realloc(size_t new_size);
-
-void levels_ref_count_free();
-
-void levels_node_ref_count_malloc(size_t new_size);
-
-void levels_node_ref_count_realloc(size_t new_size);
-
-void levels_node_ref_count_free();
+//
+//void levels_var_count_malloc(size_t new_size);
+//
+//void levels_var_count_realloc(size_t new_size);
+//
+//void levels_var_count_free();
+//
+//void levels_ref_count_malloc(size_t new_size);
+//
+//void levels_ref_count_realloc(size_t new_size);
+//
+//void levels_ref_count_free();
+//
+//void levels_node_ref_count_malloc(size_t new_size);
+//
+//void levels_node_ref_count_realloc(size_t new_size);
+//
+//void levels_node_ref_count_free();
 
 void levels_bitmap_ext_malloc(size_t new_size);
 

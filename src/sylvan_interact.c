@@ -15,7 +15,7 @@ char interact_malloc(levels_t dbs)
     dbs->bitmap_i_size = dbs->count * dbs->count; // we have a square matrix, # of vars * # of vars
     dbs->bitmap_i_nrows = dbs->count;
     dbs->bitmap_i = NULL;
-    dbs->bitmap_i = (atomic_word_t *) alloc_aligned(dbs->bitmap_i_size);
+    dbs->bitmap_i = (_Atomic(uint64_t) *) alloc_aligned(dbs->bitmap_i_size);
 
     if (dbs->bitmap_i == NULL) {
         fprintf(stderr, "interact_malloc failed to allocate new memory: %s!\n", strerror(errno));
@@ -35,20 +35,20 @@ void interact_free(levels_t dbs)
     dbs->bitmap_i_size = 0;
 }
 
-void interact_update(levels_t dbs, atomic_word_t *bitmap)
+void interact_update(levels_t dbs, atomic_bitmap_t *bitmap)
 {
     size_t i, j;
     for (i = 0; i < dbs->bitmap_i_nrows - 1; i++) {
-        if (bitmap_atomic_get(bitmap, i) == 1) {
-            bitmap_atomic_clear(bitmap, i);
+        if (atomic_bitmap_get(bitmap, i) == 1) {
+            atomic_bitmap_clear(bitmap, i);
             for (j = i + 1; j < dbs->bitmap_i_nrows; j++) {
-                if (bitmap_atomic_get(bitmap, j) == 1) {
+                if (atomic_bitmap_get(bitmap, j) == 1) {
                     interact_set(dbs, i, j);
                 }
             }
         }
     }
-    bitmap_atomic_clear(bitmap, dbs->bitmap_i_nrows - 1);
+    atomic_bitmap_clear(bitmap, dbs->bitmap_i_nrows - 1);
 }
 
 void interact_print_state(const levels_t dbs)
@@ -90,17 +90,17 @@ void interact_print_state(const levels_t dbs)
  *  F00 F01 F10 F11
  */
 #define find_support(f, bitmap_s, bitmap_g, bitmap_l) RUN(find_support, f, bitmap_s, bitmap_g, bitmap_l)
-VOID_TASK_4(find_support, MTBDD, f, atomic_word_t*, bitmap_s, atomic_word_t*, bitmap_g, atomic_word_t*, bitmap_l)
+VOID_TASK_4(find_support, MTBDD, f, atomic_bitmap_t*, bitmap_s, atomic_bitmap_t*, bitmap_g, atomic_bitmap_t*, bitmap_l)
 {
     uint64_t index = f & SYLVAN_TABLE_MASK_INDEX;
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
-    if (bitmap_atomic_get(bitmap_l, index)) return;
+    if (atomic_bitmap_get(bitmap_l, index)) return;
 
     BDDVAR var = mtbdd_getvar(f);
     // set support bitmap, <var> contributes to the outcome of <f>
-    bitmap_atomic_set(bitmap_s, levels->level_to_order[var]);
+    atomic_bitmap_set(bitmap_s, levels->level_to_order[var]);
 
     if(!mtbdd_isleaf(f)) {
         // visit all nodes reachable from <f>
@@ -112,9 +112,9 @@ VOID_TASK_4(find_support, MTBDD, f, atomic_word_t*, bitmap_s, atomic_word_t*, bi
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
-    bitmap_atomic_set(bitmap_l, index);
+    atomic_bitmap_set(bitmap_l, index);
     // globally visited node used to determining root nodes
-    bitmap_atomic_set(bitmap_g, index);
+    atomic_bitmap_set(bitmap_g, index);
 }
 
 VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
@@ -122,9 +122,9 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
     size_t nnodes = nodes->table_size; // worst case (if table is full)
     size_t nvars = dbs->count;
 
-    atomic_word_t *bitmap_s = (atomic_word_t *) alloc_aligned(nvars);  // support bitmap
-    atomic_word_t *bitmap_g = (atomic_word_t *) alloc_aligned(nnodes); // globally visited nodes bitmap (forest wise)
-    atomic_word_t *bitmap_l = (atomic_word_t *) alloc_aligned(nnodes); // locally visited nodes bitmap (tree wise)
+    atomic_bitmap_t *bitmap_s = (atomic_bitmap_t *) alloc_aligned(nvars);  // support bitmap
+    atomic_bitmap_t *bitmap_g = (atomic_bitmap_t *) alloc_aligned(nnodes); // globally visited nodes bitmap (forest wise)
+    atomic_bitmap_t *bitmap_l = (atomic_bitmap_t *) alloc_aligned(nnodes); // locally visited nodes bitmap (tree wise)
 
     if (bitmap_s == NULL || bitmap_g == NULL || bitmap_l == NULL) {
         fprintf(stderr, "interact_init failed to allocate new memory: %s!\n", strerror(errno));
@@ -146,7 +146,7 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
             continue;
         }
 
-        if (bitmap_atomic_get(bitmap_g, index) == 1) {
+        if (atomic_bitmap_get(bitmap_g, index) == 1) {
             // already visited node, thus can not be a root and we can skip it
             continue;
         }
@@ -160,7 +160,7 @@ VOID_TASK_IMPL_1(interaction_matrix_init, levels_t, dbs)
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
-        bitmap_atomic_set(bitmap_s, dbs->level_to_order[var]);
+        atomic_bitmap_set(bitmap_s, dbs->level_to_order[var]);
 
         // clear locally visited nodes bitmap,
         // TODO: investigate: it is a hotspot of this function takes cca 10 - 20% of the runtime aand it scales with the table size :(
@@ -186,6 +186,7 @@ VOID_TASK_IMPL_1(var_ref_init, levels_t, dbs)
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
         if (index == 0 || index == 1) continue;
+        ref_counters_node_count_add(&reorder_db->ref_counters, 1);
         levels_nodes_count_add(dbs, 1);
 
         mtbddnode_t node = MTBDD_GETNODE(index);

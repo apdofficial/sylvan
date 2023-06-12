@@ -298,8 +298,12 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
  */
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
-    bitmap_atomic_clear(dbs->bitmap2, index);
-    if (bitmap_get(dbs->bitmapc, index)) {
+    atomic_bitmap_t bitmap = {
+        .container = dbs->bitmap2,
+        .size = dbs->table_size
+    };
+    atomic_bitmap_clear(&bitmap, index);
+    if (atomic_bitmap_get(&bitmap, index)) {
         uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
         dbs->destroy_cb(d_ptr[1], d_ptr[2]);
     }
@@ -424,7 +428,6 @@ VOID_TASK_IMPL_1(llmsset_clear_hashes, llmsset_t, dbs)
 int
 llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 {
-    return bitmap_atomic_get(dbs->bitmap2, index);
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     return (atomic_load_explicit(ptr, memory_order_relaxed) & mask) ? 1 : 0;

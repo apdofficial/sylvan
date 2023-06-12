@@ -70,7 +70,7 @@ static inline uint64_t get_nodes_count()
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
-    return levels_nodes_count_load(levels) + 2;
+    return ref_counters_node_count_get(&reorder_db->ref_counters) + 2;
 #endif
 }
 
@@ -213,14 +213,14 @@ void sylvan_init_reorder()
     sylvan_register_quit(&sylvan_quit_reorder);
     mtbdd_levels_gc_add_mark_managed_refs();
 
-    reorder_db = reorder_db_create();
+    reorder_db = reorder_db_init();
 }
 
 void sylvan_quit_reorder()
 {
     reorder_initialized = 0;
 
-    reorder_db_destroy();
+    reorder_db_ddeinit();
 }
 
 reorder_config_t sylvan_get_reorder_config()

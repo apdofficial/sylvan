@@ -17,14 +17,14 @@ levels_t mtbdd_levels_create()
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
 
-    dbs->var_count = NULL;
-    dbs->var_count_size = 0;
-
-    dbs->ref_count = NULL;
-    dbs->ref_count_size = 0;
-
-    dbs->node_ref_count = NULL;
-    dbs->node_ref_count_size = 0;
+//    dbs->var_count = NULL;
+//    dbs->var_count_size = 0;
+//
+//    dbs->ref_count = NULL;
+//    dbs->ref_count_size = 0;
+//
+//    dbs->node_ref_count = NULL;
+//    dbs->node_ref_count_size = 0;
 
     dbs->bitmap_i = NULL;
     dbs->bitmap_i_size = 0;
@@ -39,208 +39,208 @@ levels_t mtbdd_levels_create()
     dbs->bitmap_ext = NULL;
     dbs->bitmap_ext_size = 0;
 
-    dbs->isolated_count = 0;
+//    dbs->isolated_count = 0;
     dbs->reorder_count = 0;
     dbs->reorder_size_threshold = SYLVAN_REORDER_FIRST_REORDER;
 
     levels_size = 0;
     dbs->count = 0;
-    dbs->nodes_count = 0;
+//    dbs->nodes_count = 0;
 
     return dbs;
 }
-
-counter_t
-levels_ref_count_load(levels_t dbs, size_t idx)
-{
-    if (dbs->ref_count_size == 0) return 0;
-    return atomic_load_explicit(&dbs->ref_count[idx], memory_order_relaxed);
-}
-
-void
-levels_ref_count_add(levels_t dbs, size_t idx, int val)
-{
-    if (dbs->ref_count_size == 0) return;
-    counter_t curr = levels_ref_count_load(dbs, idx);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if (dbs->ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
-    atomic_fetch_add_explicit(&dbs->ref_count[idx], val, memory_order_relaxed);
-}
-
-int
-levels_is_isolated(levels_t dbs, size_t idx)
-{
-    if (dbs->ref_count_size == 0) return 0;
-    return levels_ref_count_load(dbs, idx) == 1;
-}
-
-counter_t
-levels_var_count_load(levels_t dbs, size_t idx)
-{
-    if (dbs->var_count_size == 0) return 0;
-    return atomic_load_explicit(&dbs->var_count[idx], memory_order_relaxed);
-}
-
-void
-levels_var_count_add(levels_t dbs, size_t idx, int val)
-{
-    if (dbs->var_count_size == 0) return;
-    counter_t curr = levels_var_count_load(dbs, idx);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if ((curr + val) >= counter_t_max) return;// avoid overflow
-    if (idx >= dbs->var_count_size) return;// avoid out of bounds access
-    atomic_counter_t *ptr = &dbs->var_count[idx];
-    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
-}
-
-int
-levels_is_node_dead(levels_t dbs, size_t idx)
-{
-    if (dbs->bitmap_ext_size == 0 || dbs->node_ref_count_size == 0) return 0;
-    counter_t int_count = levels_node_ref_count_load(dbs, idx);
-    counter_t ext_count = bitmap_atomic_get(dbs->bitmap_ext, idx);
-    return int_count == 0 && ext_count == 0;
-}
-
-uint64_t
-levels_nodes_count_load(levels_t dbs)
-{
-    return atomic_load_explicit(&dbs->nodes_count, memory_order_relaxed);
-}
-
-void
-levels_nodes_count_add(levels_t dbs, int val)
-{
-    if (dbs->node_ref_count_size == 0) return;
-    uint64_t curr = atomic_load_explicit(&dbs->nodes_count, memory_order_acquire);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if ((curr + val) >= atomic_uint_t_max) return;// avoid overflow
-    atomic_uint64_t *ptr = &dbs->nodes_count;
-    atomic_fetch_add_explicit(ptr, val, memory_order_release);
-}
-
-void
-levels_nodes_count_set(levels_t dbs, int val)
-{
-    if (dbs->node_ref_count_size == 0) return;
-    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
-    if (val < 0) exit(-1); // underflow, sorry really not allowed
-    atomic_uint64_t *ptr = &dbs->nodes_count;
-    atomic_store(ptr, val);
-}
-
-counter_t
-levels_node_ref_count_load(levels_t dbs, size_t idx)
-{
-    if (dbs->node_ref_count_size == 0) {
-        return 0;
-    } else {
-        atomic_counter_t *ptr = &dbs->node_ref_count[idx];
-        return atomic_load_explicit(ptr, memory_order_relaxed);
-    }
-}
-
-void
-levels_node_ref_count_add(levels_t dbs, size_t idx, int val)
-{
-    if (dbs->node_ref_count_size == 0) return;
-    counter_t curr = levels_node_ref_count_load(dbs, idx);
-    if (curr == 0 && val < 0) return; // avoid underflow
-    if ((curr + val) >= counter_t_max) return;// avoid overflow
-    atomic_counter_t *ptr = &dbs->node_ref_count[idx];
-    atomic_fetch_add_explicit(ptr, val, memory_order_acq_rel);
-}
-
-void
-levels_node_ref_count_set(levels_t dbs, size_t idx, int val)
-{
-    if (dbs->node_ref_count_size == 0) return;
-    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
-    if (val < 0) exit(-1); // underflow, sorry really not allowed
-    atomic_counter_t *ptr = &dbs->node_ref_count[idx];
-    atomic_store(ptr, val);
-}
-
-void
-levels_var_count_malloc(size_t new_size)
-{
-    levels_var_count_free();
-    levels->var_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
-    if (levels->var_count != NULL) levels->var_count_size = new_size;
-    else levels->var_count_size = 0;
-}
-
-void
-levels_var_count_realloc(size_t new_size)
-{
-    if (levels->var_count_size == new_size) return;
-    levels_var_count_free();
-    levels_var_count_malloc(new_size);
-}
-
-void
-levels_var_count_free()
-{
-    if (levels->var_count != NULL) free_aligned(levels->var_count, levels->var_count_size);
-    levels->var_count_size = 0;
-    levels->var_count = NULL;
-}
-
-void
-levels_ref_count_malloc(size_t new_size)
-{
-    levels_ref_count_free();
-    levels->ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
-    if (levels->ref_count != NULL) levels->ref_count_size = new_size;
-    else levels->ref_count_size = 0;
-}
-
-void
-levels_ref_count_realloc(size_t new_size)
-{
-    if (levels->ref_count_size == new_size) return;
-    levels_ref_count_free();
-    levels_ref_count_malloc(new_size);
-}
-
-void
-levels_ref_count_free()
-{
-    if (levels->ref_count != NULL) free_aligned(levels->ref_count, levels->ref_count_size);
-    levels->ref_count_size = 0;
-    levels->ref_count = NULL;
-}
-
-void
-levels_node_ref_count_malloc(size_t new_size)
-{
-    levels_node_ref_count_free();
-    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
-    if (levels->node_ref_count != NULL) levels->node_ref_count_size = new_size;
-    else levels->node_ref_count_size = 0;
-}
-
-void
-levels_node_ref_count_realloc(size_t new_size)
-{
-    if (levels->node_ref_count_size == new_size) return;
-    levels_node_ref_count_free();
-    levels_node_ref_count_malloc(new_size);
-}
-
-void
-levels_node_ref_count_free()
-{
-    if (levels->node_ref_count != NULL) free_aligned(levels->node_ref_count, levels->node_ref_count_size);
-    levels->node_ref_count_size = 0;
-    levels->node_ref_count = NULL;
-}
+//
+//counter_t
+//levels_ref_count_load(levels_t dbs, size_t idx)
+//{
+//    if (dbs->ref_count_size == 0) return 0;
+//    return atomic_load_explicit(&dbs->ref_count[idx], memory_order_relaxed);
+//}
+//
+//void
+//levels_ref_count_add(levels_t dbs, size_t idx, int val)
+//{
+//    if (dbs->ref_count_size == 0) return;
+//    counter_t curr = levels_ref_count_load(dbs, idx);
+//    if (curr == 0 && val < 0) return; // avoid underflow
+//    if (dbs->ref_count_size == 0 || (curr + val) >= counter_t_max) return;// avoid overflow
+//    atomic_fetch_add_explicit(&dbs->ref_count[idx], val, memory_order_relaxed);
+//}
+//
+//int
+//levels_is_isolated(levels_t dbs, size_t idx)
+//{
+//    if (dbs->ref_count_size == 0) return 0;
+//    return levels_ref_count_load(dbs, idx) == 1;
+//}
+//
+//counter_t
+//levels_var_count_load(levels_t dbs, size_t idx)
+//{
+//    if (dbs->var_count_size == 0) return 0;
+//    return atomic_load_explicit(&dbs->var_count[idx], memory_order_relaxed);
+//}
+//
+//void
+//levels_var_count_add(levels_t dbs, size_t idx, int val)
+//{
+//    if (dbs->var_count_size == 0) return;
+//    counter_t curr = levels_var_count_load(dbs, idx);
+//    if (curr == 0 && val < 0) return; // avoid underflow
+//    if ((curr + val) >= counter_t_max) return;// avoid overflow
+//    if (idx >= dbs->var_count_size) return;// avoid out of bounds access
+//    atomic_counter_t *ptr = &dbs->var_count[idx];
+//    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
+//}
+//
+//int
+//levels_is_node_dead(levels_t dbs, size_t idx)
+//{
+//    if (dbs->bitmap_ext_size == 0 || dbs->node_ref_count_size == 0) return 0;
+//    counter_t int_count = levels_node_ref_count_load(dbs, idx);
+//    counter_t ext_count = atomic_bitmap_get(dbs->bitmap_ext, idx);
+//    return int_count == 0 && ext_count == 0;
+//}
+//
+//uint64_t
+//levels_nodes_count_load(levels_t dbs)
+//{
+//    return atomic_load_explicit(&dbs->nodes_count, memory_order_relaxed);
+//}
+//
+//void
+//levels_nodes_count_add(levels_t dbs, int val)
+//{
+//    if (dbs->node_ref_count_size == 0) return;
+//    uint64_t curr = atomic_load_explicit(&dbs->nodes_count, memory_order_acquire);
+//    if (curr == 0 && val < 0) return; // avoid underflow
+//    if ((curr + val) >= atomic_uint_t_max) return;// avoid overflow
+//    atomic_uint64_t *ptr = &dbs->nodes_count;
+//    atomic_fetch_add_explicit(ptr, val, memory_order_release);
+//}
+//
+//void
+//levels_nodes_count_set(levels_t dbs, int val)
+//{
+//    if (dbs->node_ref_count_size == 0) return;
+//    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
+//    if (val < 0) exit(-1); // underflow, sorry really not allowed
+//    atomic_uint64_t *ptr = &dbs->nodes_count;
+//    atomic_store(ptr, val);
+//}
+//
+//counter_t
+//levels_node_ref_count_load(levels_t dbs, size_t idx)
+//{
+//    if (dbs->node_ref_count_size == 0) {
+//        return 0;
+//    } else {
+//        atomic_counter_t *ptr = &dbs->node_ref_count[idx];
+//        return atomic_load_explicit(ptr, memory_order_relaxed);
+//    }
+//}
+//
+//void
+//levels_node_ref_count_add(levels_t dbs, size_t idx, int val)
+//{
+//    if (dbs->node_ref_count_size == 0) return;
+//    counter_t curr = levels_node_ref_count_load(dbs, idx);
+//    if (curr == 0 && val < 0) return; // avoid underflow
+//    if ((curr + val) >= counter_t_max) return;// avoid overflow
+//    atomic_counter_t *ptr = &dbs->node_ref_count[idx];
+//    atomic_fetch_add_explicit(ptr, val, memory_order_acq_rel);
+//}
+//
+//void
+//levels_node_ref_count_set(levels_t dbs, size_t idx, int val)
+//{
+//    if (dbs->node_ref_count_size == 0) return;
+//    if (val >= counter_t_max) exit(-1); // overflow, sorry really not allowed
+//    if (val < 0) exit(-1); // underflow, sorry really not allowed
+//    atomic_counter_t *ptr = &dbs->node_ref_count[idx];
+//    atomic_store(ptr, val);
+//}
+//
+//void
+//levels_var_count_malloc(size_t new_size)
+//{
+//    levels_var_count_free();
+//    levels->var_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
+//    if (levels->var_count != NULL) levels->var_count_size = new_size;
+//    else levels->var_count_size = 0;
+//}
+//
+//void
+//levels_var_count_realloc(size_t new_size)
+//{
+//    if (levels->var_count_size == new_size) return;
+//    levels_var_count_free();
+//    levels_var_count_malloc(new_size);
+//}
+//
+//void
+//levels_var_count_free()
+//{
+//    if (levels->var_count != NULL) free_aligned(levels->var_count, levels->var_count_size);
+//    levels->var_count_size = 0;
+//    levels->var_count = NULL;
+//}
+//
+//void
+//levels_ref_count_malloc(size_t new_size)
+//{
+//    levels_ref_count_free();
+//    levels->ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
+//    if (levels->ref_count != NULL) levels->ref_count_size = new_size;
+//    else levels->ref_count_size = 0;
+//}
+//
+//void
+//levels_ref_count_realloc(size_t new_size)
+//{
+//    if (levels->ref_count_size == new_size) return;
+//    levels_ref_count_free();
+//    levels_ref_count_malloc(new_size);
+//}
+//
+//void
+//levels_ref_count_free()
+//{
+//    if (levels->ref_count != NULL) free_aligned(levels->ref_count, levels->ref_count_size);
+//    levels->ref_count_size = 0;
+//    levels->ref_count = NULL;
+//}
+//
+//void
+//levels_node_ref_count_malloc(size_t new_size)
+//{
+//    levels_node_ref_count_free();
+//    levels->node_ref_count = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
+//    if (levels->node_ref_count != NULL) levels->node_ref_count_size = new_size;
+//    else levels->node_ref_count_size = 0;
+//}
+//
+//void
+//levels_node_ref_count_realloc(size_t new_size)
+//{
+//    if (levels->node_ref_count_size == new_size) return;
+//    levels_node_ref_count_free();
+//    levels_node_ref_count_malloc(new_size);
+//}
+//
+//void
+//levels_node_ref_count_free()
+//{
+//    if (levels->node_ref_count != NULL) free_aligned(levels->node_ref_count, levels->node_ref_count_size);
+//    levels->node_ref_count_size = 0;
+//    levels->node_ref_count = NULL;
+//}
 
 void
 levels_bitmap_ext_malloc(size_t new_size)
 {
     levels_bitmap_ext_free();
-    levels->bitmap_ext = (atomic_word_t *) alloc_aligned(new_size);
+    levels->bitmap_ext = (_Atomic(uint64_t) *) alloc_aligned(new_size);
     if (levels->bitmap_ext != NULL) levels->bitmap_ext_size = new_size;
     else levels->bitmap_ext_size = 0;
 }
@@ -265,7 +265,7 @@ void
 levels_bitmap_p2_malloc(size_t new_size)
 {
     levels_bitmap_p2_free();
-    levels->bitmap_p2 = (atomic_word_t *) alloc_aligned(new_size);
+    levels->bitmap_p2 = (_Atomic(uint64_t) *) alloc_aligned(new_size);
     if (levels->bitmap_p2 != NULL) levels->bitmap_p2_size = new_size;
     else levels->bitmap_p2_size = 0;
 }
@@ -290,7 +290,7 @@ void
 levels_bitmap_p3_malloc(size_t new_size)
 {
     levels_bitmap_p2_free();
-    levels->bitmap_p3 = (atomic_word_t *) alloc_aligned(new_size);
+    levels->bitmap_p3 = (_Atomic(uint64_t) *) alloc_aligned(new_size);
     if (levels->bitmap_p3 != NULL) levels->bitmap_p3_size = new_size;
     else levels->bitmap_p3_size = 0;
 }
@@ -315,9 +315,6 @@ levels_bitmap_p3_free()
 void
 levels_free(levels_t dbs)
 {
-    levels_var_count_free();
-    levels_ref_count_free();
-    levels_node_ref_count_free();
     interact_free(levels);
     levels_bitmap_ext_free();
     levels_bitmap_p2_free();
@@ -335,7 +332,11 @@ MTBDD
 mtbdd_newlevel(void)
 {
     mtbdd_newlevels(1);
-    return levels->table[levels->count - 1];
+    atomic_bitmap_t bitmap = {
+        .container = levels->table,
+        .size = levels->count
+    };
+    return atomic_bitmap_get(&bitmap, levels->count - 1);
 }
 
 int mtbdd_newlevels(size_t amount)
@@ -344,9 +345,9 @@ int mtbdd_newlevels(size_t amount)
         // just round up to the next multiple of 64 value
         // probably better than doubling anyhow...
         levels_size = (levels->count + amount + 63) & (~63LL);
-        levels->table = (atomic_word_t *) realloc(levels->table, sizeof(uint64_t[levels_size]));
-        levels->level_to_order = (half_word_t *) realloc(levels->level_to_order, sizeof(uint32_t[levels_size]));
-        levels->order_to_level = (half_word_t *) realloc(levels->order_to_level, sizeof(uint32_t[levels_size]));
+        levels->table = (_Atomic(uint64_t) *) realloc(levels->table, sizeof(_Atomic(uint64_t)[levels_size]));
+        levels->level_to_order = (_Atomic(uint32_t) *) realloc(levels->level_to_order, sizeof(_Atomic(uint32_t)[levels_size]));
+        levels->order_to_level = (_Atomic(uint32_t) *) realloc(levels->order_to_level, sizeof(_Atomic(uint32_t)[levels_size]));
 
         if (levels->table == NULL || levels->level_to_order == NULL || levels->order_to_level == NULL) {
             fprintf(stderr, "mtbdd_newlevels failed to realloc new memory: %s!\n", strerror(errno));
@@ -388,9 +389,9 @@ void mtbdd_resetlevels(void)
         if (!levels->order_to_level) free(levels->order_to_level);
         levels->order_to_level = NULL;
 
-        levels_var_count_free();
-        levels_ref_count_free();
-        levels_node_ref_count_free();
+//        levels_var_count_free();
+//        levels_ref_count_free();
+//        levels_node_ref_count_free();
 
         interact_free(levels);
 
@@ -399,7 +400,7 @@ void mtbdd_resetlevels(void)
 
         levels->count = 0;
         levels_size = 0;
-        levels->isolated_count = 0;
+//        levels->isolated_count = 0;
     }
 }
 

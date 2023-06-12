@@ -11,12 +11,20 @@ void interact_free(levels_t dbs);
 
 static inline void interact_set(levels_t dbs, size_t row, size_t col)
 {
-    bitmap_atomic_set(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
+    atomic_bitmap_t bitmap = {
+        .container = dbs->bitmap_i,
+        .size = dbs->bitmap_i_size
+    };
+    atomic_bitmap_set(&bitmap, (row * dbs->bitmap_i_nrows) + col);
 }
 
 static inline int interact_get(const levels_t dbs, size_t row, size_t col)
 {
-    return bitmap_atomic_get(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
+    atomic_bitmap_t bitmap = {
+        .container = dbs->bitmap_i,
+        .size = dbs->bitmap_i_size
+    };
+    return atomic_bitmap_get(&bitmap, (row * dbs->bitmap_i_nrows) + col);
 }
 
 static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
@@ -41,7 +49,7 @@ static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
   @sideeffect Clears support.
 
 */
-void interact_update(levels_t dbs, atomic_word_t *bitmap_s);
+void interact_update(levels_t dbs, atomic_bitmap_t *bitmap_s);
 
 void interact_print_state(const levels_t dbs);
 

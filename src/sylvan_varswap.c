@@ -1,17 +1,17 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
-#define node_ref_set(dd, v) levels_node_ref_count_set(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, v)
-#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, 1)
-#define node_ref_dec(dd) levels_node_ref_count_add(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, -1)
-
-#define var_inc(lvl) levels_var_count_add(levels, lvl, 1); levels_nodes_count_add(levels, 1)
-#define var_dec(lvl) levels_var_count_add(levels, lvl, -1); levels_nodes_count_add(levels, -1)
-
-#define ref_inc(lvl) levels_ref_count_add(levels, lvl, 1)
-#define ref_dec(lvl) levels_ref_count_add(levels, lvl, -1)
-
-#define is_node_dead(dd) levels_is_node_dead(levels, dd & SYLVAN_TABLE_MASK_INDEX)
+//#define node_ref_set(dd, v) levels_node_ref_count_set(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, v)
+//#define node_ref_inc(dd) levels_node_ref_count_add(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, 1)
+//#define node_ref_dec(dd) levels_node_ref_count_add(levels, (dd) & SYLVAN_TABLE_MASK_INDEX, -1)
+//
+//#define var_inc(lvl) levels_var_count_add(levels, lvl, 1)
+//#define var_dec(lvl) levels_var_count_add(levels, lvl, -1)
+//
+//#define ref_inc(lvl) levels_ref_count_add(levels, lvl, 1)
+//#define ref_dec(lvl) levels_ref_count_add(levels, lvl, -1)
+//
+//#define is_node_dead(dd) levels_is_node_dead(levels, dd & SYLVAN_TABLE_MASK_INDEX)
 
 #define delete_node_ref(idx) CALL(delete_node_ref, idx)
 VOID_TASK_DECL_1(delete_node_ref, size_t)
@@ -90,7 +90,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // projection functions from the node count.
     BDDVAR x = levels->level_to_order[pos];
     BDDVAR y = levels->level_to_order[pos + 1];
-    int isolated = -(levels_is_isolated(levels, x) + levels_is_isolated(levels, y));
+    int isolated = -(mrc_is_isolated(&reorder_db->ref_counters, x) + mrc_is_isolated(&reorder_db->ref_counters, y));
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(levels, x, y) == 0) { }
@@ -119,10 +119,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     sylvan_varswap_p4();
 
-    if (levels->ref_count_size > 0) {
-        isolated += levels_is_isolated(levels, x) + levels_is_isolated(levels, y);
-        levels->isolated_count += isolated;
-    }
+    isolated += mrc_is_isolated(&reorder_db->mrc, x) + mrc_is_isolated(&reorder_db->mrc, y);
+    reorder_db->mrc.isolated_count += isolated;
+
 
     // swap the mappings
     levels->order_to_level[levels->level_to_order[pos]] = pos + 1;
@@ -225,8 +224,9 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
 
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
-            var_inc(var);
-            var_dec(var + 1);
+            ref_counters_ref_vars_add(&reorder_db->ref_counters, var, 1);
+            ref_counters_ref_vars_add(&reorder_db->ref_counters, var+1, -1);
+
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, it->current_value) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -251,8 +251,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
                 // we are at the end of a chain
-                var_inc(var + 1);
-                var_dec(var);
+                ref_counters_ref_vars_add(&reorder_db->ref_counters, var + 1, 1);
+                ref_counters_ref_vars_add(&reorder_db->ref_counters, var, -1);
                 mtbddnode_setvariable(node, var + 1);
                 llmsset_rehash_bucket(nodes, it->current_value);
             } else {
@@ -260,8 +260,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                 uint32_t vf0 = mtbdd_getvar(f0);
                 if (vf0 > var + 1) {
                     // next in chain wasn't <var+1>...
-                    var_inc(var + 1);
-                    var_dec(var);
+                    ref_counters_ref_vars_add(&reorder_db->ref_counters, var + 1, 1);
+                    ref_counters_ref_vars_add(&reorder_db->ref_counters, var, -1);
                     mtbddnode_setvariable(node, var + 1);
                     if (!llmsset_rehash_bucket(nodes, it->current_value)) {
                         atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -279,8 +279,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                 mtbddnode_setmark(node, 1);
                 marked++;
             } else {
-                var_inc(var + 1);
-                var_dec(var);
+                ref_counters_ref_vars_add(&reorder_db->ref_counters, var + 1, 1);
+                ref_counters_ref_vars_add(&reorder_db->ref_counters, var, -1);
                 mtbddnode_setvariable(node, var + 1);
                 if (!llmsset_rehash_bucket(nodes, it->current_value)) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
