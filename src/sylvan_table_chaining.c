@@ -18,7 +18,6 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
-
 #include <errno.h>  // for errno
 #include <string.h> // memset
 #include <sys/mman.h> // for mmap
@@ -299,12 +298,17 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
  */
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
-    atomic_bitmap_t bitmap = {
+//    printf("llmsset_clear_one_data: %llu\n", index);
+    atomic_bitmap_t bitmap2 = {
         .container = dbs->bitmap2,
         .size = dbs->table_size
     };
-    atomic_bitmap_clear(&bitmap, index);
-    if (atomic_bitmap_get(&bitmap, index)) {
+    atomic_bitmap_clear(&bitmap2, index);
+    bitmap_t bitmapc = {
+        .container = dbs->bitmapc,
+        .size = dbs->table_size
+    };
+    if (bitmap_get(&bitmapc, index)) {
         uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
         dbs->destroy_cb(d_ptr[1], d_ptr[2]);
     }

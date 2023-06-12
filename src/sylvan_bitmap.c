@@ -242,6 +242,7 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos)
 
 int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
 {
+    assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
     bitmap_container_t v = atomic_load_explicit(ptr, memory_order_acquire);
     uint64_t mask = BIT_MASK(pos);
@@ -252,6 +253,7 @@ int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
 
 int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
 {
+    assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
     bitmap_container_t v = atomic_load_explicit(ptr, memory_order_acquire);
     uint64_t mask = BIT_MASK(pos);

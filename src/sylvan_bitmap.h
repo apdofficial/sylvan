@@ -22,18 +22,14 @@ typedef struct atomic_bitmap_s {
     size_t size;
 } atomic_bitmap_t;
 
-enum
-{
-    BITS_PER_WORD = sizeof(bitmap_container_t) * CHAR_BIT,
-};
+static const size_t npos = (bitmap_container_t)-1;
 
-static const size_t npos = (uint64_t)-1;
-
+#define BITS_PER_WORD           (sizeof(bitmap_container_t) * CHAR_BIT)
 #define WORD_INDEX(b)           ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)           ((b) % BITS_PER_WORD)
-#define BIT_MASK(b)             ((uint64_t) 0x8000000000000000LL >> (b))
-#define BIT_FWD_ITER_MASK(b)    (~((uint64_t) 0x0) >> (b))
-#define BIT_BCK_ITER_MASK(b)    (~(~((uint64_t) 0x0) >> (int)(b)))
+#define BIT_MASK(b)             ((bitmap_container_t) 0x8000000000000000LL >> (b))
+#define BIT_FWD_ITER_MASK(b)    (~((bitmap_container_t) 0x0) >> (b))
+#define BIT_BCK_ITER_MASK(b)    (~(~((bitmap_container_t) 0x0) >> (int)(b)))
 #define NUMBER_OF_WORDS(b)      (((b) + BITS_PER_WORD-1) / BITS_PER_WORD)
 
 /*

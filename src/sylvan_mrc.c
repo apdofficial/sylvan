@@ -123,6 +123,7 @@ void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_i
     }
 
     mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
+
 }
 
 void mrc_deinit(mrc_t* self)
@@ -203,11 +204,6 @@ size_t mrc_nnodes_get(const mrc_t *self)
     return self->nnodes;
 }
 
-int mrc_node_count_get(const mrc_t *self)
-{
-    return self->isolated_count;
-}
-
 int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 {
     if (self->ref_vars.size == 0) return 0;
@@ -250,6 +246,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
     assert(!SYLVAN_USE_LINEAR_PROBING);
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
+    mrc_nnodes_add(self, -1);
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
         size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;

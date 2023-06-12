@@ -202,8 +202,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
 
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
-            mrc_ref_vars_add(&reorder_db->mrc, var, 1);
-            mrc_ref_vars_add(&reorder_db->mrc, var + 1, -1);
+            mrc_var_nnodes_add(&reorder_db->mrc, var, 1);
+            mrc_var_nnodes_add(&reorder_db->mrc, var + 1, -1);
 
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, it->current_value) != 1) {
@@ -229,8 +229,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
                 // we are at the end of a chain
-                mrc_ref_vars_add(&reorder_db->mrc, var + 1, 1);
-                mrc_ref_vars_add(&reorder_db->mrc, var, -1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
 
                 mtbddnode_setvariable(node, var + 1);
                 llmsset_rehash_bucket(nodes, it->current_value);
@@ -239,8 +239,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                 uint32_t vf0 = mtbdd_getvar(f0);
                 if (vf0 > var + 1) {
                     // next in chain wasn't <var+1>...
-                    mrc_ref_vars_add(&reorder_db->mrc, var + 1, 1);
-                    mrc_ref_vars_add(&reorder_db->mrc, var, -1);
+                    mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
+                    mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
 
                     mtbddnode_setvariable(node, var + 1);
                     if (!llmsset_rehash_bucket(nodes, it->current_value)) {
@@ -259,8 +259,8 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
                 mtbddnode_setmark(node, 1);
                 marked++;
             } else {
-                mrc_ref_vars_add(&reorder_db->mrc, var + 1, 1);
-                mrc_ref_vars_add(&reorder_db->mrc, var, -1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
                 mtbddnode_setvariable(node, var + 1);
                 if (!llmsset_rehash_bucket(nodes, it->current_value)) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -363,7 +363,8 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
                 return;
             }
             if (created1) {
-                mrc_ref_vars_add(&reorder_db->mrc, var + 1, 1);
+                mrc_nnodes_add(&reorder_db->mrc, 1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
                 mrc_ref_nodes_set(&reorder_db->mrc, newf1 & SYLVAN_TABLE_MASK_INDEX, 1);
                 mrc_ref_nodes_add(&reorder_db->mrc, f11 & SYLVAN_TABLE_MASK_INDEX, 1);
                 mrc_ref_nodes_add(&reorder_db->mrc, f01 & SYLVAN_TABLE_MASK_INDEX, 1);
@@ -378,7 +379,8 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
                 return;
             }
             if (created0) {
-                mrc_ref_vars_add(&reorder_db->mrc, var + 1, 1);
+                mrc_nnodes_add(&reorder_db->mrc, 1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
                 mrc_ref_nodes_set(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
                 mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
                 mrc_ref_nodes_add(&reorder_db->mrc, f10 & SYLVAN_TABLE_MASK_INDEX, 1);

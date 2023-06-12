@@ -19,7 +19,7 @@
 #include <sys/time.h>
 #include <stdatomic.h>
 
-#define STATS 1 // useful information w.r.t. dynamic reordering for debugging
+#define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
 
 static int reorder_initialized = 0;
