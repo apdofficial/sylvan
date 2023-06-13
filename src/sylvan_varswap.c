@@ -64,6 +64,12 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
 
+    size_t filled, total;
+    sylvan_table_usage(&filled, &total);
+    if ((double)filled > (double)total * 0.85){
+        return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
+    }
+
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
@@ -418,6 +424,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
+                size_t filled, total;
+                sylvan_table_usage(&filled, &total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }

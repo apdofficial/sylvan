@@ -49,6 +49,8 @@ typedef enum reorder_result {
     SYLVAN_REORDER_NOT_INITIALISED = -11,
     /// the operation failed fast because the varswap was already running
     SYLVAN_REORDER_ALREADY_RUNNING = -12,
+    /// the operation did not even start because there was not enough memory
+    SYLVAN_REORDER_NOT_ENOUGH_MEMORY = -13,
 } reorder_result_t;
 
 /**

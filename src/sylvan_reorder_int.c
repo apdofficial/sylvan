@@ -534,6 +534,9 @@ void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t bu
         case SYLVAN_REORDER_ALREADY_RUNNING:
             sprintf(buf, "SYLVAN_REORDER: cannot start reordering when it is already running (%d)", result);
             break;
+        case SYLVAN_REORDER_NOT_ENOUGH_MEMORY:
+            sprintf(buf, "SYLVAN_REORDER: not enough memory (%d)", result);
+            break;
         default:
             sprintf(buf, "SYLVAN_REORDER: UNKNOWN ERROR (%d)", result);
             break;
