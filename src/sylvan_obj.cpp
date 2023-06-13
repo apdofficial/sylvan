@@ -1103,11 +1103,6 @@ reorder_result_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
     return sylvan_reorder_perm(perm.data());
 }
 
-reorder_config_t Sylvan::getReorderConfig()
-{
-    return sylvan_get_reorder_config();
-}
-
 
 uint32_t Sylvan::getLevelsCount()
 {

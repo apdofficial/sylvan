@@ -35,7 +35,7 @@ namespace sylvan {
 #include <sylvan_interact.h>
 #include <sylvan_varswap.h>
 #include <sylvan_mrc.h>
-#include <sylvan_reorder_db.h>
+#include <sylvan_reorder_int.h>
 
 #ifndef SYLVAN_INT_H
 #define SYLVAN_INT_H

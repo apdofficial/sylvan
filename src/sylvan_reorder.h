@@ -18,28 +18,6 @@ typedef enum {
     SYLVAN_REORDER_BOUNDED_SIFT,
 } reordering_type_t;
 
-typedef struct sifting_state
-{
-    uint32_t    pos;
-    int         size;
-    uint32_t    best_pos;
-    int         best_size;
-    uint32_t    low;
-    uint32_t    high;
-} sifting_state_t;
-
-typedef struct sifting_config {
-    double t_start_sifting;                     // start time of the sifting
-    uint32_t threshold;                         // threshold for number of nodes per level
-    double max_growth;                          // coefficient used to calculate maximum growth
-    uint32_t max_swap;                          // maximum number of swaps per sifting
-    uint32_t varswap_count;                     // number of swaps completed
-    uint32_t max_var;                           // maximum number of vars swapped per sifting
-    uint32_t total_num_var;                     // number of vars sifted
-    double time_limit_ms;                       // time limit in milliseconds
-    reordering_type_t type;                     // type of reordering algorithm
-} sifting_config_t;
-
 typedef int (*re_term_cb)();
 
 typedef enum reorder_result {
@@ -83,15 +61,6 @@ typedef enum reorder_result {
  */
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len);
 
-static inline int sylvan_reorder_issuccess(reorder_result_t result)
-{
-    return result == SYLVAN_REORDER_SUCCESS ||
-    result == SYLVAN_REORDER_NOT_INITIALISED ||
-    result == SYLVAN_REORDER_ROLLBACK;
-}
-
-void sylvan_print_reorder_res(reorder_result_t result);
-
 /**
  * @brief Add a hook that is called before dynamic variable reordering begins.
  */
@@ -112,9 +81,6 @@ void sylvan_re_hook_progre(re_hook_cb callback);
  */
 void sylvan_re_hook_termre(re_term_cb callback);
 
-// opaque type
-typedef struct reorder_config *reorder_config_t;
-
 /**
  * @brief Initialize the dynamic variable reordering.
  */
@@ -125,10 +91,6 @@ void sylvan_init_reorder(void);
  */
 void sylvan_quit_reorder(void);
 
-/**
- * @brief Get the reorder configuration.
- */
-reorder_config_t sylvan_get_reorder_config();
 
 /**
  * @brief Set threshold for the number of nodes per level to consider during the reordering.
@@ -187,27 +149,6 @@ void sylvan_set_reorder_verbose(int is_verbose);
  */
 void sylvan_set_reorder_type(reordering_type_t type);
 
-/**
- * @brief Sift given variable up from its current level to the target level.
- * @sideeffect order of variables is changed
- */
-TASK_DECL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*);
-#define sylvan_siftdown(state) CALL(sylvan_siftdown, state)
-
-/**
- * @brief Sift given variable down from its current level to the target level.
- * @sideeffect order of variables is changed
- */
-TASK_DECL_1(reorder_result_t, sylvan_siftup, sifting_state_t*);
-#define sylvan_siftup(state) CALL(sylvan_siftup, state)
-
-/**
- * @brief Sift a variable to its best level.
- * @param pos - variable to sift
- * @param target_pos - target position (w.r.t. dynamic variable reordering)
- */
-TASK_DECL_1(reorder_result_t, sylvan_siftback, sifting_state_t*);
-#define sylvan_siftback(state) CALL(sylvan_siftback, state)
 
 /**
  * @brief Reduce the heap size in the entire forest.
@@ -239,12 +180,6 @@ TASK_DECL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*);
   currently in use.
  */
 #define sylvan_reorder_perm(permutation)  RUN(sylvan_reorder_perm, permutation)
-
-#define sylvan_pre_reorder(type) RUN(sylvan_pre_reorder, type)
-VOID_TASK_DECL_1(sylvan_pre_reorder, reordering_type_t)
-
-#define sylvan_post_reorder() RUN(sylvan_post_reorder)
-VOID_TASK_DECL_0(sylvan_post_reorder)
 
 #ifdef __cplusplus
 }
