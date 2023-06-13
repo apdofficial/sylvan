@@ -29,28 +29,28 @@ typedef struct sifting_state
 
 typedef struct reorder_config
 {
-    double t_start_sifting;                             // start time of the sifting
-    uint32_t threshold;                                 // threshold for number of nodes per level
-    double max_growth;                                  // coefficient used to calculate maximum growth
-    uint32_t max_swap;                                  // maximum number of swaps per sifting
-    uint32_t varswap_count;                             // number of swaps completed
-    uint32_t max_var;                                   // maximum number of vars swapped per sifting
-    uint32_t total_num_var;                             // number of vars sifted
-    double time_limit_ms;                               // time limit in milliseconds
-    reordering_type_t type;                             // type of reordering algorithm
-    bool print_stat;                                    // flag to print the progress of the reordering
-    size_t size_threshold;                              // reorder if this size is reached
+    double                  t_start_sifting;      // start time of the sifting
+    uint32_t                threshold;            // threshold for number of nodes per level
+    double                  max_growth;           // coefficient used to calculate maximum growth
+    uint32_t                max_swap;             // maximum number of swaps per sifting
+    uint32_t                varswap_count;        // number of swaps completed
+    uint32_t                max_var;              // maximum number of vars swapped per sifting
+    uint32_t                total_num_var;        // number of vars sifted
+    double                  time_limit_ms;        // time limit in milliseconds
+    reordering_type_t       type;                 // type of reordering algorithm
+    bool                    print_stat;           // flag to print the progress of the reordering
+    size_t                  size_threshold;       // reorder if this size is reached
 } reorder_config_t;
 
 typedef struct reorder_db_s
 {
-    roaring_bitmap_t *node_ids;                         // compressed roaring bitmap holding node indices of the unique table nodes
-    mrc_t mrc;                                          // reference counters used for the unique table nodes
-    interact_t matrix;                                  // bitmap used for storing the square variable interaction matrix (use sylvan_interact with it)
-    size_t call_count;                                  // number of reordering calls
-    bool is_initialised;                                // is dynamic reordering initialised
-    reorder_config_t config;                            // configuration for the sifting
-    levels_t levels;                                    // levels of the unique table nodes
+    roaring_bitmap_t*       node_ids;             // compressed roaring bitmap holding node indices of the unique table nodes
+    mrc_t                   mrc;                  // reference counters used for the unique table nodes
+    interact_t              matrix;               // bitmap used for storing the square variable interaction matrix (use sylvan_interact with it)
+    levels_t                levels;               // levels of the unique table nodes
+    reorder_config_t        config;               // configuration for the sifting
+    size_t                  call_count;           // number of reordering calls
+    bool                    is_initialised;       // is dynamic reordering initialised
 } *reorder_db_t;
 
 reorder_db_t reorder_db_init();

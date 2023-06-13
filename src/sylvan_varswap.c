@@ -69,12 +69,20 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // isolated projection functions are there by checking only these
     // two functions again. This is done to eliminate the isolated
     // projection functions from the node count.
-    BDDVAR x = reorder_db->levels.level_to_order[pos];
-    BDDVAR y = reorder_db->levels.level_to_order[pos + 1];
-    int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, x) + mrc_is_var_isolated(&reorder_db->mrc, y));
+    BDDVAR xIndex = reorder_db->levels.level_to_order[pos];
+    BDDVAR yIndex = reorder_db->levels.level_to_order[pos + 1];
+    int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (interact_test(levels, x, y) == 0) { }
+    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
+//        printf("non-interacting swap: %d %d\n", xIndex, yIndex);
+//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos]] = pos + 1;
+//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos + 1]] = pos;
+//        uint32_t save = reorder_db->levels.level_to_order[pos];
+//        reorder_db->levels.level_to_order[pos] = reorder_db->levels.level_to_order[pos + 1];
+//        reorder_db->levels.level_to_order[pos + 1] = save;
+//        return result;
+    }
     sylvan_clear_cache();
 
 #if SYLVAN_USE_LINEAR_PROBING
@@ -101,7 +109,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
 
-    isolated += mrc_is_var_isolated(&reorder_db->mrc, x) + mrc_is_var_isolated(&reorder_db->mrc, y);
+    isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;
 
 
