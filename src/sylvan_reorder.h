@@ -35,18 +35,20 @@ typedef enum reorder_result {
     SYLVAN_REORDER_P2_REHASH_FAIL = -4,
     /// cannot create node in phase 2 (ergo marked nodes remaining)
     SYLVAN_REORDER_P2_CREATE_FAIL = -5,
+    /// cannot create mapnode in phase 2 (ergo marked nodes remaining)
+    SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL = -6,
     /// cannot rehash and cannot create node in phase 2
-    SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -6,
+    SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL = -7,
     //// cannot rehash in phase 3, maybe there are marked nodes remaining
-    SYLVAN_REORDER_P3_REHASH_FAIL = -7,
+    SYLVAN_REORDER_P3_REHASH_FAIL = -8,
     //// cannot clear in phase 3, maybe there are marked nodes remaining
-    SYLVAN_REORDER_P3_CLEAR_FAIL = -8,
+    SYLVAN_REORDER_P3_CLEAR_FAIL = -9,
     /// the operation failed fast because there are no registered variables
-    SYLVAN_REORDER_NO_REGISTERED_VARS = -9,
+    SYLVAN_REORDER_NO_REGISTERED_VARS = -10,
     /// the operation failed fast because the varswap was not initialised
-    SYLVAN_REORDER_NOT_INITIALISED = -10,
+    SYLVAN_REORDER_NOT_INITIALISED = -11,
     /// the operation failed fast because the varswap was already running
-    SYLVAN_REORDER_ALREADY_RUNNING = -11,
+    SYLVAN_REORDER_ALREADY_RUNNING = -12,
 } reorder_result_t;
 
 /**

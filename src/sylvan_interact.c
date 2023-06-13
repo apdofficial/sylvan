@@ -130,14 +130,24 @@ VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nv
 {
     atomic_bitmap_init(self, nvars * nvars);
 
-    atomic_bitmap_t support;    // support bitmap
-    atomic_bitmap_t global;     // globally visited nodes bitmap (forest wise)
-    atomic_bitmap_t local;      // locally visited nodes bitmap (tree wise)
+    atomic_bitmap_t support = (atomic_bitmap_t){
+        .container = NULL,
+        .size = 0
+    }; // support bitmap
+    atomic_bitmap_t global = (atomic_bitmap_t){
+        .container = NULL,
+        .size = 0
+    }; // globally visited nodes bitmap (forest wise)
+    atomic_bitmap_t local = (atomic_bitmap_t){
+        .container = NULL,
+        .size = 0
+    }; // locally visited nodes bitmap (tree wise)
 
     atomic_bitmap_init(&support, nvars);
     atomic_bitmap_init(&global, nnodes);
     atomic_bitmap_init(&local, nnodes);
 
+    assert(!roaring_bitmap_is_empty(reorder_db->node_ids));
     roaring_uint32_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 

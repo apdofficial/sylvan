@@ -47,7 +47,7 @@ claim_data_bucket(const llmsset_t dbs)
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
                     size_t index = (8 * my_region + i) * 64 + j;
-                    if (reorder_db != NULL && reorder_db->node_ids != NULL){
+                    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
                         roaring_bitmap_add(reorder_db->node_ids, index);
                     }
                     return index;
@@ -71,7 +71,7 @@ claim_data_bucket(const llmsset_t dbs)
             _Atomic (uint64_t) *ptr = dbs->bitmap1 + (my_region / 64);
             uint64_t mask = 0x8000000000000000LL >> (my_region & 63);
             uint64_t v;
-restart:
+            restart:
             v = atomic_load_explicit(ptr, memory_order_relaxed);
             if (v & mask) continue; // taken
             if (atomic_compare_exchange_weak(ptr, &v, v | mask)) break;
@@ -84,6 +84,9 @@ restart:
 static void
 release_data_bucket(const llmsset_t dbs, uint64_t index)
 {
+    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
+        roaring_bitmap_remove(reorder_db->node_ids, index);
+    }
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64); // get the desired word
     uint64_t mask = 0x8000000000000000LL >> (index & 63); // look only at first 6 least significant bits
     atomic_fetch_and(ptr, ~mask);
@@ -245,7 +248,7 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
     // set d to the next bucket in the chain
     uint64_t d = atomic_load_explicit(dptr, memory_order_relaxed);
     if (d & MASK_INDEX) {
-        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t)-1)) { // settgin ptr to not in use(-1)
+        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) { // settgin ptr to not in use(-1)
         }
         d &= MASK_INDEX; // <d> now contains the next bucket in the chain
     } else {
@@ -253,8 +256,9 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
     }
 
     const uint64_t hash = is_custom_bucket(dbs, didx) ?
-        dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
-        sylvan_tabhash16(dptr[1], dptr[2], 14695981039346656037LLU); // use hash to find where it should be hashed
+                          dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
+                          sylvan_tabhash16(dptr[1], dptr[2],
+                                           14695981039346656037LLU); // use hash to find where it should be hashed
 
 #if LLMSSET_MASK
     _Atomic (uint64_t) *fptr = &dbs->table[hash & dbs->mask];
@@ -278,7 +282,7 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
             // if you use clear one on the same thing twice it goues wrong
             if (idx == 0) return 0; // wasn't in???
 
-            _Atomic(uint64_t)* ptr = ((_Atomic(uint64_t)*)dbs->data) + 3*idx;
+            _Atomic (uint64_t) *ptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * idx;
             uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
 
             if (v == (uint64_t) -1) break; // found delete-in-progress, restart
@@ -298,15 +302,10 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
  */
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
-//    printf("llmsset_clear_one_data: %llu\n", index);
-    atomic_bitmap_t bitmap2 = {
-        .container = dbs->bitmap2,
-        .size = dbs->table_size
-    };
-    atomic_bitmap_clear(&bitmap2, index);
+    release_data_bucket(dbs, index);
     bitmap_t bitmapc = {
-        .container = dbs->bitmapc,
-        .size = dbs->table_size
+            .container = dbs->bitmapc,
+            .size = dbs->table_size
     };
     if (bitmap_get(&bitmapc, index)) {
         uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
@@ -420,7 +419,9 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
 
     // forbid first two positions (index 0 and 1)
     dbs->bitmap2[0] = 0xc000000000000000LL;
-    roaring_bitmap_clear(reorder_db->node_ids);
+    if (reorder_db != NULL && reorder_db->node_ids != NULL){
+        roaring_bitmap_clear(reorder_db->node_ids);
+    }
 
     TOGETHER(llmsset_reset_region);
 }
@@ -441,7 +442,9 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
-    roaring_bitmap_add(reorder_db->node_ids, index);
+    if (reorder_db != NULL && reorder_db->node_ids != NULL){
+        roaring_bitmap_add(reorder_db->node_ids, index);
+    }
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {

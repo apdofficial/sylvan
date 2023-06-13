@@ -243,7 +243,6 @@ void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
 
 void mrc_delete_node(mrc_t *self, size_t index)
 {
-    assert(!SYLVAN_USE_LINEAR_PROBING);
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
     mrc_nnodes_add(self, -1);
@@ -264,6 +263,5 @@ void mrc_delete_node(mrc_t *self, size_t index)
 #if !SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
-    roaring_bitmap_remove(reorder_db->node_ids, index);
 #endif
 }

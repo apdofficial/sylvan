@@ -168,11 +168,11 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
             result = sylvan_bounded_sift(0, 0);
             break;
     }
+    re = 0;
+    sylvan_post_reorder();
     if (sylvan_reorder_issuccess(result) == 0) {
         sylvan_print_reorder_res(result);
     }
-    re = 0;
-    sylvan_post_reorder();
 }
 
 TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
@@ -403,32 +403,26 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         }
 
         reorder_db->config.total_num_var++;
+
 #if STATS
         if (i > 1) exit(1);
 #endif
         continue;
 
         siftingFailed:
+        sylvan_print_reorder_res(res);
         if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL) {
 #if INFO
             printf("\nRunning out of memory. (Running GC and table resizing.)\n");
 #endif
-//            mrc_deinit(&reorder_db->mrc);
-//            interact_deinit(&reorder_db->matrix);
-            sylvan_post_reorder();
+//            sylvan_post_reorder();
+//            sylvan_gc();
+            return res;
 
-            sylvan_gc();
-
-            sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
-
-//            mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
-//            interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
-
-            return CALL(sylvan_bounded_sift, low, high);
+//            sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+//
+//            return sylvan_bounded_sift(low, high);
         } else {
-#if INFO
-            sylvan_print_reorder_res(res);
-#endif
             return res;
         }
     }

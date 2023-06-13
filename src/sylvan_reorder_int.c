@@ -62,7 +62,7 @@ reorder_db_t reorder_db_init()
             .container = NULL,
     };
 
-    db->levels = (levels_t){
+    db->levels = (levels_t) {
             .table = NULL,
             .level_to_order = NULL,
             .order_to_level = NULL,
@@ -72,8 +72,6 @@ reorder_db_t reorder_db_init()
     db->is_initialised = 1;
     db->config = (reorder_config_t) {};
     reorder_set_default_config(&db->config);
-
-    sylvan_init_mtbdd();
 
     sylvan_register_quit(&sylvan_quit_reorder);
     levels_gc_add_mark_managed_refs();
@@ -451,6 +449,9 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
+//    sylvan_clear_and_mark();
+//    sylvan_rehash_all();
+
     size_t after_size = llmsset_count_marked(nodes);
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
@@ -466,14 +467,21 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
 
     double end = wctime() - reorder_db->config.t_start_sifting;
     if (reorder_db->config.print_stat) {
-        printf("%zu nodes in %f sec\n", after_size, end);
+        printf("%zu nodes in %f sec ", after_size, end);
     }
+
+    size_t filled, total;
+    sylvan_table_usage(&filled, &total);
+    printf("\t (table usage: %zu / %zu (%.2f%%))\n", filled, total, (double) filled / (double) total * 100.0);
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
 
     sylvan_timer_stop(SYLVAN_RE);
+
+//    sylvan_clear_and_mark();
+//    sylvan_rehash_all();
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
@@ -494,13 +502,16 @@ void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t bu
             sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, no marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P1_REHASH_FAIL_MARKED:
-            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, and marked nodes remaining (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 1, marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P2_REHASH_FAIL:
             sprintf(buf, "SYLVAN_REORDER: cannot rehash in phase 2, no marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P2_CREATE_FAIL:
-            sprintf(buf, "SYLVAN_REORDER: cannot create node in phase 2 (ergo marked nodes remaining) (%d)", result);
+            sprintf(buf, "SYLVAN_REORDER: cannot create node in phase 2, marked nodes remaining (%d)", result);
+            break;
+        case SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL:
+            sprintf(buf, "SYLVAN_REORDER: cannot create mapnode in phase 2, marked nodes remaining (%d)", result);
             break;
         case SYLVAN_REORDER_P2_REHASH_AND_CREATE_FAIL:
             sprintf(buf, "SYLVAN_REORDER: cannot rehash and cannot create node in phase 2 (%d)", result);

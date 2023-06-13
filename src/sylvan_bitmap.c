@@ -150,7 +150,7 @@ void atomic_bitmap_init(atomic_bitmap_t* bitmap, size_t new_size)
 
 void atomic_bitmap_deinit(atomic_bitmap_t *bitmap)
 {
-    if (bitmap->container != NULL) free_aligned(bitmap->container, bitmap->size);
+    if (bitmap->container != NULL && bitmap->size > 0) free_aligned(bitmap->container, bitmap->size);
     bitmap->size = 0;
     bitmap->container = NULL;
 }

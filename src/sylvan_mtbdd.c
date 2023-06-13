@@ -505,7 +505,10 @@ _mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
     mtbddnode_makenode(&n, var, low, high);
 
     uint64_t index = llmsset_lookup(nodes, n.a, n.b, created);
-    if (index == 0) return mtbdd_invalid;
+    if (index == 0) {
+        return mtbdd_invalid;
+    }
+
 
     if (created) sylvan_stats_count(BDD_NODES_CREATED);
     else sylvan_stats_count(BDD_NODES_REUSED);
