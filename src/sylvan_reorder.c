@@ -412,9 +412,12 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         siftingFailed:
         if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL || res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
 #if INFO
-            printf("\nRunning out of memory. (Running GC and table resizing.)\n");
+            sylvan_print_reorder_res(res);
 #endif
+            sylvan_post_reorder();
             sylvan_gc();
+            sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+
             return sylvan_bounded_sift(low, high);
         } else {
             return res;
