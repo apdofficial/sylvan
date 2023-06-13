@@ -55,9 +55,17 @@ reorder_db_t reorder_db_init()
     };
 
     db->call_count = 0;
+
     db->matrix = (interact_t) {
             .container = NULL,
     };
+
+    db->levels = (levels_t){
+            .table = NULL,
+            .level_to_order = NULL,
+            .order_to_level = NULL,
+    };
+
 
     db->is_initialised = 1;
     db->config = (reorder_config_t) {};
@@ -66,7 +74,7 @@ reorder_db_t reorder_db_init()
     sylvan_init_mtbdd();
 
     sylvan_register_quit(&sylvan_quit_reorder);
-    mtbdd_levels_gc_add_mark_managed_refs();
+    levels_gc_add_mark_managed_refs();
 
     return db;
 }
@@ -150,7 +158,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
     BDDVAR y;
 
     s_state->size = (int) get_nodes_count();
-    xIndex = levels->level_to_order[s_state->pos];
+    xIndex = reorder_db->levels.level_to_order[s_state->pos];
 
     limitSize = s_state->size = s_state->size - reorder_db->mrc.isolated_count;
     R = 0;
@@ -173,7 +181,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 #endif
     // Initialize the upper bound
     for (y = s_state->high; y > s_state->pos; y--) {
-        yIndex = levels->level_to_order[y];
+        yIndex = reorder_db->levels.level_to_order[y];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             R += (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
 #if STATS
@@ -199,7 +207,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
         x = s_state->pos;
         y = s_state->pos + 1;
         //  Update the upper bound on node decrease
-        yIndex = levels->level_to_order[y];
+        yIndex = reorder_db->levels.level_to_order[y];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             R -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
         }
@@ -267,7 +275,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     BDDVAR y;
 
     s_state->size = (int) get_nodes_count();
-    yIndex = levels->level_to_order[s_state->pos];
+    yIndex = reorder_db->levels.level_to_order[s_state->pos];
 
     // Let <x> be the variable at level <pos-1>. (s_state->pos-1)
     // Let <y> be the variable at level <pos>. (s_state->pos)
@@ -288,7 +296,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
            L, limitSize, s_state->size, reorder_db->mrc.isolated_count);
 #endif
     for (x = s_state->low + 1; x < s_state->pos; x++) {
-        xIndex = levels->level_to_order[x];
+        xIndex = reorder_db->levels.level_to_order[x];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, x) - mrc_is_var_isolated(&reorder_db->mrc, xIndex);
 #if STATS
@@ -315,7 +323,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
         x = s_state->pos - 1;
         y = s_state->pos;
-        xIndex = levels->level_to_order[x];
+        xIndex = reorder_db->levels.level_to_order[x];
 
         res = sylvan_varswap(x);
         if (!sylvan_reorder_issuccess(res)) return res;
@@ -418,7 +426,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 #endif
     }
 
-    mrc_init(&reorder_db->mrc, levels->count, nodes->table_size, reorder_db->node_ids);
+    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;

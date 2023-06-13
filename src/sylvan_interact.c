@@ -99,7 +99,7 @@ void interact_print(const interact_t* self)
  *  F00 F01 F10 F11
  */
 #define find_support(f, lvl_db, support, global, local) RUN(find_support, f, support, global, local)
-VOID_TASK_5(find_support, MTBDD, f, levels_t, lvl_db, atomic_bitmap_t*, support, atomic_bitmap_t*, global, atomic_bitmap_t*, local)
+VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support, atomic_bitmap_t*, global, atomic_bitmap_t*, local)
 {
     uint64_t index = f & SYLVAN_TABLE_MASK_INDEX;
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
@@ -126,7 +126,7 @@ VOID_TASK_5(find_support, MTBDD, f, levels_t, lvl_db, atomic_bitmap_t*, support,
     atomic_bitmap_set(global, index);
 }
 
-VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t, lvl_db, size_t, nvars, size_t, nnodes)
+VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nvars, size_t, nnodes)
 {
     atomic_bitmap_init(self, nvars * nvars);
 

@@ -7,7 +7,7 @@ extern "C" {
 
 typedef atomic_bitmap_t interact_t;
 
-VOID_TASK_DECL_4(interact_init, interact_t*, levels_t, size_t, size_t)
+VOID_TASK_DECL_4(interact_init, interact_t*, levels_t*, size_t, size_t)
 /**
  * @brief Initialize the variable interaction matrix.
  *
@@ -15,7 +15,7 @@ VOID_TASK_DECL_4(interact_init, interact_t*, levels_t, size_t, size_t)
  *
  * @memory: # of variables * # of variables * 1 bit -> O(v^2)
  */
-#define interact_init(s, l, v, n) RUN(interact_init,s, l, v, n)
+#define interact_init(i, l, v, n) RUN(interact_init, i, l, v, n)
 
 void interact_deinit(interact_t *self);
 

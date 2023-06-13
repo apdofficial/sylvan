@@ -50,6 +50,7 @@ typedef struct reorder_db_s
     size_t call_count;                                  // number of reordering calls
     bool is_initialised;                                // is dynamic reordering initialised
     reorder_config_t config;                            // configuration for the sifting
+    levels_t levels;                                    // levels of the unique table nodes
 } *reorder_db_t;
 
 reorder_db_t reorder_db_init();
@@ -58,10 +59,6 @@ void reorder_db_deinit(reorder_db_t self);
 
 static inline void reorder_set_default_config(reorder_config_t *configs)
 {
-//    configs->t_start_sifting = 0;
-//    configs->total_num_var = 0;
-//    configs->varswap_count = 0;
-
     configs->threshold = SYLVAN_REORDER_NODES_THRESHOLD;
     configs->max_growth = SYLVAN_REORDER_GROWTH;
     configs->max_swap = SYLVAN_REORDER_MAX_SWAPS;
@@ -119,7 +116,6 @@ void sylvan_reorder_type_description(reordering_type_t type, char *buf, size_t b
 int should_terminate_sifting(const struct reorder_config *reorder_config);
 
 int should_terminate_reordering(const struct reorder_config *reorder_config);
-
 
 VOID_TASK_DECL_0(reorder_db_call_progress_hooks)
 

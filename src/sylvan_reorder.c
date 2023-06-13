@@ -34,23 +34,6 @@ TASK_DECL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, uint32_t)
 
 #define sylvan_bounded_sift(v, limit) CALL(sylvan_bounded_sift, v, limit)
 
-static double wctime()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (tv.tv_sec + 1E-6 * tv.tv_usec);
-}
-
-static inline double wctime_sec_elapsed(double t_start)
-{
-    return wctime() - t_start;
-}
-
-static inline double wctime_ms_elapsed(double start)
-{
-    return wctime_sec_elapsed(start) * 1000;
-}
-
 void sylvan_init_reorder()
 {
     reorder_db = reorder_db_init();
@@ -121,17 +104,17 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
     int is_identity = 1;
 
     // check if permutation is identity
-    for (size_t level = 0; level < levels->count; level++) {
-        if (permutation[level] != levels->level_to_order[level]) {
+    for (size_t level = 0; level < reorder_db->levels.count; level++) {
+        if (permutation[level] != reorder_db->levels.level_to_order[level]) {
             is_identity = 0;
             break;
         }
     }
     if (is_identity) return res;
 
-    for (size_t level = 0; level < levels->count; ++level) {
+    for (size_t level = 0; level < reorder_db->levels.count; ++level) {
         uint32_t var = permutation[level];
-        uint32_t pos = mtbdd_order_to_level(var);
+        uint32_t pos = levels_order_to_level(&reorder_db->levels, var);
         for (; pos < level; pos++) {
             res = sylvan_varswap(pos);
             if (!sylvan_reorder_issuccess(res)) return res;
@@ -170,7 +153,7 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
 {
     reorder_result_t result = SYLVAN_REORDER_SUCCESS;
     if (!reorder_db->is_initialised) result = SYLVAN_REORDER_NOT_INITIALISED;
-    if (levels->count < 1) result = SYLVAN_REORDER_NO_REGISTERED_VARS;
+    if (reorder_db->levels.count < 1) result = SYLVAN_REORDER_NO_REGISTERED_VARS;
     if (sylvan_reorder_issuccess(result) == 0) {
         sylvan_print_reorder_res(result);
         return;
@@ -194,26 +177,26 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
 TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 {
     // if high == 0, then we sift all variables
-    if (high == 0) high = levels->count - 1;
+    if (high == 0) high = reorder_db->levels.count - 1;
 
     // count all variable levels (parallel...)
-    _Atomic (size_t) level_counts[levels->count];
-    for (size_t i = 0; i < levels->count; i++) {
-        level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, levels->level_to_order[i]);
+    _Atomic (size_t) level_counts[reorder_db->levels.count];
+    for (size_t i = 0; i < reorder_db->levels.count; i++) {
+        level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, reorder_db->levels.level_to_order[i]);
     }
     // mark and sort variable levels based on the threshold
-    int ordered_levels[levels->count];
-    mtbdd_mark_threshold(ordered_levels, level_counts, 0);
-    gnome_sort(ordered_levels, level_counts);
+    int ordered_levels[reorder_db->levels.count];
+    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
+    levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
 
     size_t cursize = get_nodes_count();
 
-    for (int i = 0; i < (int) levels->count; i++) {
+    for (int i = 0; i < (int) reorder_db->levels.count; i++) {
         int lvl = ordered_levels[i];
         if (lvl < 0) break; // done
-        size_t pos = levels->level_to_order[lvl];
+        size_t pos = reorder_db->levels.level_to_order[lvl];
 
         size_t bestpos = pos;
         size_t bestsize = cursize;
@@ -329,23 +312,23 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high)
 {
     // if high == 0, then we sift all variables
-    if (high == 0) high = levels->count - 1;
+    if (high == 0) high = reorder_db->levels.count - 1;
 
-    interact_init(&reorder_db->matrix, levels, levels->count, nodes->table_size);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
 
     // count all variable levels
-    _Atomic (size_t) level_counts[levels->count];
-    for (size_t i = 0; i < levels->count; i++) {
-        level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, levels->level_to_order[i]);
+    _Atomic (size_t) level_counts[reorder_db->levels.count];
+    for (size_t i = 0; i < reorder_db->levels.count; i++) {
+        level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, reorder_db->levels.level_to_order[i]);
     }
     // mark and sort variable levels based on the threshold
-    int ordered_levels[levels->count];
-    mtbdd_mark_threshold(ordered_levels, level_counts, reorder_db->config.threshold);
-    gnome_sort(ordered_levels, level_counts);
+    int ordered_levels[reorder_db->levels.count];
+    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
+    levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
-    _Atomic (uint32_t) level_to_order[levels->count];
-    for (size_t i = 0; i < levels->count; i++) {
-        level_to_order[i] = levels->level_to_order[i];
+    _Atomic (uint32_t) level_to_order[reorder_db->levels.count];
+    for (size_t i = 0; i < reorder_db->levels.count; i++) {
+        level_to_order[i] = reorder_db->levels.level_to_order[i];
     }
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
@@ -369,9 +352,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     printf("\n");
 #endif
 
-    for (int i = 0; i < (int) levels->count; i++) {
+    for (int i = 0; i < (int) reorder_db->levels.count; i++) {
         int lvl = ordered_levels[i];
-        s_state.pos = levels->order_to_level[level_to_order[lvl]];
+        s_state.pos = reorder_db->levels.order_to_level[level_to_order[lvl]];
         if (s_state.pos < s_state.low || s_state.pos > s_state.high) continue;
 
         reorder_db->config.varswap_count = 0;
@@ -436,8 +419,8 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
             sylvan_gc();
 
-            mrc_init(&reorder_db->mrc, levels->count, nodes->table_size, reorder_db->node_ids);
-            interact_init(&reorder_db->matrix, levels, levels->count, nodes->table_size);
+            mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+            interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
 
             return CALL(sylvan_bounded_sift, low, high);
         } else {

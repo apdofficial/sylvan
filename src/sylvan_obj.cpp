@@ -432,35 +432,35 @@ Bdd::bddVar(uint32_t index)
     return sylvan_ithvar(index);
 }
 
-Bdd
-Bdd::newLevel()
-{
-    return sylvan_newlevel();
-}
+//Bdd
+//Bdd::newLevel()
+//{
+//    return sylvan_newlevel();
+//}
+//
+//int
+//Bdd::newLevels(size_t amount)
+//{
+//    return sylvan_newlevels(amount);
+//}
 
-int
-Bdd::newLevels(size_t amount)
-{
-    return sylvan_newlevels(amount);
-}
+//void
+//Bdd::resetLevels()
+//{
+//    sylvan_resetlevels();
+//}
 
-void
-Bdd::resetLevels()
-{
-    sylvan_resetlevels();
-}
-
-Bdd
-Bdd::bddLevel(uint32_t index)
-{
-    return sylvan_level_to_order(index);
-}
-
-uint32_t
-bddVarToLevel(uint32_t index)
-{
-    return sylvan_order_to_level(index);
-}
+//Bdd
+//Bdd::bddLevel(uint32_t index)
+//{
+//    return sylvan_level_to_order(index);
+//}
+//
+//uint32_t
+//bddVarToLevel(uint32_t index)
+//{
+//    return sylvan_order_to_level(index);
+//}
 
 Bdd
 Bdd::bddCube(const BddSet &variables, uint8_t *values)
@@ -611,36 +611,36 @@ Mtbdd::mtbddVar(uint32_t variable)
 {
     return mtbdd_makenode(variable, mtbdd_false, mtbdd_true);
 }
+//
+//Mtbdd
+//Mtbdd::newLevel()
+//{
+//    return sylvan_newlevel();
+//}
 
-Mtbdd
-Mtbdd::newLevel()
-{
-    return sylvan_newlevel();
-}
+//int
+//Mtbdd::newLevels(size_t amount)
+//{
+//    return sylvan_newlevels(amount);
+//}
 
-int
-Mtbdd::newLevels(size_t amount)
-{
-    return sylvan_newlevels(amount);
-}
+//void
+//Mtbdd::resetLevels()
+//{
+//    sylvan_resetlevels();
+//}
 
-void
-Mtbdd::resetLevels()
-{
-    sylvan_resetlevels();
-}
-
-Mtbdd
-Mtbdd::mtbddLevel(uint32_t index)
-{
-    return sylvan_ithlevel(index);
-}
-
-uint32_t
-Mtbdd::bddVarToLevel(uint32_t index)
-{
-    return sylvan_order_to_level(index);
-}
+//Mtbdd
+//Mtbdd::mtbddLevel(uint32_t index)
+//{
+//    return sylvan_ithlevel(index);
+//}
+//
+//uint32_t
+//Mtbdd::bddVarToLevel(uint32_t index)
+//{
+//    return sylvan_order_to_level(index);
+//}
 
 Mtbdd
 Mtbdd::mtbddOne()
@@ -1104,8 +1104,8 @@ reorder_result_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
 }
 
 
-uint32_t Sylvan::getLevelsCount()
-{
-    return sylvan_levelscount();
-}
+//uint32_t Sylvan::getLevelsCount()
+//{
+//    return sylvan_levelscount();
+//}
 

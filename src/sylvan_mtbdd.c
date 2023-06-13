@@ -406,9 +406,6 @@ mtbdd_quit()
         protect_free(&mtbdd_protected);
         mtbdd_protected_created = 0;
     }
-
-    levels_free(levels);
-
     mtbdd_initialized = 0;
 }
 
@@ -429,8 +426,6 @@ sylvan_init_mtbdd()
         protect_create(&mtbdd_protected, 4096);
         mtbdd_protected_created = 1;
     }
-
-    levels = mtbdd_levels_create();
 
     RUN(mtbdd_refs_init);
 }
@@ -591,7 +586,11 @@ mtbdd_makemapnode(uint32_t var, MTBDD low, MTBDD high)
 MTBDD
 mtbdd_ithvar(uint32_t var)
 {
-    return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    if (reorder_db->is_initialised){
+        return levels_ithlevel(&reorder_db->levels, var);
+    } else {
+        return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    }
 }
 
 /* Operations */
