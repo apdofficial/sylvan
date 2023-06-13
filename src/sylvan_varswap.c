@@ -84,7 +84,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 //        return result;
 //    }
 
-#if SYLVAN_USE_LINEAR_PROBING
+#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
@@ -112,7 +112,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;
-
 
     // swap the mappings
     reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos]] = pos + 1;
@@ -166,7 +165,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         if (nvar == var || nvar == (var + 1)) {
             if (!llmsset_clear_one_hash(nodes, index)) {
                 atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
-                exit(-1);
                 return;
             }
         }
@@ -442,16 +440,17 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
 {
-#if SYLVAN_USE_LINEAR_PROBING
+    if (reorder_db->config.print_stat) {
+        printf("\nRunning recovery after running out of memory...\n");
+    }
+#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, result, node_ids);
+    if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
 #endif
-    if (reorder_db->config.print_stat) {
-        printf("\nRunning recovery after running out of memory...\n");
-    }
     // at this point we already have nodes marked from P2 so we will unmark them now in P1
     size_t marked_count = sylvan_varswap_p1(pos, result, node_ids);
     if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast

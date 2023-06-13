@@ -238,6 +238,9 @@ void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+#elif SYLVAN_USE_CHAINING_REHASH_ALL
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
 #endif
 }
 
@@ -260,7 +263,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
         }
     }
-#if !SYLVAN_USE_LINEAR_PROBING
+#if !SYLVAN_USE_LINEAR_PROBING && !SYLVAN_USE_CHAINING_REHASH_ALL
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
 #endif
