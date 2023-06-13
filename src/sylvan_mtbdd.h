@@ -133,11 +133,6 @@ static const MTBDD sylvan_invalid    = 0xffffffffffffffffLL;
 #define sylvan_printsha         mtbdd_printsha
 #define sylvan_fprintsha        mtbdd_fprintsha
 #define sylvan_getsha           mtbdd_getsha
-//#define sylvan_newlevel         levels_new_one(&reorder_db->levels)
-//#define sylvan_newlevels(m)     levels_new_many(&reorder_db->levels, m)
-//#define sylvan_levelscount      levels_count_get(&reorder_db->levels)
-//#define sylvan_resetlevels      levels_reset
-#define sylvan_ithlevel         mtbdd_ithlevel
 #define sylvan_level_to_order   mtbdd_level_to_order
 #define sylvan_order_to_level   mtbdd_order_to_level
 /**
