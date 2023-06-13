@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 
 
 void interact_deinit(interact_t *self)
@@ -11,16 +12,20 @@ void interact_deinit(interact_t *self)
     atomic_bitmap_deinit(self);
 }
 
+static inline size_t interact_get_nrows(const interact_t *self)
+{
+    double nrows = sqrt(self->size);
+    return nrows < 0 ? 0 : (size_t) nrows;
+}
+
 inline void interact_set(interact_t *self, size_t row, size_t col)
 {
-    size_t nrows = self->size / 2;
-    atomic_bitmap_set(self, (row * nrows) + col);
+    atomic_bitmap_set(self, (row * interact_get_nrows(self)) + col);
 }
 
 inline int interact_get(const interact_t *self, size_t row, size_t col)
 {
-    size_t nrows = self->size / 2;
-    return atomic_bitmap_get(self, (row * nrows) + col);
+    return atomic_bitmap_get(self, (row * interact_get_nrows(self)) + col);
 }
 
 inline int interact_test(const interact_t *self, uint32_t x, uint32_t y)
@@ -38,7 +43,7 @@ inline int interact_test(const interact_t *self, uint32_t x, uint32_t y)
 void interact_update(interact_t *self, atomic_bitmap_t *bitmap)
 {
     size_t i, j;
-    size_t nrows = self->size / 2;
+    size_t nrows = interact_get_nrows(self);
     size_t ncols = nrows;
     for (i = 0; i < nrows - 1; i++) {
         if (atomic_bitmap_get(bitmap, i) == 1) {
@@ -55,7 +60,7 @@ void interact_update(interact_t *self, atomic_bitmap_t *bitmap)
 
 void interact_print(const interact_t* self)
 {
-    size_t nrows = self->size / 2;
+    size_t nrows = interact_get_nrows(self);
     size_t ncols = nrows;
     printf("Interaction matrix: \n");
     printf("  \t");

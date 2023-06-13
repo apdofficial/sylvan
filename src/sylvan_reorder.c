@@ -329,9 +329,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
         }
     }
 
+#if STATS
     x = s_state->pos;
     y = s_state->pos + 1;
-#if STATS
     printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
            x, R, s_state->size, limitSize,
            mrc_var_nnodes_get(&reorder_db->mrc, x),
@@ -443,11 +443,12 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 #endif
         }
     }
-    x = s_state->pos - 1;
+
     y = s_state->pos;
 
     L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
 #if STATS
+    x = s_state->pos - 1;
     printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
            x, L, s_state->size, limitSize,
            mrc_var_nnodes_get(&reorder_db->mrc, x),
