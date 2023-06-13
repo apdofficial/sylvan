@@ -268,11 +268,6 @@ VOID_TASK_IMPL_0(sylvan_gc)
 reorder_db_t reorder_db;
 
 /**
- * The levels table used with dynamic variable reordering.
- */
-levels_t levels;
-
-/**
  * The unique table
  */
 llmsset_t nodes;

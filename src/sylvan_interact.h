@@ -5,31 +5,25 @@
 extern "C" {
 #endif /* __cplusplus */
 
-char interact_malloc(levels_t dbs);
+typedef atomic_bitmap_t interact_t;
 
-void interact_free(levels_t dbs);
+VOID_TASK_DECL_4(interact_init, interact_t*, levels_t*, size_t, size_t)
+/**
+ * @brief Initialize the variable interaction matrix.
+ *
+ * @details The interaction matrix is a bitmap of size n*n, where n is the number of variables.
+ *
+ * @memory: # of variables * # of variables * 1 bit -> O(v^2)
+ */
+#define interact_init(i, l, v, n) RUN(interact_init, i, l, v, n)
 
-static inline void interact_set(levels_t dbs, size_t row, size_t col)
-{
-    bitmap_atomic_set(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
-}
+void interact_deinit(interact_t *self);
 
-static inline int interact_get(const levels_t dbs, size_t row, size_t col)
-{
-    return bitmap_atomic_get(dbs->bitmap_i, (row * dbs->bitmap_i_nrows) + col);
-}
+void interact_set(interact_t *self, size_t row, size_t col);
 
-static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
-{
-    // ensure x < y
-    // this is because we only keep the upper triangle of the matrix
-    if (x > y) {
-        int tmp = x;
-        x = y;
-        y = tmp;
-    }
-    return interact_get(dbs, x, y);
-}
+int interact_get(const interact_t *self, size_t row, size_t col);
+
+int interact_test(const interact_t *self, uint32_t x, uint32_t y);
 
 /**
   @brief Marks as interacting all pairs of variables that appear in
@@ -41,21 +35,9 @@ static inline int interact_test(const levels_t dbs, BDDVAR x, BDDVAR y)
   @sideeffect Clears support.
 
 */
-void interact_update(levels_t dbs, atomic_word_t *bitmap_s);
+void interact_update(interact_t *self, atomic_bitmap_t *support);
 
-void interact_print_state(const levels_t dbs);
-
-VOID_TASK_DECL_1(interaction_matrix_init, levels_t)
-/**
-  @brief Initialize the variable interaction matrix, nodes count for each variable, and internal reference count for each variable.
-*/
-#define interaction_matrix_init(dbs) RUN(interaction_matrix_init, dbs)
-
-VOID_TASK_DECL_1(var_ref_init, levels_t)
-/**
-  @brief Initialize nodes count for each variable, and internal reference count for each variable.
-*/
-#define var_ref_init(dbs) RUN(var_ref_init, dbs)
+void interact_print(const interact_t *self);
 
 #ifdef __cplusplus
 }

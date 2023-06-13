@@ -1096,8 +1096,6 @@ namespace sylvan
          */
         static reorder_result_t reorderPerm(const std::vector <uint32_t> &perm);
 
-        static reorder_config_t getReorderConfig();
-
         /**
          * @brief Get the number of created levels
          */

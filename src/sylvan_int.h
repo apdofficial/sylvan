@@ -20,7 +20,6 @@
  * Include this file for access to internals.
  */
 #include <sylvan.h>
-#include <sylvan_reorder_int.h> // roaring.h conflicts in sylvan namespace
 
 #ifdef __cplusplus
 namespace sylvan {
@@ -29,12 +28,14 @@ namespace sylvan {
 /**
  * Sylvan internal header files inside the namespace
  */
+#include <sylvan_bitmap.h>
 #include <sylvan_cache.h>
 #include <sylvan_table.h>
 #include <sylvan_hash.h>
-#include <sylvan_levels.h>
-#include <sylvan_interact.h>
 #include <sylvan_varswap.h>
+#include <sylvan_mrc.h>
+#include <sylvan_interact.h>
+#include <sylvan_reorder_int.h>
 
 #ifndef SYLVAN_INT_H
 #define SYLVAN_INT_H
@@ -52,10 +53,6 @@ extern "C" {
  */
 extern reorder_db_t reorder_db;
 
-/**
- * The levels table used with dynamic variable reordering.
- */
-extern levels_t levels;
 
 /**
  * Nodes table.

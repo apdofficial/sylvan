@@ -9,7 +9,7 @@ extern "C" {
   * @brief Swaps two consecutive variables in the entire forest.
   */
 TASK_DECL_1(reorder_result_t, sylvan_varswap, uint32_t)
-#define sylvan_varswap(pos) CALL(sylvan_varswap, pos)
+#define sylvan_varswap(p) CALL(sylvan_varswap, p)
 
 #ifdef __cplusplus
 }
