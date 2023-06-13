@@ -1,8 +1,6 @@
 #ifndef SYLVAN_SYLVAN_LEVELS_H
 #define SYLVAN_SYLVAN_LEVELS_H
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -25,7 +23,7 @@ typedef struct levels_s {
 /**
  * @brief Get the number of levels
  */
-size_t   levels_count_get(levels_t* self);
+size_t levels_count_get(levels_t* self);
 
 /**
  * @brief Create the next level and return the BDD representing the variable (ithlevel)

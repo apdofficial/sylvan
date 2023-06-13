@@ -74,7 +74,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
+//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
 //        printf("non-interacting swap: %d %d\n", xIndex, yIndex);
 //        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos]] = pos + 1;
 //        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos + 1]] = pos;
@@ -82,7 +82,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 //        reorder_db->levels.level_to_order[pos] = reorder_db->levels.level_to_order[pos + 1];
 //        reorder_db->levels.level_to_order[pos + 1] = save;
 //        return result;
-    }
+//    }
     sylvan_clear_cache();
 
 #if SYLVAN_USE_LINEAR_PROBING
