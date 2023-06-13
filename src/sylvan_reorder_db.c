@@ -34,6 +34,9 @@ reorder_db_t reorder_db_init()
 
     db->size_threshold = SYLVAN_REORDER_FIRST_REORDER;
     db->call_count = 0;
+    db->matrix = (interact_t){
+        .container = NULL,
+    };
 
     return db;
 }
@@ -43,5 +46,6 @@ void reorder_db_deinit(reorder_db_t self)
     if (is_db_available() == 0) return;
     roaring_bitmap_free(self->node_ids);
     mrc_deinit(&self->mrc);
+    interact_deinit(&self->matrix);
     free(reorder_db);
 }

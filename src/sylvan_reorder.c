@@ -317,7 +317,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
     // Initialize the upper bound
     for (y = s_state->high; y > s_state->pos; y--) {
         yIndex = levels->level_to_order[y];
-        if (interact_test(levels, xIndex, yIndex)) {
+        if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             R += (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
 #if STATS
             printf("R: %d, xindex: %d, yindex: %d\n", R, xIndex, yIndex);
@@ -343,7 +343,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
         y = s_state->pos + 1;
         //  Update the upper bound on node decrease
         yIndex = levels->level_to_order[y];
-        if (interact_test(levels, xIndex, yIndex)) {
+        if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             R -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
         }
         res = sylvan_varswap(x);
@@ -432,7 +432,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 #endif
     for (x = s_state->low + 1; x < s_state->pos; x++) {
         xIndex = levels->level_to_order[x];
-        if (interact_test(levels, xIndex, yIndex)) {
+        if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, x) - mrc_is_var_isolated(&reorder_db->mrc, xIndex);
 #if STATS
             printf("L: %d, xindex: %d, yindex: %d\n", L, xIndex, yIndex);
@@ -478,7 +478,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         }
 
         // Update the lower bound on DD size
-        if (interact_test(levels, xIndex, yIndex)) {
+        if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
             L += (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, xIndex);
         }
 
@@ -614,7 +614,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
     levels_bitmap_p2_malloc(nodes->table_size);         // memory usage: # of nodes * 1 bit                      (n)
     // at the moment unfortunately, interaction matrix requires consecutive variables without **gaps**
-    interact_malloc(levels);                            // memory usage: # of variables * # of variables * 1 bit (v^2)
 
 //    Reordering memory composition in bits is: 32v + 19n + v^2
 //    O(v^2 + n) quadratic space complexity
@@ -829,7 +828,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     // if high == 0, then we sift all variables
     if (high == 0) high = levels->count - 1;
 
-    interaction_matrix_init(nodes->table_size);
+    interact_init(&reorder_db->matrix, levels, levels->count, nodes->table_size);
 
     // count all variable levels
     _Atomic (size_t) level_counts[levels->count];
@@ -949,13 +948,14 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
             printf("\nRunning out of memory. (Running GC and table resizing.)\n");
 #endif
             mrc_deinit(&reorder_db->mrc);
+            interact_deinit(&reorder_db->matrix);
             levels_bitmap_p2_free();
 
             sylvan_gc();
 
             mrc_init(&reorder_db->mrc, levels->count, nodes->table_size, reorder_db->node_ids);
+            interact_init(&reorder_db->matrix, levels, levels->count, nodes->table_size);
             levels_bitmap_p2_malloc(nodes->table_size);
-            interact_malloc(levels);
 
             return CALL(sylvan_bounded_sift, low, high);
         } else {

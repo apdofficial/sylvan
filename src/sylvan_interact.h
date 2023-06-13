@@ -5,15 +5,25 @@
 extern "C" {
 #endif /* __cplusplus */
 
-char interact_malloc(levels_t dbs);
+typedef atomic_bitmap_t interact_t;
 
-void interact_free(levels_t dbs);
+VOID_TASK_DECL_4(interact_init, interact_t*, levels_t, size_t, size_t)
+/**
+ * @brief Initialize the variable interaction matrix.
+ *
+ * @details The interaction matrix is a bitmap of size n*n, where n is the number of variables.
+ *
+ * @memory: # of variables * # of variables * 1 bit -> O(v^2)
+ */
+#define interact_init(s, l, v, n) RUN(interact_init,s, l, v, n)
 
-void interact_set(levels_t dbs, size_t row, size_t col);
+void interact_deinit(interact_t *self);
 
-int interact_get(levels_t dbs, size_t row, size_t col);
+void interact_set(interact_t *self, size_t row, size_t col);
 
-int interact_test(levels_t dbs, uint32_t x, uint32_t y);
+int interact_get(const interact_t *self, size_t row, size_t col);
+
+int interact_test(const interact_t *self, uint32_t x, uint32_t y);
 
 /**
   @brief Marks as interacting all pairs of variables that appear in
@@ -25,15 +35,9 @@ int interact_test(levels_t dbs, uint32_t x, uint32_t y);
   @sideeffect Clears support.
 
 */
-void interact_update(levels_t dbs, atomic_bitmap_t *bitmap_s);
+void interact_update(interact_t *self, atomic_bitmap_t *support);
 
-void interact_print_state(levels_t dbs);
-
-VOID_TASK_DECL_1(interaction_matrix_init, size_t)
-/**
-  @brief Initialize the variable interaction matrix, nodes count for each variable, and internal reference count for each variable.
-*/
-#define interaction_matrix_init(nnodes) RUN(interaction_matrix_init, nnodes)
+void interact_print(const interact_t *self);
 
 #ifdef __cplusplus
 }

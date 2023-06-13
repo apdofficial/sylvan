@@ -93,7 +93,7 @@ size_t bitmap_prev(bitmap_t *bitmap, size_t pos);
 size_t bitmap_count(bitmap_t *bitmap);
 
 /*
- * Allocate a new bitmap with the given size
+ * Allocate a new bitmap with the given size (heap allocation)
  */
 void atomic_bitmap_init(atomic_bitmap_t* bitmap, size_t new_size);
 

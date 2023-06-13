@@ -9,6 +9,7 @@ typedef struct reorder_db_s
 {
     roaring_bitmap_t*       node_ids;                   // compressed roaring bitmap holding node indices of the unique table nodes
     mrc_t                   mrc;                        // reference counters used for the unique table nodes
+    interact_t              matrix;                     // bitmap used for storing the square variable interaction matrix (use sylvan_interact with it)
     size_t                  size_threshold;             // reorder if this size is reached
     size_t                  call_count;                 // number of reordering calls
 } *reorder_db_t;

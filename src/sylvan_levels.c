@@ -17,10 +17,6 @@ levels_t mtbdd_levels_create()
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
 
-    dbs->bitmap_i = NULL;
-    dbs->bitmap_i_size = 0;
-    dbs->bitmap_i_nrows = 0;
-
     dbs->bitmap_p2 = NULL;
     dbs->bitmap_p2_size = 0;
 
@@ -59,7 +55,6 @@ levels_bitmap_p2_free()
 void
 levels_free(levels_t dbs)
 {
-    interact_free(levels);
     levels_bitmap_p2_free();
     free_aligned(dbs, sizeof(struct levels_db));
 }
@@ -126,8 +121,6 @@ void mtbdd_resetlevels(void)
 
         if (!levels->order_to_level) free(levels->order_to_level);
         levels->order_to_level = NULL;
-
-        interact_free(levels);
 
         levels_bitmap_p2_free();
 
