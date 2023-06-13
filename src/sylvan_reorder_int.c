@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <sys/time.h>
 
-#define STATS 1 // useful information w.r.t. dynamic reordering for debugging
+#define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
 
 static inline int is_db_available()
@@ -420,6 +420,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
+    sylvan_clear_cache();
+
     if (reorder_db->config.print_stat) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
@@ -431,6 +433,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     }
 
     mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;

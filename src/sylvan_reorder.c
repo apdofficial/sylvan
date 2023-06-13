@@ -19,7 +19,7 @@
 #include <sys/time.h>
 #include <stdatomic.h>
 
-#define STATS 1 // useful information w.r.t. dynamic reordering for debugging
+#define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
 
 VOID_TASK_DECL_1(sylvan_reorder_stop_world, reordering_type_t)
@@ -139,7 +139,7 @@ void sylvan_test_reduce_heap()
 
 void sylvan_reduce_heap(reordering_type_t type)
 {
-    if (reorder_db == NULL || reorder_db->is_initialised) return;
+    if (reorder_db == NULL || reorder_db->is_initialised == false) return;
     sylvan_reorder_stop_world(type);
 }
 
@@ -315,8 +315,6 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     // if high == 0, then we sift all variables
     if (high == 0) high = reorder_db->levels.count - 1;
 
-    interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
-
     // count all variable levels
     _Atomic (size_t) level_counts[reorder_db->levels.count];
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
@@ -415,13 +413,16 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #if INFO
             printf("\nRunning out of memory. (Running GC and table resizing.)\n");
 #endif
-            mrc_deinit(&reorder_db->mrc);
-            interact_deinit(&reorder_db->matrix);
+//            mrc_deinit(&reorder_db->mrc);
+//            interact_deinit(&reorder_db->matrix);
+            sylvan_post_reorder();
 
             sylvan_gc();
 
-            mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
-            interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
+            sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
+
+//            mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+//            interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
 
             return CALL(sylvan_bounded_sift, low, high);
         } else {

@@ -83,7 +83,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 //        reorder_db->levels.level_to_order[pos + 1] = save;
 //        return result;
 //    }
-    sylvan_clear_cache();
 
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
