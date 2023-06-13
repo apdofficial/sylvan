@@ -19,7 +19,7 @@
 #include <sys/time.h>
 #include <stdatomic.h>
 
-#define STATS 0 // useful information w.r.t. dynamic reordering for debugging
+#define STATS 1 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
 
 VOID_TASK_DECL_1(sylvan_reorder_stop_world, reordering_type_t)
@@ -343,9 +343,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
 #if STATS
     printf("\n");
-    interact_print_state(levels);
+    interact_print(&reorder_db->matrix);
 
-    for (size_t i = 0; i < levels->count; i++) {
+    for (size_t i = 0; i < levels_count_get(&reorder_db->levels); i++) {
         int lvl = ordered_levels[i];
         printf("level %d \t has %zu nodes\n", lvl, level_counts[lvl]);
     }

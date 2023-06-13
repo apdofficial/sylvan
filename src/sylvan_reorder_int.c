@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <sys/time.h>
 
+#define STATS 1 // useful information w.r.t. dynamic reordering for debugging
+#define INFO 1  // useful information w.r.t. dynamic reordering
 
 static inline int is_db_available()
 {
@@ -136,6 +138,8 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 
 inline uint64_t get_nodes_count()
 {
+//    return llmsset_count_marked(nodes) + 2;
+
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
@@ -251,8 +255,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
 
 #if STATS
     printf("\n");
-    for (size_t i = 0; i < levels->count; i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, levels->order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
+    for (size_t i = 0; i < levels_count_get(&reorder_db->levels); i++) {
+        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
 #endif
@@ -373,8 +377,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 
 #if STATS
     printf("\n");
-    for (size_t i = 0; i < levels->count; i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, levels->order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
+    for (size_t i = 0; i < reorder_db->levels.count; i++) {
+        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
 #endif

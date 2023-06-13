@@ -43,7 +43,7 @@ counter_t atomic_counters_get(const atomic_counters_t* self, size_t idx);
 typedef struct mrc_s
 {
     int                     isolated_count;         // number of isolated projection functions
-    size_t                  nnodes;                 // number of nodes all nodes in DD
+    _Atomic(size_t)         nnodes;                 // number of nodes all nodes in DD
     atomic_counters_t       ref_nodes;              // number of internal references per node (use node unique table index)
     atomic_counters_t       ref_vars;               // number of internal references per variable (use variable order)
     atomic_counters_t       var_nnodes;             // number of nodes per variable (use variable order)

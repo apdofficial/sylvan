@@ -155,7 +155,7 @@ void mrc_var_nodes_set(mrc_t* self, size_t idx, int val)
 
 void mrc_nnodes_set(mrc_t* self, int val)
 {
-    self->nnodes = val;
+    atomic_store(&self->nnodes, val);
 }
 
 void mrc_ref_nodes_add(mrc_t *self, size_t idx, int val)
@@ -175,7 +175,7 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_add(mrc_t *self, int val)
 {
-    self->nnodes += val;
+    atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
 counter_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx)
@@ -200,7 +200,7 @@ counter_t mrc_var_nnodes_get(const mrc_t *self, size_t idx)
 
 size_t mrc_nnodes_get(const mrc_t *self)
 {
-    return self->nnodes;
+    return atomic_load_explicit(&self->nnodes, memory_order_relaxed);
 }
 
 int mrc_is_var_isolated(const mrc_t *self, size_t idx)

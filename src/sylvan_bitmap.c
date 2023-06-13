@@ -254,10 +254,8 @@ int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
-    bitmap_container_t v = atomic_load_explicit(ptr, memory_order_acquire);
     uint64_t mask = BIT_MASK(pos);
-    if (v & mask) return 0;
-    atomic_fetch_or_explicit(ptr, mask, memory_order_release);
+    atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
     return 1;
 }
 
@@ -265,10 +263,8 @@ int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
-    bitmap_container_t v = atomic_load_explicit(ptr, memory_order_acquire);
     uint64_t mask = BIT_MASK(pos);
-    if ((v & mask) == 0) return 0;
-    atomic_fetch_and_explicit(ptr, ~mask, memory_order_release);
+    atomic_fetch_and_explicit(ptr, ~mask, memory_order_relaxed);
     return 1;
 }
 
