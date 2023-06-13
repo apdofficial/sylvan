@@ -139,6 +139,7 @@ void sylvan_test_reduce_heap()
 
 void sylvan_reduce_heap(reordering_type_t type)
 {
+    if (reorder_db == NULL || reorder_db->is_initialised) return;
     sylvan_reorder_stop_world(type);
 }
 

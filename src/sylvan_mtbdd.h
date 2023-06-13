@@ -1081,6 +1081,9 @@ VOID_TASK_DECL_1(mtbdd_gc_mark_rec, MTBDD);
 VOID_TASK_DECL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*);
 #define mtbdd_re_mark_external_refs(bitmap) RUN(mtbdd_re_mark_external_refs, bitmap)
 
+VOID_TASK_DECL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*);
+#define mtbdd_re_mark_protected(bitmap) RUN(mtbdd_re_mark_protected, bitmap)
+
 
 /**
  * Infrastructure for external references using a hash table.

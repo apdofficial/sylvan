@@ -169,6 +169,19 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
     }
 }
 
+/* Called during dynamic variable reordering */
+VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
+{
+    uint64_t *it = refs_iter(&mtbdd_protected, 0, mtbdd_protected.refs_size);
+    while (it != NULL) {
+        MTBDD dd = refs_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
+        size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
+        _Atomic(uint64_t) *ptr = bitmap + WORD_INDEX(index);
+        uint64_t mask = BIT_MASK(index);
+        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    }
+}
+
 /* Called during garbage collection */
 VOID_TASK_0(mtbdd_gc_mark_external_refs)
 {
@@ -198,6 +211,8 @@ VOID_TASK_0(mtbdd_gc_mark_protected)
         SYNC(mtbdd_gc_mark_rec);
     }
 }
+
+
 
 /* Infrastructure for internal markings */
 typedef struct mtbdd_refs_task
@@ -586,7 +601,7 @@ mtbdd_makemapnode(uint32_t var, MTBDD low, MTBDD high)
 MTBDD
 mtbdd_ithvar(uint32_t var)
 {
-    if (reorder_db->is_initialised){
+    if (reorder_db != NULL && reorder_db->is_initialised){
         return levels_ithlevel(&reorder_db->levels, var);
     } else {
         return mtbdd_makenode(var, mtbdd_false, mtbdd_true);

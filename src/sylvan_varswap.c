@@ -25,9 +25,9 @@ static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
 */
-VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
+VOID_TASK_DECL_5(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
 
-#define sylvan_varswap_p0(pos, result) CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result)
+#define sylvan_varswap_p0(pos, result, node_ids) CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result, node_ids)
 #endif
 
 /*!
@@ -35,25 +35,25 @@ VOID_TASK_DECL_4(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_r
    @details Handle all trivial cases where no node is created, mark cases that are not trivial.
    @return number of nodes that were marked
 */
-TASK_DECL_4(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *)
+TASK_DECL_5(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
 
-#define sylvan_varswap_p1(pos, result) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result)
+#define sylvan_varswap_p1(pos, result, node_ids) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, node_ids)
 
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle the not so trivial cases. (creates new nodes)
 */
-VOID_TASK_DECL_3(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *)
+VOID_TASK_DECL_4(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
 
-#define sylvan_varswap_p2(result) CALL(sylvan_varswap_p2, 0, nodes->table_size, result)
+#define sylvan_varswap_p2(result, node_ids) CALL(sylvan_varswap_p2, 0, nodes->table_size, result, node_ids)
 
 /*!
    @brief Adjacent variable swap phase 3
    @details Recovery phase, restore the nodes that were marked in phase 1.
 */
-VOID_TASK_DECL_2(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *)
+VOID_TASK_DECL_3(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
 
-#define sylvan_varswap_p3(pos, result) CALL(sylvan_varswap_p3, pos, result)
+#define sylvan_varswap_p3(pos, result, node_ids) CALL(sylvan_varswap_p3, pos, result, node_ids)
 
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
@@ -90,19 +90,21 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, &result);
+    sylvan_varswap_p0(pos, &result, reorder_db->node_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, &result);
+    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->node_ids);
 
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     if (marked_count > 0) {
+        roaring_bitmap_t *node_ids = roaring_bitmap_copy(reorder_db->node_ids);
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(&result);
+        sylvan_varswap_p2(&result, node_ids);
+        roaring_bitmap_free(node_ids);
         if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_varswap_p3(pos, &result);
+            sylvan_varswap_p3(pos, &result, reorder_db->node_ids);
         }
     }
 
@@ -130,14 +132,18 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
  *
  * Removes exactly the nodes that will be changed from the hash table.
  */
-VOID_TASK_IMPL_4(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count, _Atomic (reorder_result_t)*,
-                 result)
+VOID_TASK_IMPL_5(sylvan_varswap_p0,
+                 uint32_t, var,
+                 size_t, first,
+                 size_t, count,
+                 _Atomic (reorder_result_t)*, result,
+                 roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_varswap_p0, var, first, split, result);
-        CALL(sylvan_varswap_p0, var, first + split, count - split, result);
+        SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
+        CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p0);
         return;
     }
@@ -148,20 +154,19 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count,
     }
 
     const size_t end = first + count;
-    roaring_uint32_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, first);
 
     while (it->has_value && it->current_value < end) {
-        mtbddnode_t node = MTBDD_GETNODE(it->current_value);
-        if (mtbddnode_isleaf(node)) {
-            roaring_advance_uint32_iterator(it);
-            continue; // a leaf
-        }
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+        mtbddnode_t node = MTBDD_GETNODE(index);
+        if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            llmsset_clear_one_hash(nodes, it->current_value);
+            llmsset_clear_one_hash(nodes, index);
         }
-        roaring_advance_uint32_iterator(it);
+
     }
 }
 
@@ -178,13 +183,18 @@ VOID_TASK_IMPL_4(sylvan_varswap_p0, uint32_t, var, size_t, first, size_t, count,
  * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
  * nodes are rehashed.
  */
-TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, count, _Atomic (reorder_result_t)*, result)
+TASK_IMPL_5(size_t, sylvan_varswap_p1,
+            uint32_t, var,
+            size_t, first,
+            size_t, count,
+            _Atomic (reorder_result_t)*, result,
+            roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_varswap_p1, var, first, split, result);
-        uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result);
+        SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
+        uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
         uint64_t res2 = SYNC(sylvan_varswap_p1);
         return res1 + res2;
     }
@@ -200,7 +210,7 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
 
     const size_t end = first + count;
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return marked;
 
     while (it->has_value && it->current_value < end) {
@@ -296,13 +306,17 @@ TASK_IMPL_4(size_t, sylvan_varswap_p1, uint32_t, var, size_t, first, size_t, cou
  * Returns 0 if there was no error, or 1 if nodes could not be
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
-VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reorder_result_t)*, result)
+VOID_TASK_IMPL_4(sylvan_varswap_p2,
+                 size_t, first,
+                 size_t, count,
+                 _Atomic (reorder_result_t)*, result,
+                 roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
     if (count > BLOCKSIZE) {
         size_t split = count / 2;
-        SPAWN(sylvan_varswap_p2, first, split, result);
-        CALL(sylvan_varswap_p2, first + split, count - split, result);
+        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
+        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p2);
         return;
     }
@@ -314,8 +328,7 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
 
     const size_t end = first + count;
 
-    roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->node_ids);
-    roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
 
     while (it->has_value && it->current_value < end) {
@@ -420,20 +433,22 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
     }
 }
 
-VOID_TASK_IMPL_2(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result)
+VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
 {
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, result);
+    sylvan_varswap_p0(pos, result, node_ids);
 #endif
     printf("Running recovery after running out of memory...\n");
     // at this point we already have nodes marked from P2 so we will unmark them now in P1
-    size_t marked_count = sylvan_varswap_p1(pos, result);
+    size_t marked_count = sylvan_varswap_p1(pos, result, node_ids);
     if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
+        roaring_bitmap_t *node_ids__ = roaring_bitmap_copy(node_ids);
         // do the not so trivial cases (but won't create new nodes this time)
-        sylvan_varswap_p2(result);
+        sylvan_varswap_p2(result, node_ids__);
+        roaring_bitmap_free(node_ids__);
     }
 }

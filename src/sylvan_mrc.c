@@ -123,6 +123,7 @@ void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_i
     }
 
     mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
+    mtbdd_re_mark_protected(self->ext_ref_nodes.container);
 }
 
 void mrc_deinit(mrc_t* self)
