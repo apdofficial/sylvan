@@ -58,6 +58,11 @@ void bitmap_clear(bitmap_t *bitmap, size_t pos);
 char bitmap_get(const bitmap_t *bitmap, size_t pos);
 
 /**
+ * Set the bit at position n to 0, if it was 1.
+ */
+void bitmap_clear_all(bitmap_t *bitmap);
+
+/**
  * Get the first bit set to 1
  */
 size_t bitmap_first(bitmap_t *bitmap);

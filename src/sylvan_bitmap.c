@@ -53,6 +53,16 @@ inline char bitmap_get(const bitmap_t *bitmap, size_t pos)
     return bitmap->container[WORD_INDEX(pos)] & BIT_MASK(pos) ? 1 : 0;
 }
 
+inline void bitmap_clear_all(bitmap_t *bitmap)
+{
+    if (bitmap->container == NULL) {
+        bitmap->size = 0;
+        return;
+    }
+    if (bitmap->size == 0) return;
+    clear_aligned(bitmap->container, bitmap->size);
+}
+
 inline size_t bitmap_first(bitmap_t *bitmap)
 {
     return bitmap_first_from(bitmap, 0);
