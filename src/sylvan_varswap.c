@@ -1,6 +1,9 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
+/**
+ * @brief Check if a node is dependent on node with label <var> or <var>+1
+ */
 static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
 {
     MTBDD f0 = mtbddnode_getlow(node);
@@ -95,6 +98,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         }
     }
 
+    // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, x) + mrc_is_var_isolated(&reorder_db->mrc, y);
@@ -317,17 +321,30 @@ VOID_TASK_IMPL_3(sylvan_varswap_p2, size_t, first, size_t, count, _Atomic (reord
 
         BDDVAR var = mtbddnode_getvariable(node);
         if (mtbddnode_ismapnode(node)) {
-            // it is a map node, swap places with next in chain
-            MTBDD f0 = mtbddnode_getlow(node);
-            MTBDD f1 = mtbddnode_gethigh(node);
-            mtbddnode_t n0 = MTBDD_GETNODE(f0);
-            MTBDD f00 = node_getlow(f0, n0);
-            MTBDD f01 = node_gethigh(f0, n0);
+            MTBDD newf0, f1, f0, f01, f00;
+            int created = 0;
 
-            f0 = mtbdd_varswap_makemapnode(var + 1, f00, f1);
-            if (f0 == mtbdd_invalid) {
+            // it is a map node, swap places with next in chain
+            f0 = mtbddnode_getlow(node);
+            f1 = mtbddnode_gethigh(node);
+            mtbddnode_t n0 = MTBDD_GETNODE(f0);
+            f00 = node_getlow(f0, n0);
+            f01 = node_gethigh(f0, n0);
+
+            mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
+            newf0 = mtbdd_varswap_makemapnode(var + 1, f00, f1, &created);
+            if (newf0 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
+            }
+            if (created) {
+                mrc_nnodes_add(&reorder_db->mrc, 1);
+                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
+                mrc_ref_nodes_set(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, 1);
+            } else {
+                mrc_ref_nodes_add(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);

@@ -19,20 +19,8 @@ typedef struct levels_db {
     size_t                  count;                   // number of created levels
     _Atomic(uint32_t)*      level_to_order;          // current level wise var permutation (level to variable label)
     _Atomic(uint32_t)*      order_to_level;          // current variable wise level permutation (variable label to level)
-    _Atomic(uint64_t)*      bitmap_p2;               // bitmap used to store reordering phase 2 mark
-    size_t                  bitmap_p2_size;          // size of bitmap_p2
 } *levels_t;
 
-/**
- * Efficient phase 2 mark iterator implemented using bitmaps and using GCC built-in bit counting functions. (thread-safe)
- *
- * Returns node index to the unique table.
- */
-#define levels_nindex npos
-
-#define levels_p2_next(idx) bitmap_atomic_next(levels->bitmap_p2, levels->bitmap_p2_size, idx)
-#define levels_p2_set(idx) bitmap_atomic_set(levels->bitmap_p2, idx)
-#define levels_p2_clear_all() clear_aligned(levels->bitmap_p2, levels->bitmap_p2_size)
 
 /**
  * @brief Create a new levels_t object
@@ -43,12 +31,6 @@ levels_t mtbdd_levels_create();
  * @brief Free a levels_t object
  */
 void levels_free(levels_t dbs);
-
-void levels_bitmap_p2_malloc(size_t new_size);
-
-void levels_bitmap_p2_realloc(size_t new_size);
-
-void levels_bitmap_p2_free();
 
 /**
  * @brief Get the number of levels

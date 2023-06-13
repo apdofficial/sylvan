@@ -17,45 +17,15 @@ levels_t mtbdd_levels_create()
     dbs->level_to_order = NULL;
     dbs->order_to_level = NULL;
 
-    dbs->bitmap_p2 = NULL;
-    dbs->bitmap_p2_size = 0;
-
     levels_size = 0;
     dbs->count = 0;
 
     return dbs;
 }
 
-
-void
-levels_bitmap_p2_malloc(size_t new_size)
-{
-    levels_bitmap_p2_free();
-    levels->bitmap_p2 = (_Atomic(uint64_t) *) alloc_aligned(new_size);
-    if (levels->bitmap_p2 != NULL) levels->bitmap_p2_size = new_size;
-    else levels->bitmap_p2_size = 0;
-}
-
-void
-levels_bitmap_p2_realloc(size_t new_size)
-{
-    if (levels->bitmap_p2_size == new_size) return;
-    levels_bitmap_p2_free();
-    levels_bitmap_p2_malloc(new_size);
-}
-
-void
-levels_bitmap_p2_free()
-{
-    if (levels->bitmap_p2 != NULL) free_aligned(levels->bitmap_p2, levels->bitmap_p2_size);
-    levels->bitmap_p2_size = 0;
-    levels->bitmap_p2 = NULL;
-}
-
 void
 levels_free(levels_t dbs)
 {
-    levels_bitmap_p2_free();
     free_aligned(dbs, sizeof(struct levels_db));
 }
 
@@ -122,8 +92,6 @@ void mtbdd_resetlevels(void)
         if (!levels->order_to_level) free(levels->order_to_level);
         levels->order_to_level = NULL;
 
-        levels_bitmap_p2_free();
-
         levels->count = 0;
         levels_size = 0;
     }
@@ -170,8 +138,6 @@ void mtbdd_levels_gc_add_mark_managed_refs(void)
 
 /**
  * Sort level counts using gnome sort.
- * @param level
- * @param level_counts
  */
 void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
 {
@@ -187,6 +153,15 @@ void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
             if (--i) continue;
         }
         i = j++;
+    }
+}
+
+// set levels below the threshold to -1
+void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
+{
+    for (unsigned int i = 0; i < levels->count; i++) {
+        if (level_counts[levels->level_to_order[i]] < threshold) level[i] = -1;
+        else level[i] = i;
     }
 }
 
@@ -220,11 +195,3 @@ void gnome_sort(int *levels_arr, const _Atomic (size_t) *level_counts)
 //    for (i = 0; i < levels->count; i++) atomic_fetch_add(&arr[i], tmp[i]);
 //}
 
-// set levels below the threshold to -1
-void mtbdd_mark_threshold(int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
-{
-    for (unsigned int i = 0; i < levels->count; i++) {
-        if (level_counts[levels->level_to_order[i]] < threshold) level[i] = -1;
-        else level[i] = i;
-    }
-}

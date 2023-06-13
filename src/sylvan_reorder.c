@@ -607,17 +607,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 #else
     printf("BDD reordering with %s (chaining): from %zu to ... ", buff, llmsset_count_marked(nodes));
 #endif
-    // alloc necessary memory dependent on table_size/ # of variables
-    // let:
-    // v - number of variables
-    // n - number of nodes
-
-    levels_bitmap_p2_malloc(nodes->table_size);         // memory usage: # of nodes * 1 bit                      (n)
-    // at the moment unfortunately, interaction matrix requires consecutive variables without **gaps**
-
-//    Reordering memory composition in bits is: 32v + 19n + v^2
-//    O(v^2 + n) quadratic space complexity
-
     mrc_init(&reorder_db->mrc, levels->count, nodes->table_size, reorder_db->node_ids);
 
     reorder_db->call_count++;
@@ -647,7 +636,7 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     }
 
     mrc_deinit(&reorder_db->mrc);
-    levels_bitmap_p2_free();
+    interact_deinit(&reorder_db->matrix);
 
     double end = wctime() - configs.t_start_sifting;
     if (print_reordering_stat) {
@@ -949,13 +938,11 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #endif
             mrc_deinit(&reorder_db->mrc);
             interact_deinit(&reorder_db->matrix);
-            levels_bitmap_p2_free();
 
             sylvan_gc();
 
             mrc_init(&reorder_db->mrc, levels->count, nodes->table_size, reorder_db->node_ids);
             interact_init(&reorder_db->matrix, levels, levels->count, nodes->table_size);
-            levels_bitmap_p2_malloc(nodes->table_size);
 
             return CALL(sylvan_bounded_sift, low, high);
         } else {

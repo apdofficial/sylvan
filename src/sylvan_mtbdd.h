@@ -183,7 +183,7 @@ static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, in
  * <var> is a 24-bit integer.
  * Please note that this does NOT check variable ordering!
  */
-MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high);
+MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high, int* created);
 
 
 /**

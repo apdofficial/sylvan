@@ -537,18 +537,18 @@ _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
  * Instead, returns mtbdd_invalid if we can't create the node.
  */
 MTBDD
-mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high)
+mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
     struct mtbddnode n;
     uint64_t index;
-    int created;
+    created = 0;
 
     // in an MTBDDMAP, the low edges eventually lead to 0 and cannot have a low mark
     assert(!MTBDD_HASMARK(low));
 
     mtbddnode_makemapnode(&n, var, low, high);
 
-    index = llmsset_lookup(nodes, n.a, n.b, &created);
+    index = llmsset_lookup(nodes, n.a, n.b, created);
     if (index == 0) return mtbdd_invalid;
 
     if (created) sylvan_stats_count(BDD_NODES_CREATED);
