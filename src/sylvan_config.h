@@ -55,6 +55,9 @@
 
 #define SYLVAN_USE_CHAINING_REHASH_ALL  1
 
+#define ATTACH_ROARING_BITMAP 0
+
+
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
   *

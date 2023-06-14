@@ -46,7 +46,13 @@ claim_data_bucket(const llmsset_t dbs)
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
-                    return (8 * my_region + i) * 64 + j;
+                    size_t index = (8 * my_region + i) * 64 + j;
+#if ATTACH_ROARING_BITMAP
+                    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
+                        roaring_bitmap_add(reorder_db->node_ids, index);
+                    }
+#endif
+                    return index;
                 }
                 i++;
                 ptr++;
@@ -80,6 +86,11 @@ claim_data_bucket(const llmsset_t dbs)
 static void
 release_data_bucket(const llmsset_t dbs, uint64_t index)
 {
+#if ATTACH_ROARING_BITMAP
+    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
+        roaring_bitmap_remove(reorder_db->node_ids, index);
+    }
+#endif
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64); // get the desired word
     uint64_t mask = 0x8000000000000000LL >> (index & 63); // look only at first 6 least significant bits
     atomic_fetch_and(ptr, ~mask);
@@ -88,7 +99,7 @@ release_data_bucket(const llmsset_t dbs, uint64_t index)
 static void
 set_custom_bucket(const llmsset_t dbs, uint64_t index, int on)
 {
-    uint64_t * ptr = dbs->bitmapc + (index / 64);
+    uint64_t *ptr = dbs->bitmapc + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     if (on) *ptr |= mask;
     else *ptr &= ~mask;
@@ -97,7 +108,7 @@ set_custom_bucket(const llmsset_t dbs, uint64_t index, int on)
 static int
 is_custom_bucket(const llmsset_t dbs, uint64_t index)
 {
-    uint64_t * ptr = dbs->bitmapc + (index / 64);
+    uint64_t *ptr = dbs->bitmapc + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     return (*ptr & mask) ? 1 : 0;
 }
@@ -123,7 +134,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
 
     uint64_t frst = atomic_load_explicit(fptr, memory_order_relaxed);
     uint64_t cidx = 0; // stores where the new data [will be] stored
-    uint64_t * cptr = 0;
+    uint64_t *cptr = 0;
 
     uint64_t idx = frst, end = 0;
 
@@ -155,7 +166,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
             }
         }
 
-        uint64_t * dptr = ((uint64_t *) dbs->data) + 3 * idx;
+        uint64_t *dptr = ((uint64_t *) dbs->data) + 3 * idx;
         uint64_t v = *dptr;
 
         if (hashm == (v & MASK_HASH)) {
@@ -198,7 +209,7 @@ llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b, int *cr
 int
 llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 {
-    uint64_t * dptr = ((uint64_t *) dbs->data) + 3 * d_idx;
+    uint64_t *dptr = ((uint64_t *) dbs->data) + 3 * d_idx;
 
     const uint64_t hash = is_custom_bucket(dbs, d_idx) ?
                           dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
@@ -290,8 +301,12 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
     release_data_bucket(dbs, index);
-    if (is_custom_bucket(dbs, index)) {
-        uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * index;
+    bitmap_t bitmapc = {
+            .container = dbs->bitmapc,
+            .size = dbs->table_size
+    };
+    if (bitmap_get(&bitmapc, index)) {
+        uint64_t *d_ptr = ((uint64_t *) dbs->data) + 3 * index;
         dbs->destroy_cb(d_ptr[1], d_ptr[2]);
     }
 }
@@ -402,7 +417,11 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
 
     // forbid first two positions (index 0 and 1)
     dbs->bitmap2[0] = 0xc000000000000000LL;
-
+#if ATTACH_ROARING_BITMAP
+    if (reorder_db != NULL && reorder_db->node_ids != NULL){
+        roaring_bitmap_clear(reorder_db->node_ids);
+    }
+#endif
     TOGETHER(llmsset_reset_region);
 }
 
@@ -422,6 +441,11 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
+#if ATTACH_ROARING_BITMAP
+    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
+        roaring_bitmap_add(reorder_db->node_ids, index);
+    }
+#endif
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {
@@ -510,12 +534,12 @@ VOID_TASK_3(llmsset_destroy_par, llmsset_t, dbs, size_t, first, size_t, count)
     } else {
         for (size_t k = first; k < first + count; k++) {
             _Atomic (uint64_t) *ptr2 = dbs->bitmap2 + (k / 64);
-            uint64_t * ptrc = dbs->bitmapc + (k / 64);
+            uint64_t *ptrc = dbs->bitmapc + (k / 64);
             uint64_t mask = 0x8000000000000000LL >> (k & 63);
 
             // if not marked but is custom
             if ((*ptr2 & mask) == 0 && (*ptrc & mask)) {
-                uint64_t * d_ptr = ((uint64_t *) dbs->data) + 3 * k;
+                uint64_t *d_ptr = ((uint64_t *) dbs->data) + 3 * k;
                 dbs->destroy_cb(d_ptr[1], d_ptr[2]);
                 *ptrc &= ~mask;
             }

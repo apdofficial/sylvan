@@ -70,7 +70,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
+#if !ATTACH_ROARING_BITMAP
     reorder_remark_node_ids(reorder_db, nodes);
+#endif
 
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many

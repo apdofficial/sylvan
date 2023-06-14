@@ -428,6 +428,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
+#if !ATTACH_ROARING_BITMAP
+    reorder_remark_node_ids(reorder_db, nodes);
+#endif
     sylvan_clear_cache();
 
     reorder_remark_node_ids(reorder_db, nodes);
