@@ -45,25 +45,36 @@ reorder_db_t reorder_db_init()
         exit(1);
     }
     db->mrc = (mrc_t) {
+            .isolated_count = 0,
+            .nnodes = 0,
             .ref_nodes = (atomic_counters_t) {
                     .container = NULL,
+                    .size = 0,
             },
             .ref_vars = (atomic_counters_t) {
                     .container = NULL,
+                    .size = 0,
             },
             .var_nnodes = (atomic_counters_t) {
                     .container = NULL,
-            }
+                    .size = 0,
+            },
+            .ext_ref_nodes = (atomic_bitmap_t) {
+                    .container = NULL,
+                    .size = 0,
+            },
     };
 
     db->call_count = 0;
 
     db->matrix = (interact_t) {
             .container = NULL,
+            .size = 0,
     };
 
     db->levels = (levels_t) {
             .table = NULL,
+            .count = 0,
             .level_to_order = NULL,
             .order_to_level = NULL,
     };
@@ -145,7 +156,7 @@ inline uint64_t get_nodes_count()
 #endif
 }
 
-TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t*, s_state)
+TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 {
     if (!reorder_db->is_initialised) return SYLVAN_REORDER_NOT_INITIALISED;
 #if STATS
@@ -449,9 +460,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
-
     size_t after_size = llmsset_count_marked(nodes);
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
