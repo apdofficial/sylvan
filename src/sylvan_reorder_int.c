@@ -147,8 +147,7 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 
 inline uint64_t get_nodes_count()
 {
-//    return llmsset_count_marked(nodes) + 2;
-
+    return llmsset_count_marked(nodes) + 2;
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
@@ -431,16 +430,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
     sylvan_clear_cache();
 
-    roaring_bitmap_clear(reorder_db->node_ids);
-
-    atomic_bitmap_t bitmap2 = {
-            .container = nodes->bitmap2,
-            .size = nodes->table_size
-    };
-    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
-    for (; index != npos && index < nodes->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
-        roaring_bitmap_add(reorder_db->node_ids, index);
-    }
+    reorder_remark_node_ids(reorder_db, nodes);
 
     if (reorder_db->config.print_stat) {
         char buff[100];
@@ -639,4 +629,18 @@ int should_terminate_reordering(const struct reorder_config *reorder_config)
         return 1;
     }
     return 0;
+}
+
+void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs)
+{
+    roaring_bitmap_clear(self->node_ids);
+
+    atomic_bitmap_t bitmap2 = {
+            .container = dbs->bitmap2,
+            .size = dbs->table_size
+    };
+    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
+    for (; index != npos && index < dbs->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
+        roaring_bitmap_add(self->node_ids, index);
+    }
 }

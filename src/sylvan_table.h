@@ -190,11 +190,6 @@ int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
 #if !SYLVAN_USE_LINEAR_PROBING
 /**
- * Delete a single node.
- */
-void llmsset_delete_node(llmsset_t dbs, uint64_t d_idx);
-
-/**
  * Clear a single bucket (hash part).
  */
 int llmsset_clear_one_hash(llmsset_t dbs, uint64_t index);

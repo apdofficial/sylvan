@@ -121,6 +121,8 @@ VOID_TASK_DECL_0(reorder_db_call_progress_hooks)
 
 #define reorder_db_call_progress_hooks() CALL(reorder_db_call_progress_hooks)
 
+void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

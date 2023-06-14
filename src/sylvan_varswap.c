@@ -70,16 +70,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
-    roaring_bitmap_clear(reorder_db->node_ids);
-
-    atomic_bitmap_t bitmap2 = {
-            .container = nodes->bitmap2,
-            .size = nodes->table_size
-    };
-    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
-    for (; index != npos && index < nodes->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
-        roaring_bitmap_add(reorder_db->node_ids, index);
-    }
+    reorder_remark_node_ids(reorder_db, nodes);
 
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
@@ -115,10 +106,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
     if (marked_count > 0) {
-        roaring_bitmap_t *node_ids = roaring_bitmap_copy(reorder_db->node_ids);
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(&result, node_ids);
-        roaring_bitmap_free(node_ids);
+        sylvan_varswap_p2(&result, reorder_db->node_ids);
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_varswap_p3(pos, &result, reorder_db->node_ids);
         }
@@ -182,8 +171,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         if (nvar == var || nvar == (var + 1)) {
             if (!llmsset_clear_one_hash(nodes, index)) {
                 atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
-                size_t filled, total;
-                sylvan_table_usage(&filled, &total);
                 return;
             }
         }
@@ -420,9 +407,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
-                size_t filled, total;
-                sylvan_table_usage(&filled, &total);
-                printf("\nSYLVAN_REORDER_P2_CREATE_FAIL: (%zu / %zu (%.2f%%))\n", filled, total, (double) filled / (double) total * 100.0);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
@@ -439,9 +423,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
-                size_t filled, total;
-                sylvan_table_usage(&filled, &total);
-                printf("\nSYLVAN_REORDER_P2_CREATE_FAIL: (%zu / %zu (%.2f%%))\n", filled, total, (double) filled / (double) total * 100.0);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }

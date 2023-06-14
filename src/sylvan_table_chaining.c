@@ -219,13 +219,6 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     }
 }
 
-void
-llmsset_delete_node(const llmsset_t dbs, uint64_t d_idx)
-{
-    llmsset_clear_one_hash(dbs, d_idx);
-    llmsset_clear_one_data(dbs, d_idx);
-}
-
 /**
  * Clear a single bucket hash.
  * (do not run parallel with lookup!!!)
@@ -241,7 +234,8 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t didx)
     // set d to the next bucket in the chain
     uint64_t d = atomic_load_explicit(dptr, memory_order_relaxed);
     if (d & MASK_INDEX) {
-        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) { // settgin ptr to not in use(-1)
+        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) {
+            // setting ptr to not in use(-1)
         }
         d &= MASK_INDEX; // <d> now contains the next bucket in the chain
     } else {
