@@ -77,9 +77,9 @@ size_t bitmap_first_from(bitmap_t *bitmap, size_t word_idx)
     else return get_first_msb_one_bit_pos(bitmap->container[word_idx], word_idx);
 }
 
-size_t bitmap_next(bitmap_t *bitmap, size_t size, size_t pos)
+size_t bitmap_next(bitmap_t *bitmap,size_t pos)
 {
-    if (pos == npos || (pos + 1) >= size) return npos;
+    if (pos == npos || (pos + 1) >= bitmap->size) return npos;
     pos++;
     // get word for pos++
     size_t word_idx = WORD_INDEX(pos);
@@ -96,9 +96,9 @@ size_t bitmap_next(bitmap_t *bitmap, size_t size, size_t pos)
     }
 }
 
-inline size_t bitmap_last(bitmap_t *bitmap, size_t size)
+inline size_t bitmap_last(bitmap_t *bitmap)
 {
-    return bitmap_last_from(bitmap, size);
+    return bitmap_last_from(bitmap, bitmap->size - 1);
 }
 
 size_t bitmap_last_from(bitmap_t *bitmap, size_t pos)

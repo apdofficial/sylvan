@@ -75,7 +75,7 @@ size_t bitmap_first_from(bitmap_t *bitmap, size_t starting_word);
 /**
  * Get the last bit set to 1
  */
-size_t bitmap_last(bitmap_t *bitmap, size_t size);
+size_t bitmap_last(bitmap_t *bitmap);
 
 /**
  * Get the last 1-bit position from the given word index
@@ -85,7 +85,7 @@ size_t bitmap_last_from(bitmap_t *bitmap, size_t pos);
 /**
  * Get the next bit set to 1
  */
-size_t bitmap_next(bitmap_t *bitmap, size_t size, size_t pos);
+size_t bitmap_next(bitmap_t *bitmap, size_t pos);
 
 /**
  * Get the previous bit set to 1
