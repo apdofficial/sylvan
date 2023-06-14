@@ -119,15 +119,6 @@ VOID_TASK_IMPL_0(sylvan_clear_and_mark)
         WRAP(e->cb);
     }
 
-    atomic_bitmap_t bitmap2 = {
-            .container = nodes->bitmap2,
-            .size = nodes->table_size
-    };
-    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
-    for (; index != npos && index < nodes->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
-        roaring_bitmap_add(reorder_db->node_ids, index);
-    }
-
     llmsset_destroy_unmarked(nodes);
 }
 

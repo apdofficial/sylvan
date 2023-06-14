@@ -53,7 +53,7 @@
 #define SYLVAN_REORDER_DEBUG            0
 #define SYLVAN_REORDER_MIN_MEM_REQ      (0.85f)
 
-#define SYLVAN_USE_CHAINING_REHASH_ALL  0
+#define SYLVAN_USE_CHAINING_REHASH_ALL  1
 
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.

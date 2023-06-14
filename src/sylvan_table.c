@@ -33,49 +33,54 @@ VOID_TASK_0(llmsset_reset_region)
 static uint64_t
 claim_data_bucket(const llmsset_t dbs)
 {
+    // get my region, based on which worker are we
+    // every worker has a region
     LOCALIZE_THREAD_LOCAL(my_region, uint64_t);
 
     for (;;) {
         if (my_region != (uint64_t) -1) {
-            // find empty bucket in region <my_region>
+            // have claimed <my_region>, find empty bucket in it
             _Atomic (uint64_t) *ptr = dbs->bitmap2 + (my_region * 8);
             int i = 0;
+            // With 64 bytes per cacheline, there are 8 64-bit values per cacheline.
             for (; i < 8;) {
                 uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
-                    size_t index = (8 * my_region + i) * 64 + j;
-                    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-                        roaring_bitmap_add(reorder_db->node_ids, index);
-                    }
-                    return index;
+                    return (8 * my_region + i) * 64 + j;
                 }
                 i++;
                 ptr++;
             }
         } else {
+            // no region claimed yet
             // special case on startup or after garbage collection
             my_region += (lace_get_worker()->worker * (dbs->table_size / (64 * 8))) / lace_workers();
         }
+
+        // apparently, either:
+        // a) there is no empty bucket in my region
+        // b) no region claimed yet
+
+        // thus, claim ownership of a region
         uint64_t count = dbs->table_size / (64 * 8);
         for (;;) {
             // check if table maybe full
             if (count-- == 0) return (uint64_t) -1;
-
             my_region += 1;
             if (my_region >= (dbs->table_size / (64 * 8))) my_region = 0;
-
             // try to claim it
             _Atomic (uint64_t) *ptr = dbs->bitmap1 + (my_region / 64);
             uint64_t mask = 0x8000000000000000LL >> (my_region & 63);
             uint64_t v;
             restart:
             v = atomic_load_explicit(ptr, memory_order_relaxed);
-            if (v & mask) continue; // taken
-            if (atomic_compare_exchange_weak(ptr, &v, v | mask)) break;
+            if (v & mask) continue; // <region> is already taken by some other worker
+            if (atomic_compare_exchange_weak(ptr, &v, v | mask)) break; // success! <region> is now claimed by me
             else goto restart;
         }
+        // assign thread local variable <my_region> to me
         SET_THREAD_LOCAL(my_region, my_region);
     }
 }
@@ -83,9 +88,6 @@ claim_data_bucket(const llmsset_t dbs)
 static void
 release_data_bucket(const llmsset_t dbs, uint64_t index)
 {
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        roaring_bitmap_remove(reorder_db->node_ids, index);
-    }
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     atomic_fetch_and(ptr, ~mask);
@@ -366,12 +368,6 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
     // forbid first two positions (index 0 and 1)
     dbs->bitmap2[0] = 0xc000000000000000LL;
 
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        if (roaring_bitmap_is_empty(reorder_db->node_ids) == 0) {
-            roaring_bitmap_clear(reorder_db->node_ids);
-        }
-    }
-
     TOGETHER(llmsset_reset_region);
 }
 
@@ -391,9 +387,6 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        roaring_bitmap_add(reorder_db->node_ids, index);
-    }
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {

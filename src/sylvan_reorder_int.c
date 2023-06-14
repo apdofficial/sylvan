@@ -431,6 +431,17 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
     sylvan_clear_cache();
 
+    roaring_bitmap_clear(reorder_db->node_ids);
+
+    atomic_bitmap_t bitmap2 = {
+            .container = nodes->bitmap2,
+            .size = nodes->table_size
+    };
+    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
+    for (; index != npos && index < nodes->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
+        roaring_bitmap_add(reorder_db->node_ids, index);
+    }
+
     if (reorder_db->config.print_stat) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
