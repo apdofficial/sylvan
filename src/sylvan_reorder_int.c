@@ -468,20 +468,16 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     double end = wctime() - reorder_db->config.t_start_sifting;
     if (reorder_db->config.print_stat) {
         printf("%zu nodes in %f sec ", after_size, end);
+        size_t filled, total;
+        sylvan_table_usage(&filled, &total);
+        printf("\t (%zu / %zu (%.2f%%))\n", filled, total, (double) filled / (double) total * 100.0);
     }
-
-    size_t filled, total;
-    sylvan_table_usage(&filled, &total);
-    printf("\t (table usage: %zu / %zu (%.2f%%))\n", filled, total, (double) filled / (double) total * 100.0);
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
 
     sylvan_timer_stop(SYLVAN_RE);
-
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)

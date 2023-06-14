@@ -66,7 +66,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     size_t filled, total;
     sylvan_table_usage(&filled, &total);
-    if ((double)filled > (double)total * 0.85){
+    if ((double)filled > (double)total * SYLVAN_REORDER_MIN_MEM_REQ){
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 

@@ -23,8 +23,8 @@ typedef struct atomic_bitmap_s {
 } atomic_bitmap_t;
 
 static const size_t npos = (bitmap_container_t)-1;
+static const size_t BITS_PER_WORD = sizeof(bitmap_container_t) * CHAR_BIT;
 
-#define BITS_PER_WORD           (sizeof(bitmap_container_t) * CHAR_BIT)
 #define WORD_INDEX(b)           ((b) / BITS_PER_WORD)
 #define BIT_OFFSET(b)           ((b) % BITS_PER_WORD)
 #define BIT_MASK(b)             ((bitmap_container_t) 0x8000000000000000LL >> (b))
