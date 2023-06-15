@@ -22,16 +22,28 @@
 #include <string.h> // memset
 #include <sys/mman.h> // for mmap
 
-/* 40 bits for the index, 24 bits for the hash */
-#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
-#define MASK_HASH  ((uint64_t)0xffffff0000000000)
+//uint64_t n = 1; // index to a data entry
+//uint64_t bucket_size = 3; // 1 byte chain, 2 bytes mtbddnode_t
+//uint64_t *cptr = ((uint64_t *) dbs->data) + bucket_size * n;
+//
+//		              ┌ -----hash------ ┐ ┌ ----------------index in the data array---------------- ┐
+// bucket[0] == n.b = 1000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+// bucket[1] == n.a
+// bucket[2] == n.b
 
-#define get_chain(d, i)         *(get_chain_ptr(d, i))
-#define get_chain_ptr(d, i)     (((_Atomic(uint64_t) *) (d)) + 3 * (i))
-#define get_a(d, i)             *(((uint64_t *) (d)) + 3 * (i) + 1)
-#define get_b(d, i)             *(((uint64_t *) (d)) + 3 * (i) + 2)
-#define get_hash(d, i)          (get_chain(d, i) & MASK_HASH)
-#define get_index(d, i)         (get_chain(d, i) & MASK_INDEX)
+#define BUCKET_MASK_HASH    ((uint64_t)0xffffff0000000000) // 24 bits for the hash
+#define BUCKET_MASK_INDEX   ((uint64_t)0x000000ffffffffff) // 40 bits for the index
+#define BUCKET_SIZE         3
+#define BUCKET_CHAIN_POS    0
+#define BUCKET_A_POS        1
+#define BUCKET_B_POS        2
+
+#define get_chain(d, i)            (*get_chain_ptr(d, i))
+#define get_chain_ptr(d, i)        (((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_CHAIN_POS)
+#define get_a(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_A_POS))
+#define get_b(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_B_POS))
+#define get_hash(d, i)             (get_chain(d, i) & BUCKET_MASK_HASH)
+#define get_index(d, i)            (get_chain(d, i) & BUCKET_MASK_INDEX)
 
 static const uint64_t invalid_bucket = (uint64_t) -1;
 
@@ -130,26 +142,26 @@ static inline uint64_t
 llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const int custom)
 {
     const uint64_t hash = create_hash(dbs, a, b, custom);
-    const uint64_t hash_mask = hash & MASK_HASH;
+    const uint64_t hash_mask = hash & BUCKET_MASK_HASH;
 
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *fptr = &dbs->table[hash & dbs->mask];
+    _Atomic (uint64_t) *bucket = &dbs->table[hash & dbs->mask];
 #else
     _Atomic(uint64_t)* fptr = &dbs->table[hash % dbs->table_size];
 #endif
 
-    uint64_t chain_start = atomic_load_explicit(fptr, memory_order_relaxed);
+    uint64_t chain_start = atomic_load_explicit(bucket, memory_order_relaxed);
     uint64_t chain_end = 0;
 
-    uint64_t bucket = chain_start;
+    uint64_t curr_bucket = chain_start;
     uint64_t claimed_bucket = 0;
 
     // stop when we encounter <end>
     for (;;) {
 
-        if (bucket == chain_end) {
+        if (curr_bucket == chain_end) {
             // we did not find existing node in our table, and reached end of chain
-            // ar the chain was empty
+            // or the chain was empty
             // thus, try to insert new node
             if (claimed_bucket == 0) {
                 // claim data bucket
@@ -167,7 +179,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
             get_chain(dbs->data, claimed_bucket) = hash_mask | chain_start;
 
             // now update the chain start (fptr) with chain_idx
-            if (atomic_compare_exchange_strong(fptr, &chain_start, claimed_bucket)) {
+            if (atomic_compare_exchange_strong(bucket, &chain_start, claimed_bucket)) {
                 if (custom) set_custom_bucket(dbs, claimed_bucket, custom);
                 *created = 1;
                 return claimed_bucket;
@@ -176,35 +188,35 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
                 // atomic_compare_exchange_strong will not fail with one worker
                 exit(-1);
                 chain_end = chain_start; // we already checked from "chain_start" to "0"
-                chain_start = bucket;
+                chain_start = curr_bucket;
             }
         }
 
-        if (hash_mask == get_hash(dbs->data, bucket)) {
+        if (hash_mask == get_hash(dbs->data, curr_bucket)) {
             // check if we already have this node in the table
             // if so, release the ownership if it was owned before, and return the bucket index
             if (custom) {
-                if (dbs->equals_cb(a, b, get_a(dbs->data, bucket), get_b(dbs->data, bucket))) {
+                if (dbs->equals_cb(a, b, get_a(dbs->data, curr_bucket), get_b(dbs->data, curr_bucket))) {
                     if (claimed_bucket != 0) {
                         dbs->destroy_cb(a, b);
                         release_data_bucket(dbs, claimed_bucket);
                     }
                     *created = 0;
-                    return bucket;
+                    return curr_bucket;
                 }
             } else {
-                if (get_a(dbs->data, bucket) == a && get_b(dbs->data, bucket) == b) {
+                if (get_a(dbs->data, curr_bucket) == a && get_b(dbs->data, curr_bucket) == b) {
                     if (claimed_bucket != 0) {
                         release_data_bucket(dbs, claimed_bucket);
                     }
                     *created = 0;
-                    return bucket;
+                    return curr_bucket;
                 }
             }
         }
 
         // get next item in the chain
-        bucket = get_index(dbs->data, bucket);
+        curr_bucket = get_index(dbs->data, curr_bucket);
         sylvan_stats_count(LLMSSET_LOOKUP);
     }
 }
@@ -224,18 +236,22 @@ llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b, int *cr
 int
 llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 {
-    const uint64_t hash = create_hash(dbs, get_a(dbs->data, d_idx), get_b(dbs->data, d_idx), is_custom_bucket(dbs, d_idx));
-    const uint64_t hash_mask = hash & MASK_HASH;
+    const uint64_t a = get_a(dbs->data, d_idx);
+    const uint64_t b = get_b(dbs->data, d_idx);
+    const int is_custom = is_custom_bucket(dbs, d_idx);
+
+    const uint64_t hash = create_hash(dbs, a, b, is_custom);
+    const uint64_t hash_mask = hash & BUCKET_MASK_HASH;
 
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *fptr = &dbs->table[hash & dbs->mask];
+    _Atomic (uint64_t) *bucket = &dbs->table[hash & dbs->mask];
 #else
     _Atomic(uint64_t)* fptr = &dbs->table[hash % dbs->table_size];
 #endif
 
-    uint64_t frst = atomic_load_explicit(fptr, memory_order_relaxed);
+    uint64_t frst = atomic_load_explicit(bucket, memory_order_relaxed);
     for (;;) {
-        if (atomic_compare_exchange_strong(fptr, &frst, d_idx)) {
+        if (atomic_compare_exchange_strong(bucket, &frst, d_idx)) {
             get_chain(dbs->data, d_idx) = hash_mask | frst;
             return 1;
         }
@@ -255,11 +271,11 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t index)
     _Atomic (uint64_t) *bucket_ptr = get_chain_ptr(dbs->data, index);
     // set data to the next bucket in the chain
     uint64_t data = atomic_load_explicit(bucket_ptr, memory_order_relaxed);
-    if (data & MASK_INDEX) {
+    if (data & BUCKET_MASK_INDEX) {
         while (!atomic_compare_exchange_strong(bucket_ptr, &data, invalid_bucket)) {
             // setting ptr to not in use(-1)
         }
-        data &= MASK_INDEX; // <data> now contains the next bucket in the chain
+        data &= BUCKET_MASK_INDEX; // <data> now contains the next bucket in the chain
     } else {
         data = 0; // nothing after us, so we don't need to make a -1
     }
@@ -293,11 +309,11 @@ llmsset_clear_one_hash(llmsset_t dbs, uint64_t index)
 
             if (v == invalid_bucket) break; // found delete-in-progress, restart
 
-            if ((v & MASK_INDEX) == index) { // found our predecessor
-                if (!atomic_compare_exchange_strong(ptr, &v, (v & MASK_HASH) | data)) break; // restart
+            if ((v & BUCKET_MASK_INDEX) == index) { // found our predecessor
+                if (!atomic_compare_exchange_strong(ptr, &v, (v & BUCKET_MASK_HASH) | data)) break; // restart
                 return 1;
             } else {
-                curr_index = v & MASK_INDEX; // next
+                curr_index = v & BUCKET_MASK_INDEX; // next
             }
         }
     }

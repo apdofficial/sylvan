@@ -121,8 +121,8 @@ static const uint64_t CL_MASK = ~(((LINE_SIZE) / 8) - 1);
 static const uint64_t CL_MASK_R = ((LINE_SIZE) / 8) - 1;
 
 /* 40 bits for the index, 24 bits for the hash */
-#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
-#define MASK_HASH  ((uint64_t)0xffffff0000000000)
+#define BUCKET_MASK_INDEX ((uint64_t)0x000000ffffffffff)
+#define BUCKET_MASK_HASH  ((uint64_t)0xffffff0000000000)
 
 static inline uint64_t
 llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const int custom)
@@ -132,7 +132,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
     else hash_rehash = sylvan_tabhash16(a, b, hash_rehash);
 
     const uint64_t step = (((hash_rehash >> 20) | 1) << 3);
-    const uint64_t hash = hash_rehash & MASK_HASH;
+    const uint64_t hash = hash_rehash & BUCKET_MASK_HASH;
     uint64_t idx, last, cidx = 0;
     int i = 0;
 
@@ -163,8 +163,8 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
             }
         }
 
-        if (hash == (v & MASK_HASH)) {
-            uint64_t d_idx = v & MASK_INDEX;
+        if (hash == (v & BUCKET_MASK_HASH)) {
+            uint64_t d_idx = v & BUCKET_MASK_INDEX;
             uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * d_idx;
             if (custom) {
                 if (dbs->equals_cb(a, b, d_ptr[0], d_ptr[1])) {
@@ -225,7 +225,7 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     if (custom) hash_rehash = dbs->hash_cb(a, b, hash_rehash);
     else hash_rehash = sylvan_tabhash16(a, b, hash_rehash);
     const uint64_t step = (((hash_rehash >> 20) | 1) << 3);
-    const uint64_t new_v = (hash_rehash & MASK_HASH) | d_idx;
+    const uint64_t new_v = (hash_rehash & BUCKET_MASK_HASH) | d_idx;
     int i = 0;
 
     uint64_t idx, last;
