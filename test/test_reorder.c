@@ -20,6 +20,7 @@ static double t_start;
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
 void _sylvan_start();
+
 void _sylvan_quit();
 
 #define create_example_bdd(is_optimal) RUN(create_example_bdd, is_optimal)
@@ -124,7 +125,7 @@ TASK_0(int, test_varswap_down)
     test_assert(mtbdd_getvar(one) == 1);
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
-    
+
     mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
 
     // 0, 1, 2, 3
@@ -263,6 +264,8 @@ TASK_0(int, test_sift_down)
     // 1, 2, 3, (0)
     // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
+    sylvan_post_reorder();
+
     test_assert(sylvan_level_to_order(0) == 1);
     test_assert(sylvan_level_to_order(1) == 2);
     test_assert(sylvan_level_to_order(2) == 3);
@@ -327,7 +330,8 @@ TASK_0(int, test_sift_up)
     // 0, 1, 2, (3)
     test_assert(sylvan_siftup(&state) == SYLVAN_REORDER_SUCCESS);
     // (3), 0, 1, 2
-    // due to the lower bounds the last variable will not be sifted as no improved in size is possible
+
+    sylvan_post_reorder();
 
     test_assert(sylvan_level_to_order(0) == 3);
     test_assert(sylvan_level_to_order(1) == 0);
@@ -389,6 +393,8 @@ TASK_0(int, test_sift_back)
     // 0, 1, 2, (3)
     test_assert(sylvan_siftback(&state) == SYLVAN_REORDER_SUCCESS);
     // (3), 0, 1, 2
+
+    sylvan_post_reorder();
 
     test_assert(sylvan_level_to_order(0) == 3);
     test_assert(sylvan_level_to_order(1) == 0);
@@ -463,6 +469,8 @@ TASK_0(int, test_reorder_perm)
 
     test_assert(sylvan_reorder_perm(perm) == SYLVAN_REORDER_SUCCESS);
 
+    sylvan_post_reorder();
+
     test_assert(sylvan_level_to_order(0) == perm[0]);
     test_assert(sylvan_level_to_order(1) == perm[1]);
     test_assert(sylvan_level_to_order(2) == perm[2]);
@@ -497,15 +505,13 @@ TASK_0(int, test_reorder)
 
     size_t not_optimal_order_size = sylvan_nodecount(bdd);
 
-    sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
-
     sylvan_reduce_heap(SYLVAN_REORDER_SIFT);
 
     size_t not_optimal_order_reordered_size = sylvan_nodecount(bdd);
 
     test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
 
-    uint32_t perm[6] = { 0, 1, 2, 3, 4, 5 };
+    uint32_t perm[6] = {0, 1, 2, 3, 4, 5};
     int identity = 1;
     // check if the new order is identity with the old order
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
@@ -521,6 +527,8 @@ TASK_0(int, test_reorder)
     sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
     test_assert(sylvan_reorder_perm(perm) == SYLVAN_REORDER_SUCCESS);
+
+    sylvan_post_reorder();
 
     size_t not_optimal_size_again = sylvan_nodecount(bdd);
     test_assert(not_optimal_order_size == not_optimal_size_again);
@@ -583,6 +591,7 @@ TASK_0(int, test_interact)
         }
     }
 
+    sylvan_post_reorder();
     interact_deinit(&reorder_db->matrix);
 
     sylvan_deref(bdd1);
@@ -604,12 +613,13 @@ TASK_0(int, test_var_count)
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+    int expected[5] = {0, 1, 1, 1, 1};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        printf("var %zu has %zu nodes\n", i,  mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i)));
+        counter_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
+        assert(expected[i] == ref_node_count);
     }
 
-    interact_deinit(&reorder_db->matrix);
+    sylvan_post_reorder();
 
     sylvan_deref(bdd1);
     sylvan_deref(bdd2);
@@ -625,20 +635,19 @@ TASK_0(int, test_ref_count)
 
     BDD bdd1 = sylvan_or(sylvan_ithvar(0), sylvan_ithvar(1));
     sylvan_ref(bdd1);
-
+    
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_ref(bdd2);
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
+    int expected[5] = {3, 4, 5, 5, 3};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        counter_t ref_count = mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i));
-        if (ref_count > 0) {
-            printf("var %zu has %zu references\n", i, ref_count);
-        }
+        counter_t ref_var_count = mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i));
+        assert(expected[i] == ref_var_count);
     }
 
-    interact_deinit(&reorder_db->matrix);
+    sylvan_post_reorder();
 
     sylvan_deref(bdd1);
     sylvan_deref(bdd2);
@@ -648,29 +657,29 @@ TASK_0(int, test_ref_count)
 TASK_1(int, runtests, size_t, ntests)
 {
     printf("test_varswap\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap)) return 1;
     printf("test_varswap_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_down)) return 1;
     printf("test_varswap_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_up)) return 1;
     printf("test_sift_down\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
     printf("test_sift_up\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
     printf("test_sift_back\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_back)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_back)) return 1;
     printf("test_reorder_perm\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder_perm)) return 1;
     printf("test_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_reorder)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder)) return 1;
     printf("test_map_reorder\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_map_reorder)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_map_reorder)) return 1;
     printf("test_interact\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_interact)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_interact)) return 1;
     printf("test_var_count\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_var_count)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_var_count)) return 1;
     printf("test_ref_count\n");
-    for (size_t j=0;j<ntests;j++) if (RUN(test_ref_count)) return 1;
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_count)) return 1;
     return 0;
 }
 
@@ -679,21 +688,27 @@ static int terminate_reordering = 0;
 VOID_TASK_0(reordering_start)
 {
     sylvan_gc();
+#ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
     printf("DE: start: %zu size\n", size);
+#endif
 }
 
 VOID_TASK_0(reordering_progress)
 {
+#ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
     printf("DE: progress: %zu size\n", size);
+#endif
 }
 
 VOID_TASK_0(reordering_end)
 {
     sylvan_gc();
+#ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
     printf("DE: end: %zu size\n", size);
+#endif
 }
 
 int should_reordering_terminate()
@@ -701,15 +716,17 @@ int should_reordering_terminate()
     return terminate_reordering;
 }
 
-void _sylvan_start(){
-    sylvan_set_limits(1LL<<20, 1, 4);
+void _sylvan_start()
+{
+    sylvan_set_limits(1LL << 20, 1, 4);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
 }
 
-void _sylvan_quit(){
+void _sylvan_quit()
+{
     sylvan_quit();
 }
 
