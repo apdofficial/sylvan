@@ -153,6 +153,7 @@ void sylvan_set_reorder_verbose(int is_verbose);
  */
 void sylvan_set_reorder_type(reordering_type_t type);
 
+void sylvan_set_reorder_print(bool is_on);
 
 /**
  * @brief Reduce the heap size in the entire forest.

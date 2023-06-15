@@ -97,6 +97,11 @@ void sylvan_set_reorder_type(reordering_type_t type)
     reorder_db->config.type = type;
 }
 
+void sylvan_set_reorder_print(bool is_on)
+{
+    reorder_db->config.print_stat = is_on;
+}
+
 TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 {
     if (!reorder_db->is_initialised) return SYLVAN_REORDER_NOT_INITIALISED;

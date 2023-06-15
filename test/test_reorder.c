@@ -428,6 +428,8 @@ TASK_0(int, test_sift_back)
     test_assert(sylvan_siftback(&state) == SYLVAN_REORDER_SUCCESS);
     // 0, 1, 2, (3)
 
+    sylvan_post_reorder();
+
     test_assert(zero == sylvan_ithvar(0));
     test_assert(one == sylvan_ithvar(1));
     test_assert(two == sylvan_ithvar(2));
@@ -599,7 +601,7 @@ TASK_0(int, test_interact)
     return 0;
 }
 
-TASK_0(int, test_var_count)
+TASK_0(int, test_ref_nodes)
 {
     // we need to delete all data so we reset sylvan
     _sylvan_quit();
@@ -627,7 +629,7 @@ TASK_0(int, test_var_count)
     return 0;
 }
 
-TASK_0(int, test_ref_count)
+TASK_0(int, test_ref_vars)
 {
     // we need to delete all data so we reset sylvan
     _sylvan_quit();
@@ -635,7 +637,7 @@ TASK_0(int, test_ref_count)
 
     BDD bdd1 = sylvan_or(sylvan_ithvar(0), sylvan_ithvar(1));
     sylvan_ref(bdd1);
-    
+
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_ref(bdd2);
 
@@ -656,30 +658,30 @@ TASK_0(int, test_ref_count)
 
 TASK_1(int, runtests, size_t, ntests)
 {
-    printf("test_varswap\n");
+    printf("Test varswap\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap)) return 1;
-    printf("test_varswap_down\n");
+    printf("Test varswap_down\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_down)) return 1;
-    printf("test_varswap_up\n");
+    printf("Test varswap_up\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_up)) return 1;
-    printf("test_sift_down\n");
+    printf("Test sift_down\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
-    printf("test_sift_up\n");
+    printf("Test sift_up\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
-    printf("test_sift_back\n");
+    printf("Test sift_back\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_back)) return 1;
-    printf("test_reorder_perm\n");
+    printf("Test reorder_perm\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder_perm)) return 1;
-    printf("test_reorder\n");
+    printf("Test reorder\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder)) return 1;
-    printf("test_map_reorder\n");
+    printf("Test map_reorder\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_map_reorder)) return 1;
-    printf("test_interact\n");
+    printf("Test interact\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_interact)) return 1;
-    printf("test_var_count\n");
-    for (size_t j = 0; j < ntests; j++) if (RUN(test_var_count)) return 1;
-    printf("test_ref_count\n");
-    for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_count)) return 1;
+    printf("Test ref_nodes\n");
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_nodes)) return 1;
+    printf("Test ref_vars\n");
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_vars)) return 1;
     return 0;
 }
 
@@ -723,6 +725,11 @@ void _sylvan_start()
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
+#ifdef NDEBUG
+    sylvan_set_reorder_print(0);
+#else
+    sylvan_set_reorder_print(1);
+#endif
 }
 
 void _sylvan_quit()
