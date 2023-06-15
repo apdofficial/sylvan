@@ -247,39 +247,41 @@ TASK_0(int, test_sift_down)
     test_assert(mtbdd_getvar(three) == 3);
 
     sifting_state_t state;
-    state.size = llmsset_count_marked(nodes);
-    state.best_size = state.size;
-    state.pos = 0;
-    state.best_pos = 0;
     state.low = 0;
     state.high = 3;
+
+    state.size = 0;
+    state.pos = 0;
+
+    state.best_size = 9999;
+    state.best_pos = 3;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
     // (0), 1, 2, 3
-    test_assert(CALL(sylvan_siftdown, &state) == SYLVAN_REORDER_SUCCESS);
-    // 1, 2, (0), 3
+    test_assert(sylvan_siftdown(&state) == SYLVAN_REORDER_SUCCESS);
+    // 1, 2, 3, (0)
     // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
     test_assert(sylvan_level_to_order(0) == 1);
     test_assert(sylvan_level_to_order(1) == 2);
-    test_assert(sylvan_level_to_order(2) == 0);
-    test_assert(sylvan_level_to_order(3) == 3);
+    test_assert(sylvan_level_to_order(2) == 3);
+    test_assert(sylvan_level_to_order(3) == 0);
 
     test_assert(sylvan_order_to_level(1) == 0);
     test_assert(sylvan_order_to_level(2) == 1);
-    test_assert(sylvan_order_to_level(0) == 2);
-    test_assert(sylvan_order_to_level(3) == 3);
+    test_assert(sylvan_order_to_level(3) == 2);
+    test_assert(sylvan_order_to_level(0) == 3);
 
-    test_assert(zero == sylvan_ithvar(2));
+    test_assert(zero == sylvan_ithvar(3));
     test_assert(one == sylvan_ithvar(0));
     test_assert(two == sylvan_ithvar(1));
-    test_assert(three == sylvan_ithvar(3));
+    test_assert(three == sylvan_ithvar(2));
 
-    test_assert(mtbdd_getvar(zero) == 2);
+    test_assert(mtbdd_getvar(zero) == 3);
     test_assert(mtbdd_getvar(one) == 0);
     test_assert(mtbdd_getvar(two) == 1);
-    test_assert(mtbdd_getvar(three) == 3);
+    test_assert(mtbdd_getvar(three) == 2);
 
     return 0;
 }
@@ -311,39 +313,41 @@ TASK_0(int, test_sift_up)
     test_assert(mtbdd_getvar(three) == 3);
 
     sifting_state_t state;
-    state.size = llmsset_count_marked(nodes);
-    state.best_size = state.size;
-    state.pos = 3;
-    state.best_pos = 0;
     state.low = 0;
     state.high = 3;
+
+    state.size = 0;
+    state.best_size = 999;
+
+    state.pos = 3;
+    state.best_pos = 0;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
     // 0, 1, 2, (3)
-    test_assert(CALL(sylvan_siftup, &state) == SYLVAN_REORDER_SUCCESS);
-    // 0, (3), 1, 2
+    test_assert(sylvan_siftup(&state) == SYLVAN_REORDER_SUCCESS);
+    // (3), 0, 1, 2
     // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
-    test_assert(sylvan_level_to_order(0) == 0);
-    test_assert(sylvan_level_to_order(1) == 3);
+    test_assert(sylvan_level_to_order(0) == 3);
+    test_assert(sylvan_level_to_order(1) == 0);
     test_assert(sylvan_level_to_order(2) == 1);
     test_assert(sylvan_level_to_order(3) == 2);
 
-    test_assert(sylvan_order_to_level(0) == 0);
-    test_assert(sylvan_order_to_level(3) == 1);
+    test_assert(sylvan_order_to_level(3) == 0);
+    test_assert(sylvan_order_to_level(0) == 1);
     test_assert(sylvan_order_to_level(1) == 2);
     test_assert(sylvan_order_to_level(2) == 3);
 
-    test_assert(zero == sylvan_ithvar(0));
+    test_assert(zero == sylvan_ithvar(1));
     test_assert(one == sylvan_ithvar(2));
     test_assert(two == sylvan_ithvar(3));
-    test_assert(three == sylvan_ithvar(1));
+    test_assert(three == sylvan_ithvar(0));
 
-    test_assert(mtbdd_getvar(zero) == 0);
+    test_assert(mtbdd_getvar(zero) == 1);
     test_assert(mtbdd_getvar(one) == 2);
     test_assert(mtbdd_getvar(two) == 3);
-    test_assert(mtbdd_getvar(three) == 1);
+    test_assert(mtbdd_getvar(three) == 0);
 
     return 0;
 }
@@ -371,18 +375,19 @@ TASK_0(int, test_sift_back)
     test_assert(mtbdd_getvar(three) == 3);
 
     sifting_state_t state;
-    state.size = llmsset_count_marked(nodes);
-    state.best_size = state.size;
-    state.pos = 3;
-    state.best_pos = 0;
     state.low = 0;
     state.high = 3;
 
+    state.size = 999;
+    state.pos = 3;
+
+    state.best_size = 1;
+    state.best_pos = 0;
+
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
-    return 0;
 
     // 0, 1, 2, (3)
-    test_assert(CALL(sylvan_siftback, &state) == SYLVAN_REORDER_SUCCESS);
+    test_assert(sylvan_siftback(&state) == SYLVAN_REORDER_SUCCESS);
     // (3), 0, 1, 2
 
     test_assert(sylvan_level_to_order(0) == 3);
@@ -405,10 +410,16 @@ TASK_0(int, test_sift_back)
     test_assert(mtbdd_getvar(two) == 3);
     test_assert(mtbdd_getvar(three) == 0);
 
+    state.size = 999;
+    state.pos = 0;
+
+    state.best_size = 1;
+    state.best_pos = 4;
+
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
     // (3), 0, 1, 2
-    test_assert(CALL(sylvan_siftback, &state) == SYLVAN_REORDER_SUCCESS);
+    test_assert(sylvan_siftback(&state) == SYLVAN_REORDER_SUCCESS);
     // 0, 1, 2, (3)
 
     test_assert(zero == sylvan_ithvar(0));
@@ -558,7 +569,7 @@ TASK_0(int, test_interact)
 
     assert(interact_test(&reorder_db->matrix, 6, 7));
     assert(interact_test(&reorder_db->matrix, 7, 6));
-    
+
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
         for (size_t j = i + 1; j < reorder_db->levels.count - 2; ++j) {
             // test interaction of variables belonging to bdd2
@@ -642,12 +653,12 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_down)) return 1;
     printf("test_varswap_up\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_varswap_up)) return 1;
-//    printf("test_sift_down\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
-//    printf("test_sift_up\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
-//    printf("test_sift_back\n");
-//    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_back)) return 1;
+    printf("test_sift_down\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_down)) return 1;
+    printf("test_sift_up\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_up)) return 1;
+    printf("test_sift_back\n");
+    for (size_t j=0;j<ntests;j++) if (RUN(test_sift_back)) return 1;
     printf("test_reorder_perm\n");
     for (size_t j=0;j<ntests;j++) if (RUN(test_reorder_perm)) return 1;
     printf("test_reorder\n");
@@ -712,7 +723,7 @@ int main()
 
     _sylvan_start();
 
-    sylvan_set_reorder_nodes_threshold(2); // keep it 2, otherwise we skip levels which will fail the test expectations
+    sylvan_set_reorder_nodes_threshold(1); // keep it 1, otherwise we skip levels which will fail the test expectations
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit_sec(30);
 
