@@ -58,7 +58,35 @@ VOID_TASK_DECL_3(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *, roar
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
+#ifndef NDEBUG
     assert(pos != sylvan_invalid);
+    // precondition:
+    // MRC and mark-and-sweep should agree on the number of nodes
+    size_t a = llmsset_count_marked(nodes) + 2;
+    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
+    assert(a == b);
+
+    // and with what nodes are marked
+    atomic_bitmap_t bitmap2 = {
+            .container = nodes->bitmap2,
+            .size = nodes->table_size
+    };
+    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
+    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
+        assert(llmsset_is_marked(nodes, idx));
+        assert(roaring_bitmap_contains(reorder_db->node_ids, idx));
+    }
+
+    // and vice versa
+    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(reorder_db->node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
+    while (it_tmp->has_value) {
+        size_t index = it_tmp->current_value;
+        roaring_advance_uint32_iterator(it_tmp);
+        assert(llmsset_is_marked(nodes, index));
+    }
+#endif
+
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
 
@@ -66,7 +94,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     size_t filled, total;
     sylvan_table_usage(&filled, &total);
-    if ((double)filled > (double)total * SYLVAN_REORDER_MIN_MEM_REQ){
+    if ((double) filled > (double) total * SYLVAN_REORDER_MIN_MEM_REQ) {
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
@@ -365,19 +393,10 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             f01 = node_gethigh(f0, n0);
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf0 = mtbdd_varswap_makemapnode(var + 1, f00, f1, &created);
+            newf0 = mrc_make_mapnode(&reorder_db->mrc, var + 1, f00, f1, &created);
             if (newf0 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL);
                 return;
-            }
-            if (created) {
-                mrc_nnodes_add(&reorder_db->mrc, 1);
-                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                mrc_ref_nodes_set(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, 1);
-            } else {
-                mrc_ref_nodes_add(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);
@@ -407,35 +426,17 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             // or may already exist in the DAG as required to implement other functions.
 
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
+            newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
-            if (created1) {
-                mrc_nnodes_add(&reorder_db->mrc, 1);
-                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                mrc_ref_nodes_set(&reorder_db->mrc, newf1 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f11 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f01 & SYLVAN_TABLE_MASK_INDEX, 1);
-            } else {
-                mrc_ref_nodes_add(&reorder_db->mrc, newf1 & SYLVAN_TABLE_MASK_INDEX, 1);
-            }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
+            newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
-            }
-            if (created0) {
-                mrc_nnodes_add(&reorder_db->mrc, 1);
-                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                mrc_ref_nodes_set(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
-                mrc_ref_nodes_add(&reorder_db->mrc, f10 & SYLVAN_TABLE_MASK_INDEX, 1);
-            } else {
-                mrc_ref_nodes_add(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
             }
 
             // update node, which also removes the mark

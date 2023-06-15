@@ -114,6 +114,10 @@ int mrc_is_node_dead(const mrc_t* self, size_t idx);
 
 void mrc_delete_node(mrc_t *self, size_t index);
 
+MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created);
+
+MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

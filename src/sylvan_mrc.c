@@ -6,7 +6,7 @@
 /**
  * Atomic counters
  */
-void atomic_counters_init(atomic_counters_t* self, size_t new_size)
+void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
     assert(self != NULL);
     atomic_counters_deinit(self);
@@ -66,11 +66,14 @@ counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
  * - The forest must be initialized.
  * - The MRC counters must be freshly initialized.
  */
-void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_ids)
+void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_ids)
 {
-    atomic_counters_init(&self->ref_nodes, nnodes);     // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
-    atomic_counters_init(&self->ref_vars, nvars);       // memory usage: # of variables * sizeof (counter_t) bits   (16v)
-    atomic_counters_init(&self->var_nnodes, nvars);     // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_counters_init(&self->ref_nodes,
+                         nnodes);     // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
+    atomic_counters_init(&self->ref_vars,
+                         nvars);       // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_counters_init(&self->var_nnodes,
+                         nvars);     // memory usage: # of variables * sizeof (counter_t) bits   (16v)
     atomic_bitmap_init(&self->ext_ref_nodes, nnodes);   // memory usage: # of nodes * 1 bit                         (n)
 
     mrc_nnodes_set(self, 2);
@@ -126,7 +129,7 @@ void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_i
 //    mtbdd_re_mark_protected(self->ext_ref_nodes.container);
 }
 
-void mrc_deinit(mrc_t* self)
+void mrc_deinit(mrc_t *self)
 {
     atomic_counters_deinit(&self->ref_nodes);
     atomic_counters_deinit(&self->ref_vars);
@@ -139,22 +142,22 @@ void mrc_isolated_count_set(mrc_t *self, int val)
     self->isolated_count = val;
 }
 
-void mrc_ref_nodes_set(mrc_t* self, size_t idx, int val)
+void mrc_ref_nodes_set(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_set(&self->ref_nodes, idx, val);
 }
 
-void mrc_ref_vars_set(mrc_t* self, size_t idx, int val)
+void mrc_ref_vars_set(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_set(&self->ref_vars, idx, val);
 }
 
-void mrc_var_nodes_set(mrc_t* self, size_t idx, int val)
+void mrc_var_nodes_set(mrc_t *self, size_t idx, int val)
 {
     atomic_counters_set(&self->var_nnodes, idx, val);
 }
 
-void mrc_nnodes_set(mrc_t* self, int val)
+void mrc_nnodes_set(mrc_t *self, int val)
 {
     atomic_store(&self->nnodes, val);
 }
@@ -176,10 +179,10 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_add(mrc_t *self, int val)
 {
-    atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
+    atomic_fetch_add(&self->nnodes, val);
 }
 
-counter_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx)
+counter_t mrc_ext_ref_nodes_get(const mrc_t *self, size_t idx)
 {
     return atomic_bitmap_get(&self->ext_ref_nodes, idx);
 }
@@ -212,18 +215,43 @@ int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 
 int mrc_is_node_dead(const mrc_t *self, size_t idx)
 {
-    if (self->ext_ref_nodes.size == 0 || self->ref_nodes.size == 0) return 0;
+    if (self->ext_ref_nodes.size == 0 && self->ref_nodes.size == 0) return 0;
     counter_t int_count = mrc_ref_nodes_get(self, idx);
     counter_t ext_count = mrc_ext_ref_nodes_get(self, idx);
     return int_count == 0 && ext_count == 0;
 }
 
-void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
+void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 {
-    // we will be removing items from the bitmap so we copy the current one first and
-    // use that one instead
-    roaring_bitmap_t *tmp = roaring_bitmap_copy(node_ids);
-    roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
+#ifndef NDEBUG
+    // precondition:
+    // MRC and mark-and-sweep should agree on the number of nodes
+    size_t a = llmsset_count_marked(nodes) + 2;
+    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
+    assert(a == b);
+
+    // and with what nodes are marked
+    atomic_bitmap_t bitmap2 = {
+            .container = nodes->bitmap2,
+            .size = nodes->table_size
+    };
+    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
+    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
+        assert(llmsset_is_marked(nodes, idx));
+        assert(roaring_bitmap_contains(node_ids, idx));
+    }
+
+    // and vice versa
+    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
+    while (it_tmp->has_value) {
+        size_t index = it_tmp->current_value;
+        roaring_advance_uint32_iterator(it_tmp);
+        assert(llmsset_is_marked(nodes, index));
+    }
+#endif
+
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
     while (it->has_value) {
@@ -233,14 +261,34 @@ void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids)
             mrc_delete_node(self, index);
         }
     }
-    roaring_bitmap_free(tmp);
 
-#if SYLVAN_USE_LINEAR_PROBING
+#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
     sylvan_clear_and_mark();
     sylvan_rehash_all();
-#elif SYLVAN_USE_CHAINING_REHASH_ALL
+#endif
+
+#ifndef NDEBUG
+    // post condition:
+    // MRC and mark-and-sweep should agree on the number of nodes
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+
+    a = llmsset_count_marked(nodes) + 2;
+    b = mrc_nnodes_get(&reorder_db->mrc) + 2;
+    assert(a == b);
+
+    // and with what nodes are marked
+    idx = atomic_bitmap_next(&bitmap2, 1);
+    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
+        assert(roaring_bitmap_contains(node_ids, idx));
+    }
+    it_tmp = roaring_create_iterator(node_ids);
+    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
+    while (it_tmp->has_value) {
+        size_t index = it_tmp->current_value;
+        roaring_advance_uint32_iterator(it_tmp);
+        assert(llmsset_is_marked(nodes, index));
+    }
 #endif
 }
 
@@ -252,13 +300,13 @@ void mrc_delete_node(mrc_t *self, size_t index)
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
         size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1) {
+        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
         }
         MTBDD f0 = mtbddnode_getlow(f);
         size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1) {
+        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
         }
@@ -267,4 +315,41 @@ void mrc_delete_node(mrc_t *self, size_t index)
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
 #endif
+}
+
+MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
+{
+    MTBDD new = mtbdd_varswap_makenode(var, low, high, created);
+    if (new == mtbdd_invalid) {
+        return mtbdd_invalid;
+    }
+    if (*created) {
+        mrc_nnodes_add(self, 1);
+        mrc_var_nnodes_add(self, var, 1);
+        mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+    } else {
+        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+    }
+    return new;
+}
+
+MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
+{
+    (void)self;
+    MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
+    if (new == mtbdd_invalid) {
+        return mtbdd_invalid;
+    }
+    if (*created) {
+        mrc_nnodes_add(self, 1);
+        mrc_var_nnodes_add(self, var, 1);
+        mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+    } else {
+        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+    }
+    return new;
 }
