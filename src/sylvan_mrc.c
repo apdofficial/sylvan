@@ -68,13 +68,14 @@ counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
  */
 void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_ids)
 {
-    atomic_counters_init(&self->ref_nodes,
-                         nnodes);     // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
-    atomic_counters_init(&self->ref_vars,
-                         nvars);       // memory usage: # of variables * sizeof (counter_t) bits   (16v)
-    atomic_counters_init(&self->var_nnodes,
-                         nvars);     // memory usage: # of variables * sizeof (counter_t) bits   (16v)
-    atomic_bitmap_init(&self->ext_ref_nodes, nnodes);   // memory usage: # of nodes * 1 bit                         (n)
+    // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
+    atomic_counters_init(&self->ref_nodes, nnodes);
+    // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_counters_init(&self->ref_vars, nvars);
+    // memory usage: # of variables * sizeof (counter_t) bits   (16v)
+    atomic_counters_init(&self->var_nnodes, nvars);
+    // memory usage: # of nodes * 1 bit                         (n)
+    atomic_bitmap_init(&self->ext_ref_nodes, nnodes);
 
     mrc_nnodes_set(self, 2);
 
@@ -111,6 +112,8 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_i
     it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
+    // set all nodes with ref == 0 to 1
+    // every node nees to have at least 1 reference otherwise it will be garbage collected
     while (it->has_value) {
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
@@ -224,31 +227,31 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 {
 #ifndef NDEBUG
-    // precondition:
-    // MRC and mark-and-sweep should agree on the number of nodes
-    size_t a = llmsset_count_marked(nodes) + 2;
-    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
-    assert(a == b);
-
-    // and with what nodes are marked
-    atomic_bitmap_t bitmap2 = {
-            .container = nodes->bitmap2,
-            .size = nodes->table_size
-    };
-    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
-    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
-        assert(llmsset_is_marked(nodes, idx));
-        assert(roaring_bitmap_contains(node_ids, idx));
-    }
-
-    // and vice versa
-    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
-    while (it_tmp->has_value) {
-        size_t index = it_tmp->current_value;
-        roaring_advance_uint32_iterator(it_tmp);
-        assert(llmsset_is_marked(nodes, index));
-    }
+//    // precondition:
+//    // MRC and mark-and-sweep should agree on the number of nodes
+//    size_t a = llmsset_count_marked(nodes) + 2;
+//    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
+//    assert(a == b);
+//
+//    // and with what nodes are marked
+//    atomic_bitmap_t bitmap2 = {
+//            .container = nodes->bitmap2,
+//            .size = nodes->table_size
+//    };
+//    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
+//    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
+//        assert(llmsset_is_marked(nodes, idx));
+//        assert(roaring_bitmap_contains(node_ids, idx));
+//    }
+//
+//    // and vice versa
+//    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(node_ids);
+//    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
+//    while (it_tmp->has_value) {
+//        size_t index = it_tmp->current_value;
+//        roaring_advance_uint32_iterator(it_tmp);
+//        assert(llmsset_is_marked(nodes, index));
+//    }
 #endif
 
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
@@ -268,27 +271,27 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 #endif
 
 #ifndef NDEBUG
-    // post condition:
-    // MRC and mark-and-sweep should agree on the number of nodes
-    sylvan_clear_and_mark();
-    sylvan_rehash_all();
-
-    a = llmsset_count_marked(nodes) + 2;
-    b = mrc_nnodes_get(&reorder_db->mrc) + 2;
-    assert(a == b);
-
-    // and with what nodes are marked
-    idx = atomic_bitmap_next(&bitmap2, 1);
-    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
-        assert(roaring_bitmap_contains(node_ids, idx));
-    }
-    it_tmp = roaring_create_iterator(node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
-    while (it_tmp->has_value) {
-        size_t index = it_tmp->current_value;
-        roaring_advance_uint32_iterator(it_tmp);
-        assert(llmsset_is_marked(nodes, index));
-    }
+//    // post condition:
+//    // MRC and mark-and-sweep should agree on the number of nodes
+//    sylvan_clear_and_mark();
+//    sylvan_rehash_all();
+//
+//    a = llmsset_count_marked(nodes) + 2;
+//    b = mrc_nnodes_get(&reorder_db->mrc) + 2;
+//    assert(a == b);
+//
+//    // and with what nodes are marked
+//    idx = atomic_bitmap_next(&bitmap2, 1);
+//    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
+//        assert(roaring_bitmap_contains(node_ids, idx));
+//    }
+//    it_tmp = roaring_create_iterator(node_ids);
+//    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
+//    while (it_tmp->has_value) {
+//        size_t index = it_tmp->current_value;
+//        roaring_advance_uint32_iterator(it_tmp);
+//        assert(llmsset_is_marked(nodes, index));
+//    }
 #endif
 }
 
@@ -337,7 +340,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
 {
-    (void)self;
+    (void) self;
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;

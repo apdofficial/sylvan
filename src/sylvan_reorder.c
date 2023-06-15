@@ -325,6 +325,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
     levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
+    // remember the order of the levels, since it will change during the sifting
     _Atomic (uint32_t) level_to_order[reorder_db->levels.count];
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
         level_to_order[i] = reorder_db->levels.level_to_order[i];

@@ -48,6 +48,7 @@ int levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high)
  */
 void levels_reset(levels_t* self);
 
+
 /**
  * \brief  Get the BDD node representing "if level then true else false"
  * \details  Order a node does not change after a swap, meaning it is in the same level,

@@ -2,7 +2,7 @@
 #include <sylvan_align.h>
 #include <errno.h>      // for errno
 
-static size_t levels_size; // size of the arrays in levels_t used to realloc memory
+static size_t levels_size = 0; // size of the arrays in levels_t used to realloc memory
 
 size_t levels_count_get(levels_t* self)
 {
@@ -21,9 +21,9 @@ int levels_new_many(levels_t* self, size_t amount)
         // just round up to the next multiple of 64 value
         // probably better than doubling anyhow...
         levels_size = (self->count + amount + 63) & (~63LL);
-        self->table = (_Atomic (uint64_t) *) realloc(self->table, sizeof(_Atomic (uint64_t)[levels_size]));
-        self->level_to_order = (_Atomic (uint32_t) *) realloc(self->level_to_order, sizeof(_Atomic (uint32_t)[levels_size]));
-        self->order_to_level = (_Atomic (uint32_t) *) realloc(self->order_to_level,sizeof(_Atomic (uint32_t)[levels_size]));
+        self->table = (_Atomic (uint64_t) *) realloc(self->table, sizeof(uint64_t[levels_size]));
+        self->level_to_order = (_Atomic (uint32_t) *) realloc(self->level_to_order, sizeof(uint32_t[levels_size]));
+        self->order_to_level = (_Atomic (uint32_t) *) realloc(self->order_to_level, sizeof(uint32_t[levels_size]));
 
         if (self->table == NULL || self->level_to_order == NULL || self->order_to_level == NULL) {
             fprintf(stderr, "levels_new_many failed to realloc new memory: %s!\n", strerror(errno));
@@ -31,6 +31,7 @@ int levels_new_many(levels_t* self, size_t amount)
         }
     }
     for (size_t i = 0; i < amount; i++) {
+        (void)self->count;
         self->table[self->count] = mtbdd_makenode(self->count, mtbdd_false, mtbdd_true);
         self->level_to_order[self->count] = self->count;
         self->order_to_level[self->count] = self->count;

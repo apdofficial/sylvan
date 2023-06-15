@@ -50,11 +50,6 @@ claim_data_bucket(const llmsset_t dbs)
                     int j = __builtin_clzll(~v);
                     *ptr |= (0x8000000000000000LL >> j);
                     size_t index = (8 * my_region + i) * 64 + j;
-#if ATTACH_ROARING_BITMAP
-                    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-                        roaring_bitmap_add(reorder_db->node_ids, index);
-                    }
-#endif
                     return index;
                 }
                 i++;
@@ -95,11 +90,6 @@ claim_data_bucket(const llmsset_t dbs)
 static void
 release_data_bucket(const llmsset_t dbs, uint64_t index)
 {
-#if ATTACH_ROARING_BITMAP
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        roaring_bitmap_remove(reorder_db->node_ids, index);
-    }
-#endif
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     atomic_fetch_and(ptr, ~mask);
@@ -380,14 +370,6 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
     // forbid first two positions (index 0 and 1)
     dbs->bitmap2[0] = 0xc000000000000000LL;
 
-#if ATTACH_ROARING_BITMAP
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        if (roaring_bitmap_is_empty(reorder_db->node_ids) == 0) {
-            roaring_bitmap_clear(reorder_db->node_ids);
-        }
-    }
-#endif
-
     TOGETHER(llmsset_reset_region);
 }
 
@@ -407,11 +389,6 @@ llmsset_is_marked(const llmsset_t dbs, uint64_t index)
 int
 llmsset_mark(const llmsset_t dbs, uint64_t index)
 {
-#if ATTACH_ROARING_BITMAP
-    if (reorder_db != NULL && reorder_db->node_ids != NULL) {
-        roaring_bitmap_add(reorder_db->node_ids, index);
-    }
-#endif
     _Atomic (uint64_t) *ptr = dbs->bitmap2 + (index / 64);
     uint64_t mask = 0x8000000000000000LL >> (index & 63);
     for (;;) {

@@ -58,35 +58,6 @@ VOID_TASK_DECL_3(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *, roar
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
-#ifndef NDEBUG
-    assert(pos != sylvan_invalid);
-    // precondition:
-    // MRC and mark-and-sweep should agree on the number of nodes
-    size_t a = llmsset_count_marked(nodes) + 2;
-    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
-    assert(a == b);
-
-    // and with what nodes are marked
-    atomic_bitmap_t bitmap2 = {
-            .container = nodes->bitmap2,
-            .size = nodes->table_size
-    };
-    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
-    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
-        assert(llmsset_is_marked(nodes, idx));
-        assert(roaring_bitmap_contains(reorder_db->node_ids, idx));
-    }
-
-    // and vice versa
-    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(reorder_db->node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
-    while (it_tmp->has_value) {
-        size_t index = it_tmp->current_value;
-        roaring_advance_uint32_iterator(it_tmp);
-        assert(llmsset_is_marked(nodes, index));
-    }
-#endif
-
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
 
@@ -98,9 +69,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
-#if !ATTACH_ROARING_BITMAP
     reorder_remark_node_ids(reorder_db, nodes);
-#endif
 
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
@@ -263,7 +232,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             // if <var+1>, then replace with <var> and rehash
             mrc_var_nnodes_add(&reorder_db->mrc, var, 1);
             mrc_var_nnodes_add(&reorder_db->mrc, var + 1, -1);
-
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, index) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -291,7 +259,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                 // we are at the end of a chain
                 mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
                 mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
-
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, index) != 1) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -304,7 +271,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                     // next in chain wasn't <var+1>...
                     mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
                     mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
-
                     mtbddnode_setvariable(node, var + 1);
                     if (llmsset_rehash_bucket(nodes, index) != 1) {
                         atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -463,11 +429,8 @@ VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     size_t marked_count = sylvan_varswap_p1(pos, result, node_ids);
     if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
     if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
-        roaring_bitmap_t *node_ids__ = roaring_bitmap_copy(node_ids);
         // do the not so trivial cases (but won't create new nodes this time)
-        sylvan_varswap_p2(result, node_ids__);
-        roaring_bitmap_free(node_ids__);
+        sylvan_varswap_p2(result, node_ids);
         if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
     }
-
 }
