@@ -37,6 +37,8 @@ claim_data_bucket(const llmsset_t dbs)
     // get my region, based on which worker are we
     // every worker has a region
     LOCALIZE_THREAD_LOCAL(my_region, uint64_t);
+    size_t marked = llmsset_count_marked(nodes);
+    (void) marked;
 
     for (;;) {
         if (my_region != (uint64_t) -1) {
@@ -48,8 +50,8 @@ claim_data_bucket(const llmsset_t dbs)
                 uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
-//                    *ptr |= (0x8000000000000000LL >> j);
-                    atomic_fetch_or(ptr, (0x8000000000000000LL >> j));
+                    *ptr |= (0x8000000000000000LL >> j);
+//                    atomic_fetch_or(ptr, (0x8000000000000000LL >> j));
                     size_t index = (8 * my_region + i) * 64 + j;
                     return index;
                 }
@@ -72,7 +74,10 @@ claim_data_bucket(const llmsset_t dbs)
             // check if table maybe full
             if (count-- == 0) return (uint64_t) -1;
             my_region += 1;
-            if (my_region >= (dbs->table_size / (64 * 8))) my_region = 0;
+            if (my_region >= (dbs->table_size / (64 * 8))) {
+                my_region = 0;
+            }
+
             // try to claim it
             _Atomic (uint64_t) *ptr = dbs->bitmap1 + (my_region / 64);
             uint64_t mask = 0x8000000000000000LL >> (my_region & 63);

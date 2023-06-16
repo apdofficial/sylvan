@@ -91,7 +91,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 //        return result;
 //    }
 
-#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
+#if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
@@ -394,6 +394,9 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
+                size_t used, total;
+                sylvan_table_usage(&used, &total);
+                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
@@ -401,6 +404,9 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
+                size_t used, total;
+                sylvan_table_usage(&used, &total);
+                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
@@ -417,7 +423,7 @@ VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     if (reorder_db->config.print_stat) {
         printf("\nRunning recovery after running out of memory...\n");
     }
-#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
+#if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else

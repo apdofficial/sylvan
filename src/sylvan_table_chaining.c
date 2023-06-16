@@ -51,13 +51,14 @@
 #define data_get_a(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_A_POS))
 #define data_get_b(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_B_POS))
 
-static const uint64_t invalid_bucket = (uint64_t) -1;
+static const uint64_t invalid = (uint64_t) -1;
+static int clear_one_is_busy = 0;
 
 typedef struct
 {
-    _Atomic (uint64_t)* chain;
-    _Atomic (uint64_t)* a;
-    _Atomic (uint64_t)* b;
+    _Atomic (uint64_t) *chain;
+    _Atomic (uint64_t) *a;
+    _Atomic (uint64_t) *b;
 } data_bucket_t;
 
 static inline data_bucket_t data_get_bucket(const llmsset_t dbs, uint64_t item_idx)
@@ -79,6 +80,11 @@ VOID_TASK_0(llmsset_reset_region)
     SET_THREAD_LOCAL(my_region, my_region);
 }
 
+VOID_TASK_IMPL_0(llmsset_reset_all_regions)
+{
+    TOGETHER(llmsset_reset_region);
+}
+
 static uint64_t
 claim_data_bucket(const llmsset_t dbs)
 {
@@ -87,44 +93,61 @@ claim_data_bucket(const llmsset_t dbs)
     LOCALIZE_THREAD_LOCAL(my_region, uint64_t);
 
     for (;;) {
-        if (my_region != (uint64_t) -1) {
+        if (my_region != invalid) {
             // find empty bucket in region <my_region>
             _Atomic (uint64_t) *ptr = dbs->bitmap2 + (my_region * 8);
             int i = 0;
+            // With 64 bytes per cacheline, there are 8 64-bit values per cacheline.
+            int filled_buckets = 0;
             for (; i < 8;) {
                 uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
-//                    *ptr |= (0x8000000000000000LL >> j);
-                    atomic_fetch_or_explicit(ptr, (0x8000000000000000LL >> j), memory_order_relaxed);
+                    *ptr |= (0x8000000000000000LL >> j);
                     size_t index = (8 * my_region + i) * 64 + j;
                     return index;
+                } else {
+                    filled_buckets++;
                 }
                 i++;
                 ptr++;
+            }
+            if (filled_buckets == 8 && my_region > 10) {
+//                printf("region %llu is full (%zu)\n", my_region, llmsset_count_marked(dbs));
             }
         } else {
             // special case on startup or after garbage collection
             my_region += (lace_get_worker()->worker * (dbs->table_size / (64 * 8))) / lace_workers();
         }
-        uint64_t count = dbs->table_size / (64 * 8);
+        const uint64_t n_regions = (dbs->table_size / (64 * 8));
+        uint64_t count = n_regions;
         for (;;) {
             // check if table maybe full
-            if (count-- == 0) return invalid_bucket;
-
+            if (count-- == 0) {
+                size_t size = llmsset_get_size(dbs);
+                size_t marked = llmsset_count_marked(dbs);
+                (void) marked;
+                (void) size;
+                return invalid;
+            }
             my_region += 1;
-            if (my_region >= (dbs->table_size / (64 * 8))) my_region = 0;
-
+            if (my_region >= n_regions) {
+                my_region = 0;
+            }
             // try to claim it
             _Atomic (uint64_t) *ptr = dbs->bitmap1 + (my_region / 64);
             uint64_t mask = 0x8000000000000000LL >> (my_region & 63);
             uint64_t v;
             restart:
             v = atomic_load_explicit(ptr, memory_order_relaxed);
-            if (v & mask) continue; // taken
-            if (atomic_compare_exchange_weak(ptr, &v, v | mask)) break;
-            else goto restart;
+            if (v & mask) {
+                continue; // <region> is already taken by some other worker
+            }
+            if (atomic_compare_exchange_weak(ptr, &v, v | mask)) {
+                break; // success! <region> is now claimed by me
+            } else goto restart;
         }
+        // assign thread local variable <my_region> to me
         SET_THREAD_LOCAL(my_region, my_region);
     }
 }
@@ -187,6 +210,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
 
     // stop when we encounter <tail>
     for (;;) {
+        assert(clear_one_is_busy == 0);
         if (bucket_idx == tail) {
             // we did not find existing node in our table, and reached end of chain
             // or the chain was empty
@@ -194,7 +218,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
             if (claimed_idx == 0) {
                 // claim data bucket
                 claimed_idx = claim_data_bucket(dbs);
-                if (claimed_idx == invalid_bucket) return 0; // failed to claim a data bucket
+                if (claimed_idx == invalid) return 0; // failed to claim a data bucket
             }
 
             // call custom create callback
@@ -283,6 +307,7 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     }
 }
 
+
 /**
  * Clear a single bucket hash.
  * (do not run parallel with lookup!!!)
@@ -296,7 +321,7 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
     // set idx_chain to the next bucket in the chain
     uint64_t idx_chain = atomic_load_explicit(idx_bucket.chain, memory_order_relaxed);
     if (idx_chain & SYLVAN_TABLE_MASK_INDEX) {
-        while (!atomic_compare_exchange_strong(idx_bucket.chain, &idx_chain, invalid_bucket)) {
+        while (!atomic_compare_exchange_strong(idx_bucket.chain, &idx_chain, invalid)) {
             // setting ptr to not in use(-1)
         }
         // strip the hash mark which will leave us
@@ -319,23 +344,31 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
         if (idx == d_idx) { // we are head
             // next part of the chain
             atomic_store_explicit(first_ptr, idx_chain, memory_order_release);
+            clear_one_is_busy = 0;
             return 1;
         }
 
         for (;;) {
+            clear_one_is_busy = 1;
             // can not be used in combination with look up (find or insert)
 
             // item was not actually in the hash table (node that was not hashed)
             // if you use clear one on the same thing twice it goes wrong
-            if (idx == 0) return 0; // wasn't in???
+            if (idx == 0) {
+                clear_one_is_busy = 0;
+                return 0; // wasn't in???
+            }
 
             data_bucket_t bucket = data_get_bucket(dbs, idx);
             uint64_t chain = atomic_load_explicit(bucket.chain, memory_order_relaxed);
 
-            if (chain == invalid_bucket) break; // found delete-in-progress, restart
+            if (chain == invalid) break; // found delete-in-progress, restart
 
             if ((chain & SYLVAN_TABLE_MASK_INDEX) == d_idx) { // found our predecessor
-                if (!atomic_compare_exchange_strong(bucket.chain, &chain, (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain)) break; // restart
+                if (!atomic_compare_exchange_strong(bucket.chain, &chain,
+                                                    (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain))
+                    break; // restart
+                clear_one_is_busy = 0;
                 return 1;
             } else {
                 idx = chain & SYLVAN_TABLE_MASK_INDEX; // next
