@@ -224,7 +224,6 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
 #define llmsset_hash sylvan_tabhash16
 #define llmsset_fnvhash sylvan_fnvhash16
 
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

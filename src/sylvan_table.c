@@ -48,7 +48,8 @@ claim_data_bucket(const llmsset_t dbs)
                 uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
                 if (v != 0xffffffffffffffffLL) {
                     int j = __builtin_clzll(~v);
-                    *ptr |= (0x8000000000000000LL >> j);
+//                    *ptr |= (0x8000000000000000LL >> j);
+                    atomic_fetch_or(ptr, (0x8000000000000000LL >> j));
                     size_t index = (8 * my_region + i) * 64 + j;
                     return index;
                 }
@@ -130,11 +131,10 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
     uint64_t hash_rehash = 14695981039346656037LLU;
     if (custom) hash_rehash = dbs->hash_cb(a, b, hash_rehash);
     else hash_rehash = sylvan_tabhash16(a, b, hash_rehash);
-
+    int i = 0;
     const uint64_t step = (((hash_rehash >> 20) | 1) << 3);
     const uint64_t hash = hash_rehash & BUCKET_MASK_HASH;
     uint64_t idx, last, cidx = 0;
-    int i = 0;
 
 #if LLMSSET_MASK
     last = idx = hash_rehash & dbs->mask;
@@ -152,9 +152,10 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
                 cidx = claim_data_bucket(dbs);
                 if (cidx == (uint64_t) -1) return 0; // failed to claim a data bucket
                 if (custom) dbs->create_cb(&a, &b);
-                uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * cidx;
-                d_ptr[0] = a;
-                d_ptr[1] = b;
+
+                _Atomic (uint64_t) *ptr = ((_Atomic (uint64_t) *) dbs->data) + 2 * cidx;
+                ptr[0] = a;
+                ptr[1] = b;
             }
             if (atomic_compare_exchange_strong(bucket, &v, hash | cidx)) {
                 if (custom) set_custom_bucket(dbs, cidx, custom);
@@ -165,9 +166,12 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
 
         if (hash == (v & BUCKET_MASK_HASH)) {
             uint64_t d_idx = v & BUCKET_MASK_INDEX;
-            uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * d_idx;
+            _Atomic (uint64_t) *data_bucket = ((_Atomic (uint64_t) *) dbs->data) + 2 * d_idx;
+            uint64_t curr_a = data_bucket[0];
+            uint64_t curr_b = data_bucket[1];
+
             if (custom) {
-                if (dbs->equals_cb(a, b, d_ptr[0], d_ptr[1])) {
+                if (dbs->equals_cb(a, b, curr_a, curr_b)) {
                     if (cidx != 0) {
                         dbs->destroy_cb(a, b);
                         release_data_bucket(dbs, cidx);
@@ -176,7 +180,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
                     return d_idx;
                 }
             } else {
-                if (d_ptr[0] == a && d_ptr[1] == b) {
+                if (curr_a == a && curr_b == b) {
                     if (cidx != 0) release_data_bucket(dbs, cidx);
                     *created = 0;
                     return d_idx;
@@ -216,7 +220,7 @@ llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b, int *cr
 int
 llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 {
-    const uint64_t *const d_ptr = ((uint64_t *) dbs->data) + 2 * d_idx;
+    const uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * d_idx;
     const uint64_t a = d_ptr[0];
     const uint64_t b = d_ptr[1];
 
