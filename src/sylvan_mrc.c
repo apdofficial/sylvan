@@ -265,9 +265,20 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
         }
     }
 
-#if SYLVAN_USE_LINEAR_PROBING || SYLVAN_USE_CHAINING_REHASH_ALL
+#if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+#else
+    // together lets all workers execute a local copy of the given task
+    // since we are removing nodes there will be sap ece left in the buckets which were already claimed.
+    // this would generally result in occupying half of the buckets in the table since
+    // all bucket would be owned by some thread but mrc_delete_node with chaining
+    // would silently deleted individual entries.
+    // TODD: calling this too often will hurt performance since works will go over all the buckets again
+    // and claim first bucked containing at least one empty bit. Investigate optimal interval in which
+    // this should be called.
+    clear_aligned(nodes->bitmap1, nodes->max_size / (512 * 8));
+    llmsset_reset_all_regions();
 #endif
 
 #ifndef NDEBUG
@@ -314,7 +325,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
         }
     }
-#if !SYLVAN_USE_LINEAR_PROBING && !SYLVAN_USE_CHAINING_REHASH_ALL
+#if !SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
 #endif

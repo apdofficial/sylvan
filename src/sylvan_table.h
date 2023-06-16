@@ -189,6 +189,9 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
 #if !SYLVAN_USE_LINEAR_PROBING
+
+VOID_TASK_DECL_0(llmsset_reset_all_regions)
+#define llmsset_reset_all_regions() RUN(llmsset_reset_all_regions)
 /**
  * Clear a single bucket (hash part).
  */
@@ -223,7 +226,6 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
  */
 #define llmsset_hash sylvan_tabhash16
 #define llmsset_fnvhash sylvan_fnvhash16
-
 
 #ifdef __cplusplus
 }
