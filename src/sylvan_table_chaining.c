@@ -25,7 +25,7 @@
 // hash = create_hash(dbs, n.a, n.b, is_custom);
 //_Atomic (uint64_t) *bucket = dbs->table[hash & dbs->mask];
 //
-//		    ┌ -----hash------ ┐ ┌ ----------------index in the data array---------------- ┐
+//		    ┌ --------------------------index in the data array-------------------------- ┐
 //bucket == 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
 
 //uint64_t n = 1; // index to a data entry
@@ -52,6 +52,23 @@
 #define data_get_b(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_B_POS))
 
 static const uint64_t invalid_bucket = (uint64_t) -1;
+
+typedef struct
+{
+    _Atomic (uint64_t)* chain;
+    _Atomic (uint64_t)* a;
+    _Atomic (uint64_t)* b;
+} data_bucket_t;
+
+static inline data_bucket_t data_get_bucket(const llmsset_t dbs, uint64_t item_idx)
+{
+    data_bucket_t bucket;
+    _Atomic (uint64_t) *item = data_get(dbs->data, item_idx);
+    bucket.chain = item;
+    bucket.a = ++item;
+    bucket.b = ++item;
+    return bucket;
+}
 
 DECLARE_THREAD_LOCAL(my_region, uint64_t);
 
@@ -144,23 +161,6 @@ create_hash(const llmsset_t dbs, uint64_t a, uint64_t b, const int custom)
     if (custom) hash = dbs->hash_cb(a, b, hash);
     else hash = sylvan_tabhash16(a, b, hash);
     return hash;
-}
-
-typedef struct
-{
-    _Atomic (uint64_t)* chain;
-    _Atomic (uint64_t)* a;
-    _Atomic (uint64_t)* b;
-} data_bucket_t;
-
-static inline data_bucket_t data_get_bucket(const llmsset_t dbs, uint64_t item_idx)
-{
-    data_bucket_t bucket;
-    _Atomic (uint64_t) *item = data_get(dbs->data, item_idx);
-    bucket.chain = item;
-    bucket.a = ++item;
-    bucket.b = ++item;
-    return bucket;
 }
 
 static inline uint64_t
@@ -264,10 +264,7 @@ llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b, int *cr
 int
 llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 {
-//    printf("rehashing bucket %llu\n", d_idx);
-//    exit(1);
     data_bucket_t bucket = data_get_bucket(dbs, d_idx);
-
     uint64_t hash = create_hash(dbs, *bucket.a, *bucket.b, is_custom_bucket(dbs, d_idx));
     uint64_t masked_hash = hash & BUCKET_MASK_HASH;
 
@@ -281,14 +278,6 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
     for (;;) {
         if (atomic_compare_exchange_strong(first_ptr, &first, d_idx)) {
             *bucket.chain = masked_hash | first;
-//            uint64_t bucket_idx = *bucket.chain & BUCKET_MASK_INDEX; // next item index in the chain
-//            while (bucket_idx != 0) {
-//                bucket = data_get_bucket(dbs, bucket_idx);
-//                hash = create_hash(dbs, *bucket.a, *bucket.b, is_custom_bucket(dbs, d_idx));
-//                masked_hash = hash & BUCKET_MASK_HASH;
-//                *bucket.chain = masked_hash | *bucket.chain;
-//                bucket_idx = *bucket.chain & BUCKET_MASK_INDEX;
-//            }
             return 1;
         }
     }
@@ -365,8 +354,6 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
  */
 void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
-    printf("exit\n");
-    exit(-1);
     release_data_bucket(dbs, index);
     if (is_custom_bucket(dbs, index)) {
         uint64_t *d_ptr = ((uint64_t *) dbs->data) + 3 * index;
