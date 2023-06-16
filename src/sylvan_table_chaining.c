@@ -290,40 +290,35 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
  * (lock-free, but not wait-free)
  */
 int
-llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
+llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
 {
-    // unique table 2 arrays: hashes | data
-    _Atomic (uint64_t) *dptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * didx; // first 8 bytes are chaining
-
-    // set d to the next bucket in the chain
-    uint64_t d = atomic_load_explicit(dptr, memory_order_relaxed);
-    if (d & SYLVAN_TABLE_MASK_INDEX) {
-//        while (!atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1)) {
-//            // setting ptr to not in use(-1)
-//        }
-        atomic_compare_exchange_strong(dptr, &d, (uint64_t) -1); // setting ptr to not in use(-1)
-        d &= SYLVAN_TABLE_MASK_INDEX; // <d> now contains the next bucket in the chain
+    data_bucket_t idx_bucket = data_get_bucket(dbs, d_idx);
+    // set idx_chain to the next bucket in the chain
+    uint64_t idx_chain = atomic_load_explicit(idx_bucket.chain, memory_order_relaxed);
+    if (idx_chain & SYLVAN_TABLE_MASK_INDEX) {
+        while (!atomic_compare_exchange_strong(idx_bucket.chain, &idx_chain, invalid_bucket)) {
+            // setting ptr to not in use(-1)
+        }
+        // strip the hash mark which will leave us
+        idx_chain &= SYLVAN_TABLE_MASK_INDEX; // <d> now contains the next bucket in the chain
     } else {
-        d = 0; // nothing after us, so we don't need to make a -1
+        idx_chain = 0; // nothing after us, so we don't need to make a -1
     }
 
-    const uint64_t hash = is_custom_bucket(dbs, didx) ?
-                          dbs->hash_cb(dptr[1], dptr[2], 14695981039346656037LLU) :
-                          sylvan_tabhash16(dptr[1], dptr[2],
-                                           14695981039346656037LLU); // use hash to find where it should be hashed
+    uint64_t hash = create_hash(dbs, *idx_bucket.a, *idx_bucket.b, is_custom_bucket(dbs, d_idx));
 
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *fptr = &dbs->table[hash & dbs->mask];
+    _Atomic (uint64_t) *first_ptr = &dbs->table[hash & dbs->mask];
 #else
     _Atomic(uint64_t)* fptr = &dbs->table[hash % dbs->table_size];
 #endif
 
     for (;;) {
-        uint64_t idx = atomic_load_explicit(fptr, memory_order_relaxed);
+        uint64_t idx = atomic_load_explicit(first_ptr, memory_order_acquire);
 
-        if (idx == didx) { // we are head
+        if (idx == d_idx) { // we are head
             // next part of the chain
-            atomic_store_explicit(fptr, d, memory_order_relaxed);
+            atomic_store_explicit(first_ptr, idx_chain, memory_order_release);
             return 1;
         }
 
@@ -331,19 +326,19 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t didx)
             // can not be used in combination with look up (find or insert)
 
             // item was not actually in the hash table (node that was not hashed)
-            // if you use clear one on the same thing twice it goues wrong
+            // if you use clear one on the same thing twice it goes wrong
             if (idx == 0) return 0; // wasn't in???
 
-            _Atomic (uint64_t) *ptr = ((_Atomic (uint64_t) *) dbs->data) + 3 * idx;
-            uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
+            data_bucket_t bucket = data_get_bucket(dbs, idx);
+            uint64_t chain = atomic_load_explicit(bucket.chain, memory_order_relaxed);
 
-            if (v == (uint64_t) -1) break; // found delete-in-progress, restart
+            if (chain == invalid_bucket) break; // found delete-in-progress, restart
 
-            if ((v & SYLVAN_TABLE_MASK_INDEX) == didx) { // found our predecessor
-                if (!atomic_compare_exchange_strong(ptr, &v, (v & SYLVAN_TABLE_MASK_HASH) | d)) break; // restart
+            if ((chain & SYLVAN_TABLE_MASK_INDEX) == d_idx) { // found our predecessor
+                if (!atomic_compare_exchange_strong(bucket.chain, &chain, (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain)) break; // restart
                 return 1;
             } else {
-                idx = v & SYLVAN_TABLE_MASK_INDEX; // next
+                idx = chain & SYLVAN_TABLE_MASK_INDEX; // next
             }
         }
     }
