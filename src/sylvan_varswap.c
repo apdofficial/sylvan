@@ -59,9 +59,6 @@ VOID_TASK_DECL_3(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *, roar
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
-    sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
-
-    _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
 
     size_t filled, total;
     sylvan_table_usage(&filled, &total);
@@ -71,6 +68,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     reorder_remark_node_ids(reorder_db, nodes);
 
+    _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
+    sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these

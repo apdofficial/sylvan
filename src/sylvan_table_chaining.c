@@ -82,6 +82,7 @@ VOID_TASK_0(llmsset_reset_region)
 
 VOID_TASK_IMPL_0(llmsset_reset_all_regions)
 {
+    clear_aligned(nodes->bitmap1, nodes->max_size / (512 * 8));
     TOGETHER(llmsset_reset_region);
 }
 

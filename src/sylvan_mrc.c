@@ -129,7 +129,7 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_i
     }
 
     mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
-//    mtbdd_re_mark_protected(self->ext_ref_nodes.container);
+    mtbdd_re_mark_protected(self->ext_ref_nodes.container);
 }
 
 void mrc_deinit(mrc_t *self)
@@ -277,7 +277,6 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
     // TODD: calling this too often will hurt performance since works will go over all the buckets again
     // and claim first bucked containing at least one empty bit. Investigate optimal interval in which
     // this should be called.
-    clear_aligned(nodes->bitmap1, nodes->max_size / (512 * 8));
     llmsset_reset_all_regions();
 #endif
 

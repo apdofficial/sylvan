@@ -174,8 +174,8 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
 {
     uint64_t *it = protect_iter(&mtbdd_protected, 0, mtbdd_protected.refs_size);
     while (it != NULL) {
-        MTBDD dd = protect_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
-        size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
+        BDD *dd = (BDD*)protect_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
+        size_t index = (*dd & SYLVAN_TABLE_MASK_INDEX);
         _Atomic(uint64_t) *ptr = bitmap + WORD_INDEX(index);
         uint64_t mask = BIT_MASK(index);
         atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
