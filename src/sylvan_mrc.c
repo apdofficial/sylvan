@@ -8,9 +8,6 @@
  */
 void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
-#ifndef NDEBUG
-    assert(self->container != NULL);
-#endif
     atomic_counters_deinit(self);
     self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (self->container == NULL) {
