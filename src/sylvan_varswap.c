@@ -62,7 +62,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     size_t filled, total;
     sylvan_table_usage(&filled, &total);
-    if ((double) filled > (double) total * SYLVAN_REORDER_MIN_MEM_REQ) {
+    if ((double) filled > (double) total * SYLVAN_REORDER_MAX_MEM_REQ) {
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
@@ -167,9 +167,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            if (!llmsset_clear_one_hash(nodes, index)) {
-                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
-                return;
+            if (llmsset_clear_one_hash(nodes, index) != 1) {
+                llmsset_clear_one_data(nodes, index);
             }
         }
     }

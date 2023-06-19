@@ -52,7 +52,6 @@
 #define data_get_b(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_B_POS))
 
 static const uint64_t invalid = (uint64_t) -1;
-static int clear_one_is_busy = 0;
 
 typedef struct
 {
@@ -211,7 +210,6 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
 
     // stop when we encounter <tail>
     for (;;) {
-        assert(clear_one_is_busy == 0);
         if (bucket_idx == tail) {
             // we did not find existing node in our table, and reached end of chain
             // or the chain was empty
@@ -344,31 +342,27 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
         if (idx == d_idx) { // we are head
             // next part of the chain
             atomic_store_explicit(first_ptr, idx_chain, memory_order_release);
-            clear_one_is_busy = 0;
             return 1;
         }
 
         for (;;) {
-            clear_one_is_busy = 1;
             // can not be used in combination with look up (find or insert)
 
             // item was not actually in the hash table (node that was not hashed)
             // if you use clear one on the same thing twice it goes wrong
             if (idx == 0) {
-                clear_one_is_busy = 0;
                 return 0; // wasn't in???
             }
 
             data_bucket_t bucket = data_get_bucket(dbs, idx);
-            uint64_t chain = atomic_load_explicit(bucket.chain, memory_order_relaxed);
+            uint64_t chain = atomic_load_explicit(bucket.chain, memory_order_acquire);
 
             if (chain == invalid) break; // found delete-in-progress, restart
 
             if ((chain & SYLVAN_TABLE_MASK_INDEX) == d_idx) { // found our predecessor
-                if (!atomic_compare_exchange_strong(bucket.chain, &chain,
-                                                    (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain))
+                if (!atomic_compare_exchange_strong(bucket.chain, &chain, (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain)) {
                     break; // restart
-                clear_one_is_busy = 0;
+                }
                 return 1;
             } else {
                 idx = chain & SYLVAN_TABLE_MASK_INDEX; // next
