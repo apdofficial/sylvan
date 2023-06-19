@@ -75,11 +75,7 @@ typedef struct llmsset
 static inline void*
 llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 {
-#if SYLVAN_USE_LINEAR_PROBING
     return dbs->data + index * 16;
-#else
-    return dbs->data + index * 24 + 8;
-#endif
 }
 
 /**
@@ -189,7 +185,6 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
 #if !SYLVAN_USE_LINEAR_PROBING
-
 VOID_TASK_DECL_0(llmsset_reset_all_regions)
 #define llmsset_reset_all_regions() RUN(llmsset_reset_all_regions)
 /**
