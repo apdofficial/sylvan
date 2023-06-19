@@ -618,7 +618,7 @@ TASK_0(int, test_ref_nodes)
     int expected[5] = {0, 1, 1, 1, 1};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
         counter_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
-        assert(expected[i] == ref_node_count);
+        assert(expected[i] == (int)ref_node_count);
     }
 
     sylvan_post_reorder();
@@ -646,7 +646,7 @@ TASK_0(int, test_ref_vars)
     int expected[5] = {3, 4, 5, 5, 3};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
         counter_t ref_var_count = mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i));
-        assert(expected[i] == ref_var_count);
+        assert(expected[i] == (int)ref_var_count);
     }
 
     sylvan_post_reorder();

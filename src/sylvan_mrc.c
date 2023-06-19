@@ -8,9 +8,6 @@
  */
 void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
-#ifndef NDEBUG
-    assert(self->container != NULL);
-#endif
     atomic_counters_deinit(self);
     self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (self->container == NULL) {
@@ -321,18 +318,18 @@ void mrc_delete_node(mrc_t *self, size_t index)
         if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
-            if(mrc_is_node_dead(self, f1_index)) {
-                mrc_delete_node(self, f1_index);
-            }
+//            if(mrc_is_node_dead(self, f1_index)) {
+//                mrc_delete_node(self, f1_index);
+//            }
         }
         MTBDD f0 = mtbddnode_getlow(f);
         size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
         if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
-            if(mrc_is_node_dead(self, f0_index)) {
-                mrc_delete_node(self, f0_index);
-            }
+//            if(mrc_is_node_dead(self, f0_index)) {
+//                mrc_delete_node(self, f0_index);
+//            }
         }
     }
 #if !SYLVAN_USE_LINEAR_PROBING
