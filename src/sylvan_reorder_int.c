@@ -429,6 +429,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
+    reorder_db->config.t_start_sifting = wctime();
+    reorder_db->config.total_num_var = 0;
+
     reorder_remark_node_ids(reorder_db, nodes);
 
     sylvan_clear_cache();
@@ -455,9 +458,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
-
-    reorder_db->config.t_start_sifting = wctime();
-    reorder_db->config.total_num_var = 0;
 }
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
