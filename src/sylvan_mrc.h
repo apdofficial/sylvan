@@ -7,7 +7,7 @@ extern "C" {
 
 #define COUNTER_T_MAX UINT64_MAX
 
-typedef size_t counter_t;
+typedef uint64_t counter_t;
 typedef _Atomic(counter_t) atomic_counter_t;
 
 /**
@@ -92,7 +92,7 @@ counter_t mrc_ref_nodes_get(const mrc_t* self, size_t idx);
 
 counter_t mrc_ref_vars_get(const mrc_t* self, size_t idx);
 
-size_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
+counter_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
 
 size_t mrc_nnodes_get(const mrc_t* self);
 

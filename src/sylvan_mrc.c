@@ -8,6 +8,10 @@
  */
 void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
+    if (self->size == new_size) {
+        clear_aligned(self->container, self->size);
+        return;
+    }
     atomic_counters_deinit(self);
     self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (self->container == NULL) {
@@ -19,7 +23,7 @@ void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 
 void atomic_counters_deinit(atomic_counters_t *self)
 {
-    if (self->container != NULL && self->size > 0) {
+    if (self->container != NULL) {
         free_aligned(self->container, self->size);
     }
     self->size = 0;
@@ -33,9 +37,24 @@ void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
     assert(self->size != 0);
 #endif
     counter_t curr = atomic_counters_get(self, idx);
-    if (curr == 0 && val < 0) return;               // underflow
-    if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
-    if (idx >= self->size) return;                  // out of bounds
+    if (curr == 0 && val < 0) {
+        // underflow
+//        printf("atomic_counters_add: underflow\n");
+        return;
+        exit(-1);
+    }
+    if ((curr + val) >= COUNTER_T_MAX) {
+        // overflow
+//        printf("atomic_counters_add: overflow\n");
+        return;
+        exit(-1);
+    }
+    if (idx >= self->size) {
+        // out of bounds
+//        printf("atomic_counters_add: out of bounds\n");
+        return;
+        exit(-1);
+    }
     atomic_fetch_add(self->container + idx, val);
 }
 
@@ -184,6 +203,17 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_add(mrc_t *self, int val)
 {
+    size_t curr = mrc_nnodes_get(self);
+    if (curr == 0 && val < 0) {
+        // underflow
+//        printf("mrc_nnodes_add: underflow\n");
+        return;
+    }
+    if ((curr + val) >= COUNTER_T_MAX) {
+        // overflow
+//        printf("mrc_nnodes_add: overflow\n");
+        return;
+    }
     atomic_fetch_add(&self->nnodes, val);
 }
 
@@ -214,13 +244,11 @@ size_t mrc_nnodes_get(const mrc_t *self)
 
 int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 {
-    if (self->ref_vars.size == 0) return 0;
     return mrc_ref_vars_get(self, idx) == 1;
 }
 
 int mrc_is_node_dead(const mrc_t *self, size_t idx)
 {
-    if (self->ext_ref_nodes.size == 0 && self->ref_nodes.size == 0) return 0;
     counter_t int_count = mrc_ref_nodes_get(self, idx);
     counter_t ext_count = mrc_ext_ref_nodes_get(self, idx);
     return int_count == 0 && ext_count == 0;
@@ -229,8 +257,8 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 {
 #ifndef NDEBUG
-//    // precondition:
-//    // MRC and mark-and-sweep should agree on the number of nodes
+    // precondition:
+    // MRC and mark-and-sweep should agree on the number of nodes
 //    size_t a = llmsset_count_marked(nodes) + 2;
 //    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
 //    assert(a == b);
@@ -242,6 +270,7 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
     while (it->has_value) {
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
+        if (index == sylvan_invalid|| (index) == 0 || (index) == 1 || index == sylvan_true) continue;
         if (mrc_is_node_dead(self, index)) {
             mrc_delete_node(self, index);
         }
@@ -262,8 +291,8 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 #ifndef NDEBUG
 //    // post condition:
 //    // MRC and mark-and-sweep should agree on the number of nodes
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
 #endif
 }
 
@@ -292,7 +321,6 @@ void mrc_delete_node(mrc_t *self, size_t index)
             }
         }
     }
-
 #if !SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
@@ -308,18 +336,23 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
+
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+
+//        mrc_ref_vars_add(self, mtbdd_getvar(high & SYLVAN_TABLE_MASK_INDEX), 1);
+//        mrc_ref_vars_add(self, mtbdd_getvar(low & SYLVAN_TABLE_MASK_INDEX), 1);
     } else {
         mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_vars_add(self, mtbdd_getvar(new & SYLVAN_TABLE_MASK_INDEX), 1);
     }
     return new;
 }
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
 {
-    (void) self;
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
@@ -328,10 +361,15 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+
+//        mrc_ref_vars_add(self, mtbdd_getvar(high & SYLVAN_TABLE_MASK_INDEX), 1);
+//        mrc_ref_vars_add(self, mtbdd_getvar(low & SYLVAN_TABLE_MASK_INDEX), 1);
     } else {
         mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_vars_add(self, mtbdd_getvar(new & SYLVAN_TABLE_MASK_INDEX), 1);
     }
     return new;
 }

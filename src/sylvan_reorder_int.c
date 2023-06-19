@@ -151,7 +151,7 @@ inline size_t get_nnodes()
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
-//    return llmsset_count_marked(nodes) + 2;
+    return llmsset_count_marked(nodes) + 2;
     return mrc_nnodes_get(&reorder_db->mrc) + 2;
 #endif
 }

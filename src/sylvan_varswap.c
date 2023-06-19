@@ -61,6 +61,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
 
     if ((double) get_nnodes() > (double) llmsset_get_size(nodes) * SYLVAN_REORDER_MAX_MEM_REQ) {
+        printf("sylvan_varswap: not enough memory to perform reordering: %zu / %f\n", get_nnodes(), llmsset_get_size(nodes) * SYLVAN_REORDER_MAX_MEM_REQ);
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
@@ -133,7 +134,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE * 10000) {
+    if (count > BLOCKSIZE) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -160,8 +161,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         if (nvar == var || nvar == (var + 1)) {
             if (llmsset_clear_one_hash(nodes, index) != 1) {
                 llmsset_clear_one_data(nodes, index);
-                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
-                return;
+//                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
+//                return;
             }
         }
     }
@@ -310,7 +311,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE * 1000) {
+    if (count > BLOCKSIZE) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
         CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);

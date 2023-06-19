@@ -411,12 +411,15 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         reorder_db->config.total_num_var++;
 
 #if STATS
-        if (i > 1) exit(1);
+        if (i > 3) exit(1);
 #endif
         continue;
 
         siftingFailed:
         if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL || res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
+            size_t filled, total;
+            sylvan_table_usage(&filled, &total);
+            printf("Sylvan table usage: %zu / %zu\n", filled, total);
 #if INFO
             sylvan_print_reorder_res(res);
 #endif
