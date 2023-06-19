@@ -22,7 +22,7 @@
 #include <string.h> // memset
 #include <sys/mman.h> // for mmap
 
-// hash = create_hash(dbs, n.a, n.b, is_custom);
+// hash = compute_hash(dbs, n.a, n.b, is_custom);
 //_Atomic (uint64_t) *bucket = dbs->table[hash & dbs->mask];
 //
 //		    ┌ --------------------------index in the data array-------------------------- ┐
@@ -41,17 +41,16 @@
 
 #define BUCKET_MASK_HASH    ((uint64_t)0xffffff0000000000) // 24 bits for the hash
 #define BUCKET_MASK_INDEX   ((uint64_t)0x000000ffffffffff) // 40 bits for the index
-#define BUCKET_SIZE         3
-#define BUCKET_CHAIN_POS    0
-#define BUCKET_A_POS        1
-#define BUCKET_B_POS        2
+#define BUCKET_SIZE         2
+#define BUCKET_A_POS        0
+#define BUCKET_B_POS        1
 
 #define data_get(d, i)                  (((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_CHAIN_POS)
-#define data_get_chain(d, i)          (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_CHAIN_POS))
 #define data_get_a(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_A_POS))
 #define data_get_b(d, i)              (*(((_Atomic(uint64_t) *) (d)) + BUCKET_SIZE * (i) + BUCKET_B_POS))
 
-static const uint64_t invalid = (uint64_t) -1;
+/*
+static const uint64_t (uint64_t)-1 = (uint64_t) -1;
 
 typedef struct
 {
@@ -68,7 +67,7 @@ static inline data_bucket_t data_get_bucket(const llmsset_t dbs, uint64_t item_i
     bucket.a = ++item;
     bucket.b = ++item;
     return bucket;
-}
+}*/
 
 DECLARE_THREAD_LOCAL(my_region, uint64_t);
 
@@ -93,7 +92,7 @@ claim_data_bucket(const llmsset_t dbs)
     LOCALIZE_THREAD_LOCAL(my_region, uint64_t);
 
     for (;;) {
-        if (my_region != invalid) {
+        if (my_region != (uint64_t)-1) {
             // find empty bucket in region <my_region>
             _Atomic (uint64_t) *ptr = dbs->bitmap2 + (my_region * 8);
             int i = 0;
@@ -111,24 +110,22 @@ claim_data_bucket(const llmsset_t dbs)
             }
         } else {
             // special case on startup or after garbage collection
-            my_region += (lace_get_worker()->worker * (dbs->table_size / (64 * 8))) / lace_workers();
+            // several lines below, my_region will be increased by 1 and the entry claimed.
+            my_region = -1 + (lace_get_worker()->worker * (dbs->table_size / (64 * 8))) / lace_workers();
         }
+
         const uint64_t n_regions = (dbs->table_size / (64 * 8));
         uint64_t count = n_regions;
         for (;;) {
             // check if table maybe full
             if (count-- == 0) {
-                size_t size = llmsset_get_size(dbs);
-                size_t marked = llmsset_count_marked(dbs);
-                (void) marked;
-                (void) size;
-                return invalid;
+                // at this point, we claim the table is full but in reality it just means
+                // that there are no regions left to claim
+                return (uint64_t)-1;
             }
             my_region += 1;
-            if (my_region >= n_regions) {
-                my_region = 0;
-            }
-            // try to claim it
+            if (my_region >= n_regions) my_region = 0;
+            // try to claim the region <my_region>
             _Atomic (uint64_t) *ptr = dbs->bitmap1 + (my_region / 64);
             uint64_t mask = 0x8000000000000000LL >> (my_region & 63);
             uint64_t v;
@@ -139,7 +136,9 @@ claim_data_bucket(const llmsset_t dbs)
             }
             if (atomic_compare_exchange_weak(ptr, &v, v | mask)) {
                 break; // success! <region> is now claimed by me
-            } else goto restart;
+            } else {
+                goto restart;
+            }
         }
         // assign thread local variable <my_region> to me
         SET_THREAD_LOCAL(my_region, my_region);
@@ -172,7 +171,7 @@ is_custom_bucket(const llmsset_t dbs, uint64_t index)
 }
 
 static inline uint64_t
-create_hash(const llmsset_t dbs, uint64_t a, uint64_t b, const int custom)
+compute_hash(const llmsset_t dbs, uint64_t a, uint64_t b, const int custom)
 {
     uint64_t hash = 14695981039346656037LLU;
     if (custom) hash = dbs->hash_cb(a, b, hash);
@@ -183,65 +182,68 @@ create_hash(const llmsset_t dbs, uint64_t a, uint64_t b, const int custom)
 static inline uint64_t
 llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const int custom)
 {
-    uint64_t hash = create_hash(dbs, a, b, custom);
+    uint64_t hash = compute_hash(dbs, a, b, custom);
     uint64_t masked_hash = hash & BUCKET_MASK_HASH;
 
+    // reminder
+    // table.a = index of first entry
+    // table.b = hash of entry + index of next entry
+
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *first_ptr = &dbs->table[hash & dbs->mask];
+    _Atomic(uint64_t) *first_ptr = &dbs->table[2*(hash & dbs->mask)];
 #else
-    _Atomic(uint64_t)* bucket = &dbs->table[hash % dbs->table_size];
+    _Atomic(uint64_t)* bucket = &dbs->table[2*(hash % dbs->table_size)];
 #endif
 
     // chain works like a linked list, index (BUCKET_MASK_INDEX) in a bucket points to the next node
     // head points to the first node in the chain, it only contains the index
-    uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_acquire);
-    uint64_t tail = 0;
+    uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
+    uint64_t end = 0;
     uint64_t bucket_idx = first_idx;
     uint64_t claimed_idx = 0; // stores where the new data [will be] stored
 
-    data_bucket_t bucket;
-    data_bucket_t claimed;
-
-    // stop when we encounter <tail>
+    // stop when we encounter <end>
     for (;;) {
-        if (bucket_idx == tail) {
+        if (bucket_idx == end) {
             // we did not find existing node in our table, and reached end of chain
             // or the chain was empty
             // thus, try to insert new node
             if (claimed_idx == 0) {
                 // claim data bucket
                 claimed_idx = claim_data_bucket(dbs);
-                if (claimed_idx == invalid) return 0; // failed to claim a data bucket
+                if (claimed_idx == (uint64_t)-1) return 0; // failed to claim a data bucket
+                // call custom create callback (might update a and b, but should hash to the same!)
+                if (custom) dbs->create_cb(&a, &b);
+                // write the data
+                uint64_t* dataptr = ((uint64_t*)dbs->data) + 2 * claimed_idx;
+                dataptr[0] = a;
+                dataptr[1] = b;
             }
+            // Set <next> item index in the chain
+            atomic_store_explicit(dbs->table + 2*claimed_idx + 1, masked_hash | first_idx, memory_order_relaxed);
 
-            // call custom create callback
-            if (custom) dbs->create_cb(&a, &b);
-            // write the data
-            claimed = data_get_bucket(dbs, claimed_idx);
-            *claimed.chain = masked_hash | first_idx; // Set <next> item index in the chain
-            *claimed.a = a;
-            *claimed.b = b;
-
+            // preserve the original first_idx (new "end" in case someone add something)
+            end = first_idx;
             // now update the chain start (first_ptr) with claimed_idx
             if (atomic_compare_exchange_strong(first_ptr, &first_idx, claimed_idx)) {
-                first_idx = atomic_load_explicit(first_ptr, memory_order_acquire);
                 if (custom) set_custom_bucket(dbs, claimed_idx, custom);
                 *created = 1;
                 return claimed_idx;
             } else {
-                tail = first_idx; // we already checked from "first_idx" to "0"
-                first_idx = bucket_idx; // try again from the new chain_start
+                // first_idx now holds the new value!
+                bucket_idx = first_idx; // continue with the new first index
             }
         }
 
-        bucket = data_get_bucket(dbs, bucket_idx);
+        uint64_t* dataptr = ((uint64_t*)dbs->data) + 2*bucket_idx;
+        uint64_t hash_chain = atomic_load_explicit(dbs->table + 2*bucket_idx + 1, memory_order_relaxed);
 
-        if (masked_hash == (*bucket.chain & BUCKET_MASK_HASH)) {
+        if (masked_hash == (hash_chain & BUCKET_MASK_HASH)) {
             // check if we already have this node in the table
             // if so, release the ownership if it was owned before, and return the bucket index
             if (custom) {
                 // we do not use custom nodes for this test
-                if (dbs->equals_cb(a, b, *bucket.a, *bucket.b)) {
+                if (dbs->equals_cb(a, b, dataptr[0], dataptr[1])) {
                     if (claimed_idx != 0) {
                         dbs->destroy_cb(a, b);
                         release_data_bucket(dbs, claimed_idx);
@@ -250,7 +252,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
                     return bucket_idx;
                 }
             } else {
-                if (*bucket.a == a && *bucket.b == b) {
+                if (dataptr[0] == a && dataptr[1] == b) {
                     if (claimed_idx != 0) {
                         release_data_bucket(dbs, claimed_idx);
                     }
@@ -260,7 +262,7 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
             }
         }
 
-        bucket_idx = *bucket.chain & BUCKET_MASK_INDEX; // next item index in the chain
+        bucket_idx = hash_chain & BUCKET_MASK_INDEX; // next item index in the chain
         sylvan_stats_count(LLMSSET_LOOKUP);
     }
 }
@@ -280,22 +282,23 @@ llmsset_lookupc(const llmsset_t dbs, const uint64_t a, const uint64_t b, int *cr
 int
 llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 {
-    data_bucket_t bucket = data_get_bucket(dbs, d_idx);
-    uint64_t hash = create_hash(dbs, *bucket.a, *bucket.b, is_custom_bucket(dbs, d_idx));
+    // This is like lookup, except we assume that
+    // - the data index is not duplicate
+    // - the data is not yet in the table
+    uint64_t* dataptr = ((uint64_t*)dbs->data) + 2*d_idx;
+    uint64_t hash = compute_hash(dbs, dataptr[0], dataptr[1], is_custom_bucket(dbs, d_idx));
     uint64_t masked_hash = hash & BUCKET_MASK_HASH;
 
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *first_ptr = &dbs->table[hash & dbs->mask];
+    _Atomic(uint64_t)* first_ptr = &dbs->table[2*(hash & dbs->mask)];
 #else
-    _Atomic(uint64_t)* fptr = &dbs->table[hash % dbs->table_size];
+    _Atomic(uint64_t)* first_ptr = &dbs->table[2*(hash % dbs->table_size)];
 #endif
 
-    uint64_t first = atomic_load_explicit(first_ptr, memory_order_relaxed);
+    uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
     for (;;) {
-        if (atomic_compare_exchange_strong(first_ptr, &first, d_idx)) {
-            *bucket.chain = masked_hash | first;
-            return 1;
-        }
+        atomic_store_explicit(dbs->table + 2*d_idx + 1, masked_hash | first_idx, memory_order_relaxed);
+        if (atomic_compare_exchange_strong(first_ptr, &first_idx, d_idx)) return 1;
     }
 }
 
@@ -309,57 +312,65 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 int
 llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
 {
-    data_bucket_t idx_bucket = data_get_bucket(dbs, d_idx);
-    // set idx_chain to the next bucket in the chain
-    uint64_t idx_chain = atomic_load_explicit(idx_bucket.chain, memory_order_relaxed);
-    if (idx_chain & SYLVAN_TABLE_MASK_INDEX) {
-        while (!atomic_compare_exchange_strong(idx_bucket.chain, &idx_chain, invalid)) {
-            // setting ptr to not in use(-1)
+    uint64_t* dataptr = ((uint64_t*)dbs->data) + 2*d_idx;
+    _Atomic(uint64_t)* tableptr_d = dbs->table + 2*d_idx;
+
+    // set next_idx to the next bucket in the chain
+    uint64_t next_idx = atomic_load_explicit(tableptr_d + 1, memory_order_relaxed);
+    if ((next_idx & BUCKET_MASK_INDEX) != 0) {
+        // now we will claim that we shall delete this one!
+        if (!atomic_compare_exchange_strong(tableptr_d + 1, &next_idx, (uint64_t)-1)) {
+            // some other worked is already clearing this hash! wait until it's done?
+            while (tableptr_d[1] == (uint64_t)-1) {} // wait explicitly until set to 0!
+            return 0;
         }
-        // strip the hash mark which will leave us
-        idx_chain &= SYLVAN_TABLE_MASK_INDEX; // <d> now contains the next bucket in the chain
+        next_idx &= BUCKET_MASK_INDEX;
     } else {
-        idx_chain = 0; // nothing after us, so we don't need to make a -1
+        next_idx = 0; // nothing after us, so we don't need to make a -1...
     }
 
-    uint64_t hash = create_hash(dbs, *idx_bucket.a, *idx_bucket.b, is_custom_bucket(dbs, d_idx));
+    uint64_t hash = compute_hash(dbs, dataptr[0], dataptr[1], is_custom_bucket(dbs, d_idx));
 
 #if LLMSSET_MASK
-    _Atomic (uint64_t) *first_ptr = &dbs->table[hash & dbs->mask];
+    _Atomic(uint64_t)* first_ptr = dbs->table + 2 * (hash & dbs->mask);
 #else
-    _Atomic(uint64_t)* fptr = &dbs->table[hash % dbs->table_size];
+    _Atomic(uint64_t)* first_ptr = dbs->table + 2 * (hash % dbs->table_size);
 #endif
 
     for (;;) {
-        uint64_t idx = atomic_load_explicit(first_ptr, memory_order_acquire);
+        uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
 
-        if (idx == d_idx) { // we are head
+        if (first_idx == d_idx) { // we are head
             // next part of the chain
-            atomic_store_explicit(first_ptr, idx_chain, memory_order_release);
+            // since we claimed our own bucket for deletion, we can just use a normal write
+            atomic_store_explicit(first_ptr, next_idx, memory_order_seq_cst);
             return 1;
         }
 
-        for (;;) {
-            // can not be used in combination with look up (find or insert)
+        uint64_t idx = first_idx; // start at first one
 
-            // item was not actually in the hash table (node that was not hashed)
-            // if you use clear one on the same thing twice it goes wrong
+        for (;;) {
+            // we were not head, so find it in the chain!
             if (idx == 0) {
-                return 0; // wasn't in???
+                // if idx equals 0, then the item was not in the hash table. return 0.
+                // for example it was never created, or already removed...
+                // if you use clear one on the same thing twice it goes wrong
+                return 0;
             }
 
-            data_bucket_t bucket = data_get_bucket(dbs, idx);
-            uint64_t chain = atomic_load_explicit(bucket.chain, memory_order_acquire);
+            _Atomic(uint64_t)* chain_ptr = dbs->table + 2 * idx + 1;
+            uint64_t chain = atomic_load_explicit(chain_ptr, memory_order_relaxed);
 
-            if (chain == invalid) break; // found delete-in-progress, restart
+            if (chain == (uint64_t)-1) break; // found delete-in-progress, restart
+            // TODO is there a deadlock possible in very rare cases???
 
-            if ((chain & SYLVAN_TABLE_MASK_INDEX) == d_idx) { // found our predecessor
-                if (!atomic_compare_exchange_strong(bucket.chain, &chain, (chain & SYLVAN_TABLE_MASK_HASH) | idx_chain)) {
+            if ((chain & BUCKET_MASK_INDEX) == d_idx) { // found our predecessor
+                if (!atomic_compare_exchange_strong(chain_ptr, &chain, (chain & BUCKET_MASK_HASH) | next_idx)) {
                     break; // restart
                 }
                 return 1;
             } else {
-                idx = chain & SYLVAN_TABLE_MASK_INDEX; // next
+                idx = chain & BUCKET_MASK_INDEX; // next
             }
         }
     }
@@ -372,8 +383,8 @@ void llmsset_clear_one_data(llmsset_t dbs, uint64_t index)
 {
     release_data_bucket(dbs, index);
     if (is_custom_bucket(dbs, index)) {
-        uint64_t *d_ptr = ((uint64_t *) dbs->data) + 3 * index;
-        dbs->destroy_cb(d_ptr[1], d_ptr[2]);
+        uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * index;
+        dbs->destroy_cb(d_ptr[0], d_ptr[1]);
     }
 }
 
@@ -417,8 +428,8 @@ llmsset_create(size_t initial_size, size_t max_size)
     /* This implementation of "resizable hash table" allocates the max_size table in virtual memory,
        but only uses the "actual size" part in real memory */
 
-    dbs->table = (_Atomic (uint64_t) *) alloc_aligned(dbs->max_size * 8);
-    dbs->data = (uint8_t *) alloc_aligned(dbs->max_size * 24);
+    dbs->table = (_Atomic (uint64_t) *) alloc_aligned(dbs->max_size * 16);
+    dbs->data = (uint8_t *) alloc_aligned(dbs->max_size * 16);
 
     /* Also allocate bitmaps. Each region is 64*8 = 512 buckets.
        Overhead of bitmap1: 1 bit per 4096 bucket.
@@ -435,7 +446,7 @@ llmsset_create(size_t initial_size, size_t max_size)
     }
 
 #if defined(madvise) && defined(MADV_RANDOM)
-    madvise(dbs->table, dbs->max_size * 8, MADV_RANDOM);
+    madvise(dbs->table, dbs->max_size * 16, MADV_RANDOM);
 #endif
 
     // forbid first two positions (index 0 and 1)
@@ -462,8 +473,8 @@ llmsset_create(size_t initial_size, size_t max_size)
 void
 llmsset_free(llmsset_t dbs)
 {
-    free_aligned(dbs->table, dbs->max_size * 8);
-    free_aligned(dbs->data, dbs->max_size * 24);
+    free_aligned(dbs->table, dbs->max_size * 16);
+    free_aligned(dbs->data, dbs->max_size * 16);
     free_aligned(dbs->bitmap1, dbs->max_size / (512 * 8));
     free_aligned(dbs->bitmap2, dbs->max_size / 8);
     free_aligned(dbs->bitmapc, dbs->max_size / 8);
@@ -489,7 +500,7 @@ VOID_TASK_IMPL_1(llmsset_clear_data, llmsset_t, dbs)
 
 VOID_TASK_IMPL_1(llmsset_clear_hashes, llmsset_t, dbs)
 {
-    clear_aligned(dbs->table, dbs->max_size * 8);
+    clear_aligned(dbs->table, dbs->max_size * 16);
 }
 
 int
@@ -596,8 +607,8 @@ VOID_TASK_3(llmsset_destroy_par, llmsset_t, dbs, size_t, first, size_t, count)
 
             // if not marked but is custom
             if ((*ptr2 & mask) == 0 && (*ptrc & mask)) {
-                uint64_t *d_ptr = ((uint64_t *) dbs->data) + 3 * k;
-                dbs->destroy_cb(d_ptr[1], d_ptr[2]);
+                uint64_t *d_ptr = ((uint64_t *) dbs->data) + 2 * k;
+                dbs->destroy_cb(d_ptr[0], d_ptr[1]);
                 *ptrc &= ~mask;
             }
         }
