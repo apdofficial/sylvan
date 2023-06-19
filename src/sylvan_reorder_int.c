@@ -148,10 +148,10 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 
 inline uint64_t get_nodes_count()
 {
-    return llmsset_count_marked(nodes) + 2;
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
+//    return llmsset_count_marked(nodes) + 2;
     return mrc_nnodes_get(&reorder_db->mrc) + 2;
 #endif
 }
@@ -429,9 +429,13 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
-    reorder_remark_node_ids(reorder_db, nodes);
-
     sylvan_clear_cache();
+#if !SYLVAN_USE_LINEAR_PROBING
+    sylvan_clear_and_mark();
+    sylvan_rehash_all();
+#endif
+
+    reorder_remark_node_ids(reorder_db, nodes);
 
     if (reorder_db->config.print_stat) {
         char buff[100];
@@ -488,6 +492,8 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     }
 
     sylvan_timer_stop(SYLVAN_RE);
+
+
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)

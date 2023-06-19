@@ -236,11 +236,10 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
                 if (custom) set_custom_bucket(dbs, claimed_idx, custom);
                 *created = 1;
                 return claimed_idx;
+            } else {
+                tail = first_idx; // we already checked from "first_idx" to "0"
+                first_idx = bucket_idx; // try again from the new chain_start
             }
-//            else {
-//                tail = first_idx; // we already checked from "first_idx" to "0"
-//                first_idx = bucket_idx; // try again from the new chain_start
-//            }
         }
 
         bucket = data_get_bucket(dbs, bucket_idx);
