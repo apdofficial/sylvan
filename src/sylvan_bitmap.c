@@ -238,7 +238,7 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos)
     size_t word_idx = WORD_INDEX(pos);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + word_idx;
     // check whether there are still any predecessor 1-bits in the current word
-    bitmap_container_t word = atomic_load_explicit(ptr, memory_order_acquire) & BIT_BCK_ITER_MASK(pos);
+    bitmap_container_t word = atomic_load_explicit(ptr, memory_order_relaxed) & BIT_BCK_ITER_MASK(pos);
     if (word) {
         // there exist some predecessor 1 bit in the word, thus return the pos directly
         return get_first_lsb_one_bit_pos(word, word_idx);
@@ -255,7 +255,7 @@ int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    atomic_fetch_or_explicit(ptr, mask, memory_order_release);
     return 1;
 }
 
@@ -264,7 +264,7 @@ int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_and_explicit(ptr, ~mask, memory_order_relaxed);
+    atomic_fetch_and_explicit(ptr, ~mask, memory_order_release);
     return 1;
 }
 
@@ -272,6 +272,6 @@ int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_container_t) *ptr = bitmap->container + WORD_INDEX(pos);
-    bitmap_container_t word = atomic_load_explicit(ptr, memory_order_relaxed);
+    bitmap_container_t word = atomic_load_explicit(ptr, memory_order_acquire);
     return word & BIT_MASK(pos) ? 1 : 0;
 }

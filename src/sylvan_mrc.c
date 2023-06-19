@@ -273,10 +273,7 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
     // since we are removing nodes there will be sap ece left in the buckets which were already claimed.
     // this would generally result in occupying half of the buckets in the table since
     // all bucket would be owned by some thread but mrc_delete_node with chaining
-    // would silently deleted individual entries.
-    // TODD: calling this too often will hurt performance since works will go over all the buckets again
-    // and claim first bucked containing at least one empty bit. Investigate optimal interval in which
-    // this should be called.
+    // would silently delete individual entries.
     llmsset_reset_all_regions();
 #endif
 
