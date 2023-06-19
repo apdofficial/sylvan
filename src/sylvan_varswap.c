@@ -79,13 +79,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
-//        printf("non-interacting swap: %d %d\n", xIndex, yIndex);
-//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos]] = pos + 1;
-//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos + 1]] = pos;
-//        uint32_t save = reorder_db->levels.level_to_order[pos];
-//        reorder_db->levels.level_to_order[pos] = reorder_db->levels.level_to_order[pos + 1];
-//        reorder_db->levels.level_to_order[pos + 1] = save;
-//        return result;
 //    }
 
 #if SYLVAN_USE_LINEAR_PROBING
@@ -140,7 +133,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE) {
+    if (count > BLOCKSIZE * 10000) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -167,6 +160,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         if (nvar == var || nvar == (var + 1)) {
             if (llmsset_clear_one_hash(nodes, index) != 1) {
                 llmsset_clear_one_data(nodes, index);
+                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
+                return;
             }
         }
     }
@@ -315,7 +310,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE) {
+    if (count > BLOCKSIZE * 1000) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
         CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
@@ -390,9 +385,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
-                size_t used, total;
-                sylvan_table_usage(&used, &total);
-                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
@@ -400,9 +392,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
-                size_t used, total;
-                sylvan_table_usage(&used, &total);
-                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }

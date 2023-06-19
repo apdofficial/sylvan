@@ -406,8 +406,8 @@ TASK_0(int, solve_game)
     }
 
     if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
-//    exit(-1);
-    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
+
+    sylvan_reduce_heap(SYLVAN_REORDER_SIFT);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
@@ -551,7 +551,7 @@ int main(int argc, char **argv)
     // 1LL<<24: 131072 nodes
     // 1LL<<25: 262144 nodes
     // 1LL<<26: 524288 nodes
-    sylvan_set_limits(1LL << 24 , 1, 0);
+    sylvan_set_limits(1LL << 26 , 1, 0);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
