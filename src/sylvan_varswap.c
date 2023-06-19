@@ -60,9 +60,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
 
-    size_t filled, total;
-    sylvan_table_usage(&filled, &total);
-    if ((double) filled > (double) total * SYLVAN_REORDER_MAX_MEM_REQ) {
+    if ((double) get_nnodes() > (double) llmsset_get_size(nodes) * SYLVAN_REORDER_MAX_MEM_REQ) {
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
@@ -154,8 +152,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         count = count + first - 2;
         first = 2;
     }
-
     const size_t end = first + count;
+
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, first);
 

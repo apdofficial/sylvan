@@ -98,7 +98,6 @@ claim_data_bucket(const llmsset_t dbs)
             _Atomic (uint64_t) *ptr = dbs->bitmap2 + (my_region * 8);
             int i = 0;
             // With 64 bytes per cacheline, there are 8 64-bit values per cacheline.
-            int filled_buckets = 0;
             for (; i < 8;) {
                 uint64_t v = atomic_load_explicit(ptr, memory_order_relaxed);
                 if (v != 0xffffffffffffffffLL) {
@@ -106,14 +105,9 @@ claim_data_bucket(const llmsset_t dbs)
                     *ptr |= (0x8000000000000000LL >> j);
                     size_t index = (8 * my_region + i) * 64 + j;
                     return index;
-                } else {
-                    filled_buckets++;
                 }
                 i++;
                 ptr++;
-            }
-            if (filled_buckets == 8 && my_region > 10) {
-//                printf("region %llu is full (%zu)\n", my_region, llmsset_count_marked(dbs));
             }
         } else {
             // special case on startup or after garbage collection

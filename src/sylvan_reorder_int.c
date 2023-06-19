@@ -146,7 +146,7 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
     }
 }
 
-inline uint64_t get_nodes_count()
+inline size_t get_nnodes()
 {
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
@@ -170,7 +170,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
     BDDVAR x;
     BDDVAR y;
 
-    s_state->size = (int) get_nodes_count();
+    s_state->size = (int) get_nnodes();
     xIndex = reorder_db->levels.level_to_order[s_state->pos];
 
     limitSize = s_state->size = s_state->size - reorder_db->mrc.isolated_count;
@@ -225,7 +225,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
             R -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
         }
         res = sylvan_varswap(x);
-        s_state->size = (int) get_nodes_count();
+        s_state->size = (int) get_nnodes();
         if (!sylvan_reorder_issuccess(res)) return res;
         reorder_db->config.varswap_count++;
 
@@ -287,7 +287,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     BDDVAR x;
     BDDVAR y;
 
-    s_state->size = (int) get_nodes_count();
+    s_state->size = (int) get_nnodes();
     yIndex = reorder_db->levels.level_to_order[s_state->pos];
 
     // Let <x> be the variable at level <pos-1>. (s_state->pos-1)
@@ -341,7 +341,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
         res = sylvan_varswap(x);
         if (!sylvan_reorder_issuccess(res)) return res;
 
-        s_state->size = (int) get_nodes_count();
+        s_state->size = (int) get_nnodes();
         reorder_db->config.varswap_count++;
 
         // check the max allowed size growth
@@ -409,7 +409,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
         printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos, s_state->pos + 1, s_state->size);
 #endif
         res = sylvan_varswap(s_state->pos);
-        s_state->size = (int) get_nodes_count();
+        s_state->size = (int) get_nnodes();
         if (!sylvan_reorder_issuccess(res)) return res;
         reorder_db->config.varswap_count++;
     }
@@ -420,7 +420,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
         printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos - 1, s_state->pos, s_state->size);
 #endif
         res = sylvan_varswap(s_state->pos - 1);
-        s_state->size = (int) get_nodes_count();
+        s_state->size = (int) get_nnodes();
         if (!sylvan_reorder_issuccess(res)) return res;
         reorder_db->config.varswap_count++;
     }

@@ -76,7 +76,7 @@ static inline int sylvan_reorder_issuccess(reorder_result_t result)
            result == SYLVAN_REORDER_ROLLBACK;
 }
 
-uint64_t get_nodes_count();
+size_t get_nnodes();
 
 
 /**

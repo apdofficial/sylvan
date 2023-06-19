@@ -8,7 +8,9 @@
  */
 void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
-    assert(self != NULL);
+#ifndef NDEBUG
+    assert(self->container != NULL);
+#endif
     atomic_counters_deinit(self);
     self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (self->container == NULL) {
@@ -29,20 +31,24 @@ void atomic_counters_deinit(atomic_counters_t *self)
 
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
+#endif
     counter_t curr = atomic_counters_get(self, idx);
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
     if (idx >= self->size) return;                  // out of bounds
     atomic_counter_t *ptr = self->container + idx;
-    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
+    atomic_fetch_add(ptr, val);
 }
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
+#endif
     if (val >= COUNTER_T_MAX) return;               // overflow
     if (idx >= self->size) return;                  // out of bounds
     atomic_counter_t *ptr = self->container + idx;
@@ -51,10 +57,12 @@ void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
+#endif
     atomic_counter_t *ptr = self->container + idx;
-    return atomic_load_explicit(ptr, memory_order_relaxed);
+    return atomic_load(ptr);
 }
 
 /**
@@ -207,7 +215,7 @@ counter_t mrc_var_nnodes_get(const mrc_t *self, size_t idx)
 
 size_t mrc_nnodes_get(const mrc_t *self)
 {
-    return atomic_load_explicit(&self->nnodes, memory_order_relaxed);
+    return atomic_load(&self->nnodes);
 }
 
 int mrc_is_var_isolated(const mrc_t *self, size_t idx)
@@ -313,12 +321,18 @@ void mrc_delete_node(mrc_t *self, size_t index)
         if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
+            if(mrc_is_node_dead(self, f1_index)) {
+                mrc_delete_node(self, f1_index);
+            }
         }
         MTBDD f0 = mtbddnode_getlow(f);
         size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
         if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
+            if(mrc_is_node_dead(self, f0_index)) {
+                mrc_delete_node(self, f0_index);
+            }
         }
     }
 #if !SYLVAN_USE_LINEAR_PROBING

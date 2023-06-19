@@ -197,7 +197,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
 
-    size_t cursize = get_nodes_count();
+    size_t cursize = get_nnodes();
 
     for (int i = 0; i < (int) reorder_db->levels.count; i++) {
         int lvl = ordered_levels[i];
@@ -217,7 +217,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             for (; pos < high; pos++) {
                 res = sylvan_varswap(pos);
                 if (sylvan_reorder_issuccess(res) == 0) break;
-                cursize = get_nodes_count();
+                cursize = get_nnodes();
                 reorder_db->config.varswap_count++;
                 if (should_terminate_sifting(&reorder_db->config)) break;
                 if ((double) cursize > (double) bestsize * reorder_db->config.max_growth) {
@@ -234,7 +234,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
                 for (; pos > low; pos--) {
                     res = sylvan_varswap(pos - 1);
                     if (sylvan_reorder_issuccess(res) == 0) break;
-                    cursize = get_nodes_count();
+                    cursize = get_nnodes();
                     reorder_db->config.varswap_count++;
                     if (should_terminate_sifting(&reorder_db->config)) break;
                     if ((double) cursize > (double) bestsize * reorder_db->config.max_growth) {
@@ -253,7 +253,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             for (; pos > low; pos--) {
                 res = sylvan_varswap(pos - 1);
                 if (sylvan_reorder_issuccess(res) == 0) break;
-                cursize = get_nodes_count();
+                cursize = get_nnodes();
                 reorder_db->config.varswap_count++;
                 if (should_terminate_sifting(&reorder_db->config)) break;
                 if ((double) cursize > (double) bestsize * reorder_db->config.max_growth) {
@@ -271,7 +271,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
                 for (; pos < high; pos++) {
                     res = sylvan_varswap(pos);
                     if (sylvan_reorder_issuccess(res) == 0) break;
-                    cursize = get_nodes_count();
+                    cursize = get_nnodes();
                     reorder_db->config.varswap_count++;
                     if (should_terminate_sifting(&reorder_db->config)) break;
                     if ((double) cursize > (double) bestsize * reorder_db->config.max_growth) {
@@ -299,7 +299,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
             reorder_db->config.varswap_count++;
         }
 
-        cursize = get_nodes_count();
+        cursize = get_nnodes();
 
         if (!sylvan_reorder_issuccess(res) || !sylvan_reorder_issuccess(old_res)) break;
         reorder_db->config.total_num_var++;
@@ -341,7 +341,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
     s_state.pos = 0;
     s_state.best_pos = 0;
-    s_state.size = (int) get_nodes_count();
+    s_state.size = (int) get_nnodes();
     s_state.best_size = s_state.size;
     s_state.low = low;
     s_state.high = high;

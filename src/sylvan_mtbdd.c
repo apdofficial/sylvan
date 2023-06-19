@@ -165,7 +165,7 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
         size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
         _Atomic(uint64_t) *ptr = bitmap + WORD_INDEX(index);
         uint64_t mask = BIT_MASK(index);
-        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+        atomic_fetch_or(ptr, mask);
     }
 }
 
@@ -178,7 +178,7 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
         size_t index = (*dd & SYLVAN_TABLE_MASK_INDEX);
         _Atomic(uint64_t) *ptr = bitmap + WORD_INDEX(index);
         uint64_t mask = BIT_MASK(index);
-        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+        atomic_fetch_or(ptr, mask);
     }
 }
 
