@@ -5,9 +5,11 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define COUNTER_T_MAX UINT64_MAX
+#define COUNTER_T_MAX UINT16_MAX
 
-typedef size_t counter_t;
+// use 16-bit counter used by MRC
+// max value is 65535, thus if node is referenced more than 65535, it is unlikely it will be ver deleted
+typedef unsigned short counter_t;
 typedef _Atomic(counter_t) atomic_counter_t;
 
 /**
@@ -92,7 +94,7 @@ counter_t mrc_ref_nodes_get(const mrc_t* self, size_t idx);
 
 counter_t mrc_ref_vars_get(const mrc_t* self, size_t idx);
 
-size_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
+counter_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
 
 size_t mrc_nnodes_get(const mrc_t* self);
 
