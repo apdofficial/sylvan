@@ -75,8 +75,13 @@ typedef struct llmsset
 static inline void*
 llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 {
+#if SYLVAN_USE_LINEAR_PROBING
     return dbs->data + index * 16;
+#else
+    return dbs->data + index * 24 + 8;
+#endif
 }
+
 
 /**
  * Create the set.
