@@ -66,7 +66,6 @@ counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
  *
  * @preconditions
  * - The forest must be initialized.
- * - The MRC counters must be freshly initialized.
  */
 void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_ids)
 {
@@ -226,7 +225,7 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
     return int_count == 0 && ext_count == 0;
 }
 
-void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
+VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, node_ids)
 {
 #ifndef NDEBUG
 //    // precondition:
@@ -238,7 +237,6 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
-//    RUN(mrc_gc_par, self, node_ids, 0, nodes->table_size);
     while (it->has_value) {
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
@@ -269,7 +267,7 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 
 VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count)
 {
-    if (count > 512) { // split it per bucket
+    if (count > NBITS_PER_BUCKET * 8) { // split it per bucket
         size_t split = count / 2;
         SPAWN(mrc_gc_par, self, node_ids, first, split);
         CALL(mrc_gc_par, self, node_ids, first + split, count - split);

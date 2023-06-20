@@ -7,8 +7,8 @@ extern "C" {
 
 #define COUNTER_T_MAX UINT16_MAX
 
-// use 16-bit counter used by MRC
-// max value is 65535, thus if node is referenced more than 65535, it is unlikely it will be ver deleted
+// use 16-bit counter (used by MRC)
+// max value is 65535, thus if node is referenced more than 65535 (keep it at 65535), it is unlikely it will be ever deleted
 typedef unsigned short counter_t;
 typedef _Atomic(counter_t) atomic_counter_t;
 
@@ -105,7 +105,8 @@ size_t mrc_nnodes_get(const mrc_t* self);
  * For every node with <node>.ref_count == 0 perform delete and decrease ref count of its children.
  * If the children become dead, delete them as well, repeat until no more dead nodes exist.
  */
-void mrc_gc(mrc_t* self, roaring_bitmap_t* node_ids);
+#define mrc_gc(...) RUN(mrc_gc, __VA_ARGS__)
+VOID_TASK_DECL_2(mrc_gc, mrc_t*, roaring_bitmap_t*)
 
 /**
  * utility functions
