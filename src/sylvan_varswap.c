@@ -64,8 +64,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
-    reorder_remark_node_ids(reorder_db, nodes);
-
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
     // Check whether the two projection functions involved in this
@@ -105,6 +103,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
+
+    roaring_bitmap_free(reorder_db->node_ids);
+    reorder_db->node_ids = mrc_collect_node_ids(nodes);
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;

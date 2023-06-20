@@ -4,6 +4,7 @@
 #include <errno.h>
 
 VOID_TASK_DECL_4(mrc_gc_par, mrc_t*,roaring_bitmap_t*, uint64_t, uint64_t)
+TASK_DECL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*)
 
 /**
  * Atomic counters
@@ -227,13 +228,6 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 
 VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, node_ids)
 {
-#ifndef NDEBUG
-//    // precondition:
-//    // MRC and mark-and-sweep should agree on the number of nodes
-//    size_t a = llmsset_count_marked(nodes) + 2;
-//    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
-//    assert(a == b);
-#endif
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
@@ -256,13 +250,6 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, node_ids)
     // would silently delete individual entries.
     llmsset_reset_all_regions();
 #endif
-
-#ifndef NDEBUG
-//    // post condition:
-//    // MRC and mark-and-sweep should agree on the number of nodes
-//    sylvan_clear_and_mark();
-//    sylvan_rehash_all();
-#endif
 }
 
 VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count)
@@ -275,14 +262,7 @@ VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
         return;
     }
 
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
-    }
-
     const size_t end = first + count;
-
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
 
@@ -293,6 +273,43 @@ VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
             mrc_delete_node(self, index);
         }
     }
+}
+
+roaring_bitmap_t* mrc_collect_node_ids(llmsset_t dbs)
+{
+    atomic_bitmap_t bitmap = {
+            .container = dbs->bitmap2,
+            .size = dbs->table_size
+    };
+    return RUN(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap);
+}
+
+TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap)
+{
+    if (count > NBITS_PER_BUCKET * 8) {
+        size_t split = count / 2;
+        SPAWN(mrc_collect_node_ids_par, first, split, bitmap);
+        roaring_bitmap_t *a = CALL(mrc_collect_node_ids_par, first + split, count - split, bitmap);
+        roaring_bitmap_t *b = SYNC(mrc_collect_node_ids_par);
+        roaring_bitmap_t* res = roaring_bitmap_or(a, b);
+        roaring_bitmap_free(a);
+        roaring_bitmap_free(b);
+        return res;
+    }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+    roaring_bitmap_t *tmp = roaring_bitmap_create();
+
+    for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
+        roaring_bitmap_add(tmp, first);
+    }
+    return tmp;
 }
 
 void mrc_delete_node(mrc_t *self, size_t index)

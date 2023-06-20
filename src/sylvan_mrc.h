@@ -121,6 +121,9 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created);
 
+roaring_bitmap_t* mrc_collect_node_ids(llmsset_t dbs);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
