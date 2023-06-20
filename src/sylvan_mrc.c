@@ -3,6 +3,8 @@
 
 #include <errno.h>
 
+VOID_TASK_DECL_4(mrc_gc_par, mrc_t*,roaring_bitmap_t*, uint64_t, uint64_t)
+
 /**
  * Atomic counters
  */
@@ -36,7 +38,7 @@ void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
     if (idx >= self->size) return;                  // out of bounds
     atomic_counter_t *ptr = self->container + idx;
-    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
+    atomic_fetch_add(ptr, val);
 }
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
@@ -233,10 +235,10 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 //    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
 //    assert(a == b);
 #endif
-
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
+//    RUN(mrc_gc_par, self, node_ids, 0, nodes->table_size);
     while (it->has_value) {
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
@@ -265,6 +267,36 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 #endif
 }
 
+VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count)
+{
+    if (count > 512) { // split it per bucket
+        size_t split = count / 2;
+        SPAWN(mrc_gc_par, self, node_ids, first, split);
+        CALL(mrc_gc_par, self, node_ids, first + split, count - split);
+        SYNC(mrc_gc_par);
+        return;
+    }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+
+    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
+    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
+
+    while (it->has_value && it->current_value < end) {
+        size_t index = it->current_value;
+        roaring_advance_uint32_iterator(it);
+        if (mrc_is_node_dead(self, index)) {
+            mrc_delete_node(self, index);
+        }
+    }
+}
+
 void mrc_delete_node(mrc_t *self, size_t index)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
@@ -276,12 +308,18 @@ void mrc_delete_node(mrc_t *self, size_t index)
         if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
+            if (mrc_is_node_dead(self, f1_index)) {
+                mrc_delete_node(self, f1_index);
+            }
         }
         MTBDD f0 = mtbddnode_getlow(f);
         size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
         if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
+            if (mrc_is_node_dead(self, f0_index)) {
+                mrc_delete_node(self, f0_index);
+            }
         }
     }
 #if !SYLVAN_USE_LINEAR_PROBING
