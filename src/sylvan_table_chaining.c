@@ -278,7 +278,7 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
         if (!atomic_compare_exchange_strong(tableptr_d + 1, &next_idx, (uint64_t)-1)) {
             // some other worked is already clearing this hash! wait until it's done?
             while (tableptr_d[1] == (uint64_t)-1) {} // wait explicitly until set to 0!
-            return 0;
+            return 1;
         }
         next_idx &= MASK_INDEX;
     } else {
