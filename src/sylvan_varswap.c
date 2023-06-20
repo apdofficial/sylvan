@@ -134,7 +134,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_PER_BUCKET * 4)) { // split per x buckets
+    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets  (8 buckets == 1 worker region)
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -182,7 +182,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets
+    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets (8 buckets == 1 worker region)
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
