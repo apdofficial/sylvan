@@ -4,7 +4,7 @@
 #include <sys/time.h>
 
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
-#define INFO 1  // useful information w.r.t. dynamic reordering
+#define INFO 0  // useful information w.r.t. dynamic reordering
 
 TASK_DECL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, llmsset_t, uint64_t, uint64_t, atomic_bitmap_t*)
 
