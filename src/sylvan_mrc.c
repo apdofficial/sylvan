@@ -187,7 +187,7 @@ void mrc_nnodes_add(mrc_t *self, int val)
 
 counter_t mrc_ext_ref_nodes_get(const mrc_t *self, size_t idx)
 {
-    return atomic_bitmap_get(&self->ext_ref_nodes, idx);
+    return atomic_bitmap_get(&self->ext_ref_nodes, idx, memory_order_relaxed);
 }
 
 counter_t mrc_ref_nodes_get(const mrc_t *self, size_t idx)
@@ -232,26 +232,6 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 //    size_t a = llmsset_count_marked(nodes) + 2;
 //    size_t b = mrc_nnodes_get(&reorder_db->mrc) + 2;
 //    assert(a == b);
-//
-//    // and with what nodes are marked
-//    atomic_bitmap_t bitmap2 = {
-//            .container = nodes->bitmap2,
-//            .size = nodes->table_size
-//    };
-//    bitmap_container_t idx = atomic_bitmap_next(&bitmap2, 1);
-//    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
-//        assert(llmsset_is_marked(nodes, idx));
-//        assert(roaring_bitmap_contains(node_ids, idx));
-//    }
-//
-//    // and vice versa
-//    roaring_uint32_iterator_t *it_tmp = roaring_create_iterator(node_ids);
-//    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
-//    while (it_tmp->has_value) {
-//        size_t index = it_tmp->current_value;
-//        roaring_advance_uint32_iterator(it_tmp);
-//        assert(llmsset_is_marked(nodes, index));
-//    }
 #endif
 
     roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
@@ -282,23 +262,6 @@ void mrc_gc(mrc_t *self, roaring_bitmap_t *node_ids)
 //    // MRC and mark-and-sweep should agree on the number of nodes
 //    sylvan_clear_and_mark();
 //    sylvan_rehash_all();
-//
-//    a = llmsset_count_marked(nodes) + 2;
-//    b = mrc_nnodes_get(&reorder_db->mrc) + 2;
-//    assert(a == b);
-//
-//    // and with what nodes are marked
-//    idx = atomic_bitmap_next(&bitmap2, 1);
-//    for (; idx != npos && idx < nodes->table_size; idx = atomic_bitmap_next(&bitmap2, idx)) {
-//        assert(roaring_bitmap_contains(node_ids, idx));
-//    }
-//    it_tmp = roaring_create_iterator(node_ids);
-//    roaring_move_uint32_iterator_equalorlarger(it_tmp, 2);
-//    while (it_tmp->has_value) {
-//        size_t index = it_tmp->current_value;
-//        roaring_advance_uint32_iterator(it_tmp);
-//        assert(llmsset_is_marked(nodes, index));
-//    }
 #endif
 }
 

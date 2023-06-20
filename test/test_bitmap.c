@@ -6,7 +6,7 @@
 int test_forward_iterator(size_t i, size_t j, size_t size)
 {
     bitmap_t bitmap = {
-        .container = NULL,
+        .buckets = NULL,
         .size = 0
     };
     bitmap_init(&bitmap, size);
@@ -23,9 +23,10 @@ int test_forward_iterator(size_t i, size_t j, size_t size)
 
     size_t k = i;
     size_t index = bitmap_first(&bitmap);
+
     while (index != npos) {
         test_assert(index == k);
-        index = bitmap_next(&bitmap, size, index);
+        index = bitmap_next(&bitmap, index);
         k++;
     }
 
@@ -39,7 +40,7 @@ int test_forward_iterator(size_t i, size_t j, size_t size)
 int test_backwards_iterator(size_t i, size_t j, size_t size)
 {
     bitmap_t bitmap = {
-        .container = NULL,
+        .buckets = NULL,
         .size = 0
     };
     bitmap_init(&bitmap, size);
@@ -52,10 +53,10 @@ int test_backwards_iterator(size_t i, size_t j, size_t size)
         assert(bitmap_get(&bitmap, k));
     }
 
-    test_assert(bitmap_last(&bitmap, size - 1) == j);
+    test_assert(bitmap_last(&bitmap) == j);
 
     size_t k = j;
-    size_t index = bitmap_last(&bitmap, size - 1);
+    size_t index = bitmap_last(&bitmap);
     while (index != npos) {
         test_assert(index == k);
         index = bitmap_prev(&bitmap, index);
@@ -78,11 +79,11 @@ int test_atomic_forward_iterator(size_t i, size_t j, size_t size)
     atomic_bitmap_init(&bitmap, size);
 
     for (size_t k = i; k < j; k++) {
-        atomic_bitmap_set(&bitmap, k);
+        atomic_bitmap_set(&bitmap, k, memory_order_seq_cst);
     }
 
     for (size_t k = i; k < j; k++) {
-        assert(atomic_bitmap_get(&bitmap, k));
+        assert(atomic_bitmap_get(&bitmap, k, memory_order_seq_cst));
     }
 
     test_assert(atomic_bitmap_first(&bitmap) == i);
@@ -113,7 +114,7 @@ int test_atomic_backwards_iterator(size_t i, size_t j, size_t size)
     }
 
     for (size_t k = i; k < j; k++) {
-        assert(atomic_bitmap_get(&bitmap, k));
+        assert(atomic_bitmap_get(&bitmap, k, memory_order_seq_cst));
     }
 
     test_assert(atomic_bitmap_last(&bitmap) == j);

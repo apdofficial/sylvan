@@ -4,7 +4,10 @@
 #include <sys/time.h>
 
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
-#define INFO 1  // useful information w.r.t. dynamic reordering
+#define INFO 0  // useful information w.r.t. dynamic reordering
+
+TASK_DECL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, llmsset_t, uint64_t, uint64_t, atomic_bitmap_t*)
+
 
 static inline int is_db_available()
 {
@@ -148,7 +151,6 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 
 inline uint64_t get_nodes_count()
 {
-    return llmsset_count_marked(nodes) + 2;
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
@@ -265,7 +267,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 #if STATS
     printf("\n");
     for (size_t i = 0; i < levels_count_get(&reorder_db->levels); i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
+        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i],
+               mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
 #endif
@@ -387,7 +390,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 #if STATS
     printf("\n");
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i], mrc_var_nnodes_get(&reorder_db->mrc, i));
+        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i],
+               mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
 #endif
@@ -429,6 +433,12 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
+#if INFO
+    double t_reorder = wctime();
+#endif
+    reorder_db->config.t_start_sifting = wctime();
+    reorder_db->config.total_num_var = 0;
+
     reorder_remark_node_ids(reorder_db, nodes);
 
     sylvan_clear_cache();
@@ -456,12 +466,16 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
         WRAP(e->cb);
     }
 
-    reorder_db->config.t_start_sifting = wctime();
-    reorder_db->config.total_num_var = 0;
+#if INFO
+    printf("\npre reorder took %f seconds\n", wctime() - t_reorder);
+#endif
 }
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
+#if INFO
+    double t_reorder = wctime();
+#endif
     size_t after_size = llmsset_count_marked(nodes);
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
@@ -488,6 +502,10 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     }
 
     sylvan_timer_stop(SYLVAN_RE);
+
+#if INFO
+    printf("\npost reorder took %f seconds\n", wctime() - t_reorder);
+#endif
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)
@@ -635,13 +653,40 @@ int should_terminate_reordering(const struct reorder_config *reorder_config)
 void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs)
 {
     roaring_bitmap_clear(self->node_ids);
-
-    atomic_bitmap_t bitmap2 = {
+    atomic_bitmap_t bitmap = {
             .container = dbs->bitmap2,
             .size = dbs->table_size
     };
-    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
-    for (; index != npos && index < dbs->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
-        roaring_bitmap_add(self->node_ids, index);
+
+    self->node_ids = RUN(remark_node_ids_par, self, dbs, 0, bitmap.size, &bitmap);
+
+}
+
+TASK_IMPL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, self, llmsset_t, dbs, uint64_t, first, uint64_t,
+            count, atomic_bitmap_t*, bitmap)
+{
+    if (count > BLOCKSIZE) {
+        size_t split = count / 2;
+        SPAWN(remark_node_ids_par, self, dbs, first, split, bitmap);
+        roaring_bitmap_t *a = CALL(remark_node_ids_par, self, dbs, first + split, count - split, bitmap);
+        roaring_bitmap_t *b = SYNC(remark_node_ids_par);
+        roaring_bitmap_t* res = roaring_bitmap_or(a, b);
+        roaring_bitmap_free(a);
+        roaring_bitmap_free(b);
+        return res;
     }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+    roaring_bitmap_t *tmp = roaring_bitmap_create();
+
+    for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
+        roaring_bitmap_add(tmp, first);
+    }
+    return tmp;
 }
