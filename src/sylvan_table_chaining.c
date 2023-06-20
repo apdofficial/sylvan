@@ -275,10 +275,8 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
     uint64_t next_idx = atomic_load_explicit(tableptr_d + 1, memory_order_relaxed);
     if ((next_idx & MASK_INDEX) != 0) {
         // now we will claim that we shall delete this one!
-        if (!atomic_compare_exchange_strong(tableptr_d + 1, &next_idx, (uint64_t)-1)) {
-            // some other worked is already clearing this hash! wait until it's done?
-            while (tableptr_d[1] == (uint64_t)-1) {} // wait explicitly until set to 0!
-            return 1;
+        while (!atomic_compare_exchange_strong(tableptr_d + 1, &next_idx, (uint64_t)-1)) {
+            // setting ptr to not in use(-1)
         }
         next_idx &= MASK_INDEX;
     } else {
@@ -299,7 +297,7 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
         if (first_idx == d_idx) { // we are head
             // next part of the chain
             // since we claimed our own bucket for deletion, we can just use a normal write
-            atomic_store_explicit(first_ptr, next_idx, memory_order_seq_cst);
+            atomic_store_explicit(first_ptr, next_idx, memory_order_relaxed);
             return 1;
         }
 
