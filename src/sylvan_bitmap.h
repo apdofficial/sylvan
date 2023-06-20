@@ -38,7 +38,6 @@ static const size_t NBITS_PER_BUCKET = sizeof(bitmap_bucket_t) * CHAR_BIT;
 #define BIT_OFFSET(b)           ((b) % NBITS_PER_BUCKET)
 #define BIT_MASK(b)             (0x8000000000000000LL >> (BIT_OFFSET(b)))
 #define NBUCKETS(b)             (((b) + NBITS_PER_BUCKET-1) / NBITS_PER_BUCKET)
-#define NBITS_BUCKET            512 // number of bits per bucket (assuming bucket is uint64_t)
 
 /*
  * Allocate a new bitmap with the given size

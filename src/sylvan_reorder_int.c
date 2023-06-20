@@ -665,7 +665,7 @@ void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs)
 TASK_IMPL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, self, llmsset_t, dbs, uint64_t, first, uint64_t,
             count, atomic_bitmap_t*, bitmap)
 {
-    if (count > BLOCKSIZE) {
+    if (count > NBITS_PER_BUCKET * 4) {
         size_t split = count / 2;
         SPAWN(remark_node_ids_par, self, dbs, first, split, bitmap);
         roaring_bitmap_t *a = CALL(remark_node_ids_par, self, dbs, first + split, count - split, bitmap);
