@@ -66,6 +66,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
+
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
@@ -74,7 +75,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     BDDVAR xIndex = reorder_db->levels.level_to_order[pos];
     BDDVAR yIndex = reorder_db->levels.level_to_order[pos + 1];
     int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
-
+    roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->node_ids);
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
 //
@@ -90,22 +91,19 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 #endif
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->node_ids);
+    size_t marked_count = sylvan_varswap_p1(pos, &result, tmp);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(&result, reorder_db->node_ids);
+        sylvan_varswap_p2(&result, tmp);
         if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_varswap_p3(pos, &result, reorder_db->node_ids);
+            sylvan_varswap_p3(pos, &result, tmp);
         }
     }
 
     // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
-
-    roaring_bitmap_free(reorder_db->node_ids);
-    reorder_db->node_ids = mrc_collect_node_ids(nodes);
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;
@@ -299,13 +297,13 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
-        size_t split = count / 2;
-        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
-        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
-        SYNC(sylvan_varswap_p2);
-        return;
-    }
+//    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
+//        size_t split = count / 2;
+//        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
+//        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
+//        SYNC(sylvan_varswap_p2);
+//        return;
+//    }
 
     const size_t end = first + count;
 

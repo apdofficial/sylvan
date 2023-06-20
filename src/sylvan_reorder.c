@@ -413,6 +413,10 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #if STATS
         if (i > 1) exit(1);
 #endif
+
+        roaring_bitmap_run_optimize(reorder_db->node_ids);
+        roaring_bitmap_shrink_to_fit(reorder_db->node_ids);
+
         continue;
 
         siftingFailed:

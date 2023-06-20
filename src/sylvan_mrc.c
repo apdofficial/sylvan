@@ -228,7 +228,8 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 
 VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, node_ids)
 {
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
+    roaring_bitmap_t *tmp = roaring_bitmap_copy(node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
     while (it->has_value) {
@@ -317,6 +318,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
     mrc_nnodes_add(self, -1);
+    roaring_bitmap_remove(reorder_db->node_ids, index);
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
         size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
@@ -352,6 +354,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
+        roaring_bitmap_add(reorder_db->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
@@ -363,7 +366,6 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
 {
-    (void) self;
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
@@ -371,6 +373,7 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
+        roaring_bitmap_add(reorder_db->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
