@@ -146,7 +146,6 @@ VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nv
     atomic_bitmap_init(&global, nnodes);
     atomic_bitmap_init(&local, nnodes);
 
-    assert(!roaring_bitmap_is_empty(reorder_db->node_ids));
     roaring_uint32_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
@@ -178,7 +177,6 @@ VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nv
         atomic_bitmap_set(&support, lvl_db->level_to_order[var]);
 
         // clear locally visited nodes bitmap,
-        // TODO: investigate: it is a hotspot of this function takes cca 10 - 20% of the runtime and it scales with the table size :(
         atomic_bitmap_clear_all(&local);
         // update interaction matrix
         interact_update(self, &support);
