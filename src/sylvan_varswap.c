@@ -136,7 +136,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE) {
+    if (count > (BLOCKSIZE)) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -312,7 +312,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE) {
+    if (count > (BLOCKSIZE)) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
         CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
