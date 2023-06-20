@@ -187,7 +187,7 @@ void mrc_nnodes_add(mrc_t *self, int val)
 
 counter_t mrc_ext_ref_nodes_get(const mrc_t *self, size_t idx)
 {
-    return atomic_bitmap_get(&self->ext_ref_nodes, idx);
+    return atomic_bitmap_get(&self->ext_ref_nodes, idx, memory_order_relaxed);
 }
 
 counter_t mrc_ref_nodes_get(const mrc_t *self, size_t idx)

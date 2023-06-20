@@ -79,11 +79,11 @@ int test_atomic_forward_iterator(size_t i, size_t j, size_t size)
     atomic_bitmap_init(&bitmap, size);
 
     for (size_t k = i; k < j; k++) {
-        atomic_bitmap_set(&bitmap, k);
+        atomic_bitmap_set(&bitmap, k, memory_order_seq_cst);
     }
 
     for (size_t k = i; k < j; k++) {
-        assert(atomic_bitmap_get(&bitmap, k));
+        assert(atomic_bitmap_get(&bitmap, k, memory_order_seq_cst));
     }
 
     test_assert(atomic_bitmap_first(&bitmap) == i);
@@ -114,7 +114,7 @@ int test_atomic_backwards_iterator(size_t i, size_t j, size_t size)
     }
 
     for (size_t k = i; k < j; k++) {
-        assert(atomic_bitmap_get(&bitmap, k));
+        assert(atomic_bitmap_get(&bitmap, k, memory_order_seq_cst));
     }
 
     test_assert(atomic_bitmap_last(&bitmap) == j);

@@ -20,12 +20,12 @@ static inline size_t interact_get_nrows(const interact_t *self)
 
 inline void interact_set(interact_t *self, size_t row, size_t col)
 {
-    atomic_bitmap_set(self, (row * interact_get_nrows(self)) + col);
+    atomic_bitmap_set(self, (row * interact_get_nrows(self)) + col, memory_order_seq_cst);
 }
 
 inline int interact_get(const interact_t *self, size_t row, size_t col)
 {
-    return atomic_bitmap_get(self, (row * interact_get_nrows(self)) + col);
+    return atomic_bitmap_get(self, (row * interact_get_nrows(self)) + col, memory_order_relaxed);
 }
 
 inline int interact_test(const interact_t *self, uint32_t x, uint32_t y)
@@ -46,16 +46,16 @@ void interact_update(interact_t *self, atomic_bitmap_t *bitmap)
     size_t nrows = interact_get_nrows(self);
     size_t ncols = nrows;
     for (i = 0; i < nrows - 1; i++) {
-        if (atomic_bitmap_get(bitmap, i) == 1) {
-            atomic_bitmap_clear(bitmap, i);
+        if (atomic_bitmap_get(bitmap, i, memory_order_relaxed) == 1) {
+            atomic_bitmap_clear(bitmap, i, memory_order_relaxed);
             for (j = i + 1; j < ncols; j++) {
-                if (atomic_bitmap_get(bitmap, j) == 1) {
+                if (atomic_bitmap_get(bitmap, j, memory_order_relaxed) == 1) {
                     interact_set(self, i, j);
                 }
             }
         }
     }
-    atomic_bitmap_clear(bitmap, nrows - 1);
+    atomic_bitmap_clear(bitmap, nrows - 1, memory_order_relaxed);
 }
 
 void interact_print(const interact_t* self)
@@ -105,11 +105,11 @@ VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
     if (f == mtbdd_true || f == mtbdd_false) return;
 
-    if (atomic_bitmap_get(local, index)) return;
+    if (atomic_bitmap_get(local, index, memory_order_relaxed)) return;
 
     BDDVAR var = mtbdd_getvar(f);
     // set support bitmap, <var> contributes to the outcome of <f>
-    atomic_bitmap_set(support, lvl_db->level_to_order[var]);
+    atomic_bitmap_set(support, lvl_db->level_to_order[var], memory_order_relaxed);
 
     if (!mtbdd_isleaf(f)) {
         // visit all nodes reachable from <f>
@@ -120,9 +120,9 @@ VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support
     }
 
     // locally visited node used to avoid duplicate node visit for a given tree
-    atomic_bitmap_set(local, index);
+    atomic_bitmap_set(local, index, memory_order_relaxed);
     // globally visited node used to determining root nodes
-    atomic_bitmap_set(global, index);
+    atomic_bitmap_set(global, index, memory_order_relaxed);
 }
 
 VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nvars, size_t, nnodes)
@@ -161,7 +161,7 @@ VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nv
             continue;
         }
 
-        if (atomic_bitmap_get(&global, index) == 1) {
+        if (atomic_bitmap_get(&global, index, memory_order_relaxed) == 1) {
             // already visited node, thus can not be a root and we can skip it
             continue;
         }
@@ -174,7 +174,7 @@ VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nv
 
         BDDVAR var = mtbddnode_getvariable(node);
         // set support bitmap, <var> contributes to the outcome of <f>
-        atomic_bitmap_set(&support, lvl_db->level_to_order[var]);
+        atomic_bitmap_set(&support, lvl_db->level_to_order[var], memory_order_relaxed);
 
         // clear locally visited nodes bitmap,
         atomic_bitmap_clear_all(&local);

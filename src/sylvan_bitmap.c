@@ -2,7 +2,6 @@
 #include <lace.h>
 #include <sylvan_align.h>
 
-#include <stdatomic.h>
 #include <libpopcnt.h>
 #include <assert.h>
 
@@ -253,28 +252,28 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos)
     }
 }
 
-int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_or(ptr, mask);
+    atomic_fetch_or_explicit(ptr, mask, ordering);
     return 1;
 }
 
-int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_and(ptr, ~mask);
+    atomic_fetch_and_explicit(ptr, ~mask, ordering);
     return 1;
 }
 
-int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos)
+int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
     assert(pos < bitmap->size);
     _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
-    bitmap_bucket_t word = atomic_load_explicit(ptr, memory_order_relaxed);
+    bitmap_bucket_t word = atomic_load_explicit(ptr, ordering);
     return word & BIT_MASK(pos) ? 1 : 0;
 }

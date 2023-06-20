@@ -1,9 +1,18 @@
 #ifndef SYLVAN_BITMAP_H
 #define SYLVAN_BITMAP_H
 
+#ifndef __cplusplus
+  #include <stdatomic.h>
+  #define memory_order memory_order
+#else
+  // Compatibility with C11
+  #define memory_order std::memory_order
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <limits.h>     // for CHAR_BIT
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -143,17 +152,17 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos);
 /**
  * Set the bit at position n to 1, if it was 0. (Atomic version)
  */
-int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos);
+int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
 
 /**
  * Set the bit at position n to 0, if it was 1. (Atomic version)
  */
-int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos);
+int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
 
 /**
  * Get the bit at position n. (Atomic version)
  */
-int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos);
+int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
 
 
 #ifdef __cplusplus
