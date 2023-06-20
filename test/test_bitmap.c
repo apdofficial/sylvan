@@ -23,9 +23,10 @@ int test_forward_iterator(size_t i, size_t j, size_t size)
 
     size_t k = i;
     size_t index = bitmap_first(&bitmap);
+
     while (index != npos) {
         test_assert(index == k);
-        index = bitmap_next(&bitmap, size, index);
+        index = bitmap_next(&bitmap, index);
         k++;
     }
 
@@ -52,10 +53,10 @@ int test_backwards_iterator(size_t i, size_t j, size_t size)
         assert(bitmap_get(&bitmap, k));
     }
 
-    test_assert(bitmap_last(&bitmap, size - 1) == j);
+    test_assert(bitmap_last(&bitmap) == j);
 
     size_t k = j;
-    size_t index = bitmap_last(&bitmap, size - 1);
+    size_t index = bitmap_last(&bitmap);
     while (index != npos) {
         test_assert(index == k);
         index = bitmap_prev(&bitmap, index);
