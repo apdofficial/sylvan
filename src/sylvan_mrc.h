@@ -44,6 +44,7 @@ counter_t atomic_counters_get(const atomic_counters_t* self, size_t idx);
  */
 typedef struct mrc_s
 {
+    roaring_bitmap_t*       node_ids;               // compressed roaring bitmap holding node indices of the nodes unique table
     int                     isolated_count;         // number of isolated projection functions
     _Atomic(size_t)         nnodes;                 // number of nodes all nodes in DD
     atomic_counters_t       ref_nodes;              // number of internal references per node (use node unique table index)
@@ -55,7 +56,7 @@ typedef struct mrc_s
 /**
  * init/ deinit functions.
  */
-void mrc_init(mrc_t* self, size_t nvars, size_t nnodes, roaring_bitmap_t* node_ids);
+void mrc_init(mrc_t* self, size_t nvars, size_t nnodes);
 
 void mrc_deinit(mrc_t* self);
 
@@ -106,7 +107,7 @@ size_t mrc_nnodes_get(const mrc_t* self);
  * If the children become dead, delete them as well, repeat until no more dead nodes exist.
  */
 #define mrc_gc(...) RUN(mrc_gc, __VA_ARGS__)
-VOID_TASK_DECL_2(mrc_gc, mrc_t*, roaring_bitmap_t*)
+VOID_TASK_DECL_1(mrc_gc, mrc_t*)
 
 /**
  * utility functions
@@ -129,7 +130,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created
  */
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created);
 
-roaring_bitmap_t* mrc_collect_node_ids(llmsset_t dbs);
+void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs);
 
 
 #ifdef __cplusplus

@@ -9,7 +9,6 @@
 static inline int is_db_available()
 {
     if (reorder_db == NULL) return 0;
-    if (reorder_db->node_ids == NULL) return 0;
     return 1;
 }
 
@@ -39,12 +38,9 @@ reorder_db_t reorder_db_init()
         fprintf(stderr, "reorder_db_init: Unable to allocate memory: %s!\n", strerror(errno));
         exit(1);
     }
-    db->node_ids = roaring_bitmap_create();
-    if (db->node_ids == NULL) {
-        fprintf(stderr, "reorder_db_init: Unable to allocate memory: %s!\n", strerror(errno));
-        exit(1);
-    }
+
     db->mrc = (mrc_t) {
+            .node_ids = roaring_bitmap_create(),
             .isolated_count = 0,
             .nnodes = 0,
             .ref_nodes = (atomic_counters_t) {
@@ -95,7 +91,6 @@ void reorder_db_deinit(reorder_db_t self)
     if (!self->is_initialised) return;
     self->is_initialised = 0;
     if (is_db_available() == 0) return;
-    roaring_bitmap_free(self->node_ids);
     mrc_deinit(&self->mrc);
     interact_deinit(&self->matrix);
     free(reorder_db);
@@ -436,8 +431,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     reorder_db->config.t_start_sifting = wctime();
     reorder_db->config.total_num_var = 0;
 
-    roaring_bitmap_free(reorder_db->node_ids);
-    reorder_db->node_ids = mrc_collect_node_ids(nodes);
+    mrc_collect_node_ids(&reorder_db->mrc, nodes);
 
     sylvan_clear_cache();
 
@@ -451,8 +445,8 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 #endif
     }
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
-    interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
+    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;

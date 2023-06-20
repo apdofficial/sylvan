@@ -75,18 +75,17 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     BDDVAR xIndex = reorder_db->levels.level_to_order[pos];
     BDDVAR yIndex = reorder_db->levels.level_to_order[pos + 1];
     int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
-    roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->node_ids);
+    roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
+
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
-//
-//    }
+//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) { }
 
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, &result, reorder_db->node_ids);
+    sylvan_varswap_p0(pos, &result, tmp);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
@@ -103,7 +102,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     }
 
     // collect garbage (dead nodes)
-    mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
+    mrc_gc(&reorder_db->mrc);
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;

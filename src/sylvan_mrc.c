@@ -72,7 +72,7 @@ counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
  * @preconditions
  * - The forest must be initialized.
  */
-void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_ids)
+void mrc_init(mrc_t *self, size_t nvars, size_t nnodes)
 {
     // memory usage: # of nodes * sizeof (counter_t) bits       (16n)
     atomic_counters_init(&self->ref_nodes, nnodes);
@@ -85,7 +85,7 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_i
 
     mrc_nnodes_set(self, 2);
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(self->node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
     while (it->has_value) {
@@ -115,7 +115,7 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_i
         }
     }
 
-    it = roaring_create_iterator(node_ids);
+    it = roaring_create_iterator(self->node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
     // set all nodes with ref == 0 to 1
@@ -140,6 +140,7 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes, roaring_bitmap_t *node_i
 
 void mrc_deinit(mrc_t *self)
 {
+    if (self->node_ids == NULL) roaring_bitmap_free(self->node_ids);
     atomic_counters_deinit(&self->ref_nodes);
     atomic_counters_deinit(&self->ref_vars);
     atomic_counters_deinit(&self->var_nnodes);
@@ -230,9 +231,9 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
     return int_count == 0 && ext_count == 0;
 }
 
-VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, node_ids)
+VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
-    roaring_bitmap_t *tmp = roaring_bitmap_copy(node_ids);
+    roaring_bitmap_t *tmp = roaring_bitmap_copy(self->node_ids);
     roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
@@ -280,13 +281,14 @@ VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
     }
 }
 
-roaring_bitmap_t *mrc_collect_node_ids(llmsset_t dbs)
+void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs)
 {
     atomic_bitmap_t bitmap = {
             .container = dbs->bitmap2,
             .size = dbs->table_size
     };
-    return RUN(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap);
+    roaring_bitmap_free(self->node_ids);
+    self->node_ids = RUN(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap);
 }
 
 TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap)
@@ -322,7 +324,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
     mrc_nnodes_add(self, -1);
-    roaring_bitmap_remove(reorder_db->node_ids, index);
+    roaring_bitmap_remove(self->node_ids, index);
     if (!mtbddnode_isleaf(f)) {
         MTBDD f1 = mtbddnode_gethigh(f);
         size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
@@ -358,7 +360,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        roaring_bitmap_add(reorder_db->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
+        roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
@@ -377,7 +379,7 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        roaring_bitmap_add(reorder_db->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
+        roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);

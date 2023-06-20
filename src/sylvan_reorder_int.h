@@ -44,7 +44,6 @@ typedef struct reorder_config
 
 typedef struct reorder_db_s
 {
-    roaring_bitmap_t*       node_ids;             // compressed roaring bitmap holding node indices of the unique table nodes
     mrc_t                   mrc;                  // reference counters used for the unique table nodes
     interact_t              matrix;               // bitmap used for storing the square variable interaction matrix (use sylvan_interact with it)
     levels_t                levels;               // levels of the unique table nodes
