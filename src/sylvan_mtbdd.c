@@ -163,7 +163,7 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
     while (it != NULL) {
         MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
         size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
-        _Atomic(uint64_t) *ptr = bitmap + WORD_OFFSET(index);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
         uint64_t mask = BIT_MASK(index);
         atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
     }
@@ -176,7 +176,7 @@ VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
     while (it != NULL) {
         BDD *dd = (BDD*)protect_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
         size_t index = (*dd & SYLVAN_TABLE_MASK_INDEX);
-        _Atomic(uint64_t) *ptr = bitmap + WORD_OFFSET(index);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
         uint64_t mask = BIT_MASK(index);
         atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
     }

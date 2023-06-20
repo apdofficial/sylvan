@@ -10,27 +10,25 @@ extern "C" {
 #endif /* __cplusplus */
 
 // use uint64_t/ uint32_t to advantage the usual 64 bytes per cache line
-typedef uint64_t bitmap_container_t;
+typedef uint64_t bitmap_bucket_t;
 
 typedef struct bitmap_s {
-    bitmap_container_t *container;
+    bitmap_bucket_t *buckets;
     size_t size;
 } bitmap_t;
 
 typedef struct atomic_bitmap_s {
-    _Atomic (bitmap_container_t) *container;
+    _Atomic (bitmap_bucket_t) *container;
     size_t size;
 } atomic_bitmap_t;
 
-static const size_t npos = (bitmap_container_t)-1;
-static const size_t BITS_PER_WORD = sizeof(bitmap_container_t) * CHAR_BIT;
+static const size_t npos = (bitmap_bucket_t)-1;
+static const size_t NBITS_PER_BUCKET = sizeof(bitmap_bucket_t) * CHAR_BIT;
 
-#define WORD_OFFSET(b)          ((b) / BITS_PER_WORD)
-#define BIT_OFFSET(b)           ((b) % BITS_PER_WORD)
-#define BIT_MASK(b)             ((bitmap_container_t) 0x8000000000000000LL >> (b))
-//#define BIT_FWD_ITER_MASK(b)    (0xffffffffffffffffLL >> BIT_OFFSET(pos))
-#define BIT_BCK_ITER_MASK(b)    (~(~((bitmap_container_t) 0x0) >> (int)(b)))
-#define NUMBER_OF_WORDS(b)      (((b) + BITS_PER_WORD-1) / BITS_PER_WORD)
+#define BUCKET_OFFSET(b)        ((b) / NBITS_PER_BUCKET)
+#define BIT_OFFSET(b)           ((b) % NBITS_PER_BUCKET)
+#define BIT_MASK(b)             (0x8000000000000000LL >> (BIT_OFFSET(b)))
+#define NBUCKETS(b)             (((b) + NBITS_PER_BUCKET-1) / NBITS_PER_BUCKET)
 
 /*
  * Allocate a new bitmap with the given size
@@ -70,7 +68,7 @@ size_t bitmap_first(bitmap_t *bitmap);
 /**
  * Get the first bit set to 1 (atomic version)
  */
-size_t bitmap_first_from(bitmap_t *bitmap, size_t starting_word);
+size_t bitmap_first_from(bitmap_t *bitmap, size_t bucket_idx);
 
 /**
  * Get the last bit set to 1

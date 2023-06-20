@@ -6,7 +6,7 @@
 int test_forward_iterator(size_t i, size_t j, size_t size)
 {
     bitmap_t bitmap = {
-        .container = NULL,
+        .buckets = NULL,
         .size = 0
     };
     bitmap_init(&bitmap, size);
@@ -40,7 +40,7 @@ int test_forward_iterator(size_t i, size_t j, size_t size)
 int test_backwards_iterator(size_t i, size_t j, size_t size)
 {
     bitmap_t bitmap = {
-        .container = NULL,
+        .buckets = NULL,
         .size = 0
     };
     bitmap_init(&bitmap, size);
