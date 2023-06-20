@@ -6,6 +6,9 @@
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
 
+VOID_TASK_DECL_5(remark_node_ids_par, reorder_db_t, llmsset_t, uint64_t,  uint64_t, atomic_bitmap_t*)
+
+
 static inline int is_db_available()
 {
     if (reorder_db == NULL) return 0;
@@ -148,7 +151,6 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 
 inline uint64_t get_nodes_count()
 {
-    return llmsset_count_marked(nodes) + 2;
 #if SYLVAN_USE_LINEAR_PROBING
     return llmsset_count_marked(nodes) + 2;
 #else
@@ -635,13 +637,33 @@ int should_terminate_reordering(const struct reorder_config *reorder_config)
 void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs)
 {
     roaring_bitmap_clear(self->node_ids);
-
     atomic_bitmap_t bitmap2 = {
             .container = dbs->bitmap2,
             .size = dbs->table_size
     };
-    bitmap_container_t index = atomic_bitmap_next(&bitmap2, 1);
-    for (; index != npos && index < dbs->table_size; index = atomic_bitmap_next(&bitmap2, index)) {
-        roaring_bitmap_add(self->node_ids, index);
+
+    RUN(remark_node_ids_par, self, dbs, 0, dbs->table_size, &bitmap2);
+}
+
+VOID_TASK_IMPL_5(remark_node_ids_par, reorder_db_t, self, llmsset_t, dbs, uint64_t, first,  uint64_t, count, atomic_bitmap_t*, bitmap)
+{
+    if (count > (BLOCKSIZE)) {
+        size_t split = count / 2;
+        SPAWN(remark_node_ids_par, self, dbs, first, split, bitmap);
+        CALL(remark_node_ids_par, self, dbs, first + split, count - split, bitmap);
+        SYNC(remark_node_ids_par);
+        return;
+    }
+
+    // skip buckets 0 and 1
+    if (first < 2) {
+        count = count + first - 2;
+        first = 2;
+    }
+
+    const size_t end = first + count;
+
+    for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
+        roaring_bitmap_add(self->node_ids, first);
     }
 }

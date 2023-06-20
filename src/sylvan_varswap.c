@@ -60,8 +60,8 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
 
-    size_t filled, total;
-    sylvan_table_usage(&filled, &total);
+    size_t filled = get_nodes_count();
+    size_t total = llmsset_get_size(nodes);
     if ((double) filled > (double) total * SYLVAN_REORDER_MIN_MEM_REQ) {
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
@@ -81,13 +81,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
-//        printf("non-interacting swap: %d %d\n", xIndex, yIndex);
-//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos]] = pos + 1;
-//        reorder_db->levels.order_to_level[reorder_db->levels.level_to_order[pos + 1]] = pos;
-//        uint32_t save = reorder_db->levels.level_to_order[pos];
-//        reorder_db->levels.level_to_order[pos] = reorder_db->levels.level_to_order[pos + 1];
-//        reorder_db->levels.level_to_order[pos + 1] = save;
-//        return result;
+//
 //    }
 
 #if SYLVAN_USE_LINEAR_PROBING
