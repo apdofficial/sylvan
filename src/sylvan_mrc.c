@@ -3,7 +3,8 @@
 
 #include <errno.h>
 
-VOID_TASK_DECL_4(mrc_gc_par, mrc_t*,roaring_bitmap_t*, uint64_t, uint64_t)
+VOID_TASK_DECL_4(mrc_gc_par, mrc_t*, roaring_bitmap_t*, uint64_t, uint64_t)
+
 TASK_DECL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*)
 
 /**
@@ -32,32 +33,35 @@ void atomic_counters_deinit(atomic_counters_t *self)
 
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
+#endif
     counter_t curr = atomic_counters_get(self, idx);
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_counter_t *ptr = self->container + idx;
-    atomic_fetch_add(ptr, val);
+    atomic_fetch_add(self->container + idx, val);
 }
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
+#endif
     if (val >= COUNTER_T_MAX) return;               // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_counter_t *ptr = self->container + idx;
-    atomic_store(ptr, val);
+    atomic_store(self->container + idx, val);
 }
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
+#ifndef NDEBUG
     assert(self->container != NULL);
     assert(self->size != 0);
-    atomic_counter_t *ptr = self->container + idx;
-    return atomic_load_explicit(ptr, memory_order_relaxed);
+#endif
+    return atomic_load_explicit(self->container + idx, memory_order_relaxed);
 }
 
 /**
@@ -276,7 +280,7 @@ VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
     }
 }
 
-roaring_bitmap_t* mrc_collect_node_ids(llmsset_t dbs)
+roaring_bitmap_t *mrc_collect_node_ids(llmsset_t dbs)
 {
     atomic_bitmap_t bitmap = {
             .container = dbs->bitmap2,
@@ -292,7 +296,7 @@ TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64
         SPAWN(mrc_collect_node_ids_par, first, split, bitmap);
         roaring_bitmap_t *a = CALL(mrc_collect_node_ids_par, first + split, count - split, bitmap);
         roaring_bitmap_t *b = SYNC(mrc_collect_node_ids_par);
-        roaring_bitmap_t* res = roaring_bitmap_or(a, b);
+        roaring_bitmap_t *res = roaring_bitmap_or(a, b);
         roaring_bitmap_free(a);
         roaring_bitmap_free(b);
         return res;

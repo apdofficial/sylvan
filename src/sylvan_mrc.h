@@ -117,8 +117,16 @@ int mrc_is_node_dead(const mrc_t* self, size_t idx);
 
 void mrc_delete_node(mrc_t *self, size_t index);
 
+/**
+ * @brief Create a new node in the unique table.(currently not thread-safe!)
+ * @details Updates MRC respectively
+ */
 MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created);
 
+/**
+ * @brief Create a new mapnode in the unique table.(currently not thread-safe!)
+ * @details Updates MRC respectively
+ */
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created);
 
 roaring_bitmap_t* mrc_collect_node_ids(llmsset_t dbs);
