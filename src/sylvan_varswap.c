@@ -134,17 +134,12 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_BUCKET * 24 * 100000)) { // split per 8 buckets
+    if (count > (NBITS_BUCKET * 4)) { // split per x buckets
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p0);
         return;
-    }
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
     }
 
     const size_t end = first + count;
@@ -187,7 +182,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_BUCKET * 24)) { // split per x buckets
+    if (count > (NBITS_BUCKET * 16)) { // split per x buckets
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
@@ -197,12 +192,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
     // count number of marked
     size_t marked = 0;
-
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
-    }
 
     const size_t end = first + count;
 
@@ -315,11 +304,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p2);
         return;
-    }
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
     }
 
     const size_t end = first + count;
