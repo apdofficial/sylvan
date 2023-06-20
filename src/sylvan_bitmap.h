@@ -152,12 +152,12 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos);
 /**
  * Set the bit at position n to 1, if it was 0. (Atomic version)
  */
-int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
+void atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
 
 /**
  * Set the bit at position n to 0, if it was 1. (Atomic version)
  */
-int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
+void atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering);
 
 /**
  * Get the bit at position n. (Atomic version)

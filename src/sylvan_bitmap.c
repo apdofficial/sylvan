@@ -193,9 +193,8 @@ size_t atomic_bitmap_next(atomic_bitmap_t *bitmap, size_t pos)
     pos++;
     // get word index for pos
     size_t word_idx = BUCKET_OFFSET(pos);
-    _Atomic(bitmap_bucket_t) *ptr = &bitmap->container[word_idx];
     // check whether there are still any successor 1-bits in the current word
-    bitmap_bucket_t word = atomic_load_explicit(ptr, memory_order_relaxed) & (0xffffffffffffffffLL >> BIT_OFFSET(pos));
+    bitmap_bucket_t word = atomic_load_explicit(bitmap->container + word_idx, memory_order_relaxed) & (0xffffffffffffffffLL >> BIT_OFFSET(pos));
     if (word) {
         // there exist some successor 1 bit in the word, thus return the pos directly
         return get_first_msb_one_bit_pos(word, word_idx);
@@ -252,28 +251,20 @@ size_t atomic_bitmap_prev(atomic_bitmap_t *bitmap, size_t pos)
     }
 }
 
-int atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
+void atomic_bitmap_set(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
-    assert(pos < bitmap->size);
-    _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_or_explicit(ptr, mask, ordering);
-    return 1;
+    atomic_fetch_or_explicit(bitmap->container + BUCKET_OFFSET(pos), mask, ordering);
 }
 
-int atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
+void atomic_bitmap_clear(atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
-    assert(pos < bitmap->size);
-    _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
     uint64_t mask = BIT_MASK(pos);
-    atomic_fetch_and_explicit(ptr, ~mask, ordering);
-    return 1;
+    atomic_fetch_and_explicit(bitmap->container + BUCKET_OFFSET(pos), ~mask, ordering);
 }
 
 int atomic_bitmap_get(const atomic_bitmap_t *bitmap, size_t pos, memory_order ordering)
 {
-    assert(pos < bitmap->size);
-    _Atomic(bitmap_bucket_t) *ptr = bitmap->container + BUCKET_OFFSET(pos);
-    bitmap_bucket_t word = atomic_load_explicit(ptr, ordering);
+    bitmap_bucket_t word = atomic_load_explicit(bitmap->container + BUCKET_OFFSET(pos), ordering);
     return word & BIT_MASK(pos) ? 1 : 0;
 }

@@ -60,9 +60,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 {
     if (pos == sylvan_invalid) return SYLVAN_REORDER_NO_REGISTERED_VARS;
 
-    size_t filled = get_nodes_count();
-    size_t total = llmsset_get_size(nodes);
-    if ((double) filled > (double) total * SYLVAN_REORDER_MIN_MEM_REQ) {
+    if ((double) get_nodes_count() > (double) llmsset_get_size(nodes) * SYLVAN_REORDER_MIN_MEM_REQ) {
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
@@ -136,17 +134,12 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (BLOCKSIZE)) {
+    if (count > (NBITS_PER_BUCKET * 4)) { // split per x buckets
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p0);
         return;
-    }
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
     }
 
     const size_t end = first + count;
@@ -189,8 +182,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    // divide and conquer (if count above BLOCKSIZE)
-    if (count > BLOCKSIZE) {
+    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
@@ -200,12 +192,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
     // count number of marked
     size_t marked = 0;
-
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
-    }
 
     const size_t end = first + count;
 
@@ -312,17 +298,12 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (BLOCKSIZE)) {
+    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
         CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
         SYNC(sylvan_varswap_p2);
         return;
-    }
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
     }
 
     const size_t end = first + count;
@@ -334,7 +315,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
         size_t index = it->current_value;
         roaring_advance_uint32_iterator(it);
-        if (!llmsset_is_marked(nodes, index)) continue; // an unused bucket
         mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getmark(node)) continue; // an unmarked node
