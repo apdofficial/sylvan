@@ -112,7 +112,7 @@ void levels_gc_add_mark_managed_refs(void)
 /**
  * Sort level counts using gnome sort.
  */
-void levels_gnome_sort(levels_t *self, int *levels_arr, const _Atomic (size_t) *level_counts)
+void levels_gnome_sort(levels_t *self, int *levels_arr, const size_t *level_counts)
 {
     unsigned int i = 1;
     unsigned int j = 2;
@@ -130,7 +130,7 @@ void levels_gnome_sort(levels_t *self, int *levels_arr, const _Atomic (size_t) *
 }
 
 // set levels below the threshold to -1
-void levels_mark_threshold(levels_t *self, int *level, const _Atomic (size_t) *level_counts, uint32_t threshold)
+void levels_mark_threshold(levels_t *self, int *level, const size_t *level_counts, uint32_t threshold)
 {
     for (unsigned int i = 0; i < self->count; i++) {
         if (level_counts[self->level_to_order[i]] < threshold) level[i] = -1;

@@ -76,12 +76,12 @@ void levels_gc_add_mark_managed_refs(void);
 /**
  * @brief  Mark each level_count -1 which is below the threshold.
  */
-void levels_mark_threshold(levels_t* self, int* level, const _Atomic(size_t)* level_counts, uint32_t threshold);
+void levels_mark_threshold(levels_t* self, int* level, const size_t* level_counts, uint32_t threshold);
 
 /**
  * @brief  Sort the levels in descending order according to the number of nodes.
  */
-void levels_gnome_sort(levels_t* self, int *levels, const _Atomic(size_t) *level_counts);
+void levels_gnome_sort(levels_t* self, int *levels, const size_t* level_counts);
 
 #ifdef __cplusplus
 }
