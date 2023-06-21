@@ -75,7 +75,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     BDDVAR xIndex = reorder_db->levels.level_to_order[pos];
     BDDVAR yIndex = reorder_db->levels.level_to_order[pos + 1];
     int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
-    roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) { }
@@ -85,20 +84,22 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, &result, tmp);
+    sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, &result, tmp);
+    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
+        roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
         sylvan_varswap_p2(&result, tmp);
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_varswap_p3(pos, &result, tmp);
         }
+        roaring_bitmap_free(tmp);
     }
 
     // collect garbage (dead nodes)
