@@ -58,7 +58,7 @@ void interact_update(interact_t *self, atomic_bitmap_t *bitmap)
     atomic_bitmap_clear(bitmap, nrows - 1, memory_order_relaxed);
 }
 
-void interact_print(const interact_t* self)
+void interact_print(const interact_t *self)
 {
     size_t nrows = interact_get_nrows(self);
     size_t ncols = nrows;
@@ -99,7 +99,8 @@ void interact_print(const interact_t* self)
  *  F00 F01 F10 F11
  */
 #define find_support(f, lvl_db, support, global, local) RUN(find_support, f, support, global, local)
-VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support, atomic_bitmap_t*, global, atomic_bitmap_t*, local)
+VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support, atomic_bitmap_t*, global,
+            atomic_bitmap_t*, local)
 {
     uint64_t index = f & SYLVAN_TABLE_MASK_INDEX;
     if (index == 0 || index == 1 || index == sylvan_invalid) return;
@@ -125,33 +126,33 @@ VOID_TASK_5(find_support, MTBDD, f, levels_t*, lvl_db, atomic_bitmap_t*, support
     atomic_bitmap_set(global, index, memory_order_relaxed);
 }
 
-VOID_TASK_IMPL_4(interact_init, interact_t*, self, levels_t*, lvl_db, size_t, nvars, size_t, nnodes)
+VOID_TASK_IMPL_5(interact_init, interact_t*, self, levels_t*, lvl_db, mrc_t*, mrc, size_t, nvars, size_t, nnodes)
 {
     atomic_bitmap_init(self, nvars * nvars);
 
-    atomic_bitmap_t support = (atomic_bitmap_t){
-        .container = NULL,
-        .size = 0
+    atomic_bitmap_t support = (atomic_bitmap_t) {
+            .container = NULL,
+            .size = 0
     }; // support bitmap
-    atomic_bitmap_t global = (atomic_bitmap_t){
-        .container = NULL,
-        .size = 0
+    atomic_bitmap_t global = (atomic_bitmap_t) {
+            .container = NULL,
+            .size = 0
     }; // globally visited nodes bitmap (forest wise)
-    atomic_bitmap_t local = (atomic_bitmap_t){
-        .container = NULL,
-        .size = 0
+    atomic_bitmap_t local = (atomic_bitmap_t) {
+            .container = NULL,
+            .size = 0
     }; // locally visited nodes bitmap (tree wise)
 
     atomic_bitmap_init(&support, nvars);
     atomic_bitmap_init(&global, nnodes);
     atomic_bitmap_init(&local, nnodes);
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(reorder_db->node_ids);
+    roaring_uint32_iterator_t *it = roaring_create_iterator(mrc->node_ids);
     roaring_move_uint32_iterator_equalorlarger(it, 2);
 
-    while (it->has_value) {
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+    // start the tree traversals only form nodes with external references
+    for (size_t index = atomic_bitmap_first(&reorder_db->mrc.ext_ref_nodes);
+         index < nodes->table_size; index = atomic_bitmap_next(&reorder_db->mrc.ext_ref_nodes, index)) {
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new search from it.

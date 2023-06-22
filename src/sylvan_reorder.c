@@ -186,7 +186,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
     if (high == 0) high = reorder_db->levels.count - 1;
 
     // count all variable levels (parallel...)
-    _Atomic (size_t) level_counts[reorder_db->levels.count];
+    size_t level_counts[reorder_db->levels.count];
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
         level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, reorder_db->levels.level_to_order[i]);
     }
@@ -321,7 +321,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     if (high == 0) high = reorder_db->levels.count - 1;
 
     // count all variable levels
-    _Atomic (size_t) level_counts[reorder_db->levels.count];
+    size_t level_counts[reorder_db->levels.count];
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
         level_counts[i] = mrc_var_nnodes_get(&reorder_db->mrc, reorder_db->levels.level_to_order[i]);
     }
@@ -331,7 +331,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
     // remember the order of the levels, since it will change during the sifting
-    _Atomic (uint32_t) level_to_order[reorder_db->levels.count];
+    uint32_t level_to_order[reorder_db->levels.count];
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
         level_to_order[i] = reorder_db->levels.level_to_order[i];
     }
@@ -413,6 +413,9 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #if STATS
         if (i > 1) exit(1);
 #endif
+
+        roaring_bitmap_run_optimize(reorder_db->mrc.node_ids);
+
         continue;
 
         siftingFailed:

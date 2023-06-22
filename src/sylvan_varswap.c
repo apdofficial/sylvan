@@ -64,10 +64,9 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         return SYLVAN_REORDER_NOT_ENOUGH_MEMORY;
     }
 
-    reorder_remark_node_ids(reorder_db, nodes);
-
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
+
     // Check whether the two projection functions involved in this
     // swap are isolated. At the end, we'll be able to tell how many
     // isolated projection functions are there by checking only these
@@ -78,33 +77,33 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
 
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) {
-//
-//    }
+//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) { }
 
 #if SYLVAN_USE_LINEAR_PROBING
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
-    sylvan_varswap_p0(pos, &result, reorder_db->node_ids);
+    sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->node_ids);
+    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(&result, reorder_db->node_ids);
+        roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
+        sylvan_varswap_p2(&result, tmp);
         if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_varswap_p3(pos, &result, reorder_db->node_ids);
+            sylvan_varswap_p3(pos, &result, tmp);
         }
+        roaring_bitmap_free(tmp);
     }
 
     // collect garbage (dead nodes)
-    mrc_gc(&reorder_db->mrc, reorder_db->node_ids);
+    mrc_gc(&reorder_db->mrc);
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;
@@ -134,7 +133,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_PER_BUCKET * 4)) { // split per x buckets
+    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets  (8 buckets == 1 worker region)
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -182,7 +181,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets
+    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets (8 buckets == 1 worker region)
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
@@ -298,13 +297,13 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
-        size_t split = count / 2;
-        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
-        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
-        SYNC(sylvan_varswap_p2);
-        return;
-    }
+//    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
+//        size_t split = count / 2;
+//        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
+//        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
+//        SYNC(sylvan_varswap_p2);
+//        return;
+//    }
 
     const size_t end = first + count;
 

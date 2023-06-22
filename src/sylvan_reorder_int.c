@@ -6,13 +6,9 @@
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 0  // useful information w.r.t. dynamic reordering
 
-TASK_DECL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, llmsset_t, uint64_t, uint64_t, atomic_bitmap_t*)
-
-
 static inline int is_db_available()
 {
     if (reorder_db == NULL) return 0;
-    if (reorder_db->node_ids == NULL) return 0;
     return 1;
 }
 
@@ -42,12 +38,9 @@ reorder_db_t reorder_db_init()
         fprintf(stderr, "reorder_db_init: Unable to allocate memory: %s!\n", strerror(errno));
         exit(1);
     }
-    db->node_ids = roaring_bitmap_create();
-    if (db->node_ids == NULL) {
-        fprintf(stderr, "reorder_db_init: Unable to allocate memory: %s!\n", strerror(errno));
-        exit(1);
-    }
+
     db->mrc = (mrc_t) {
+            .node_ids = roaring_bitmap_create(),
             .isolated_count = 0,
             .nnodes = 0,
             .ref_nodes = (atomic_counters_t) {
@@ -98,7 +91,6 @@ void reorder_db_deinit(reorder_db_t self)
     if (!self->is_initialised) return;
     self->is_initialised = 0;
     if (is_db_available() == 0) return;
-    roaring_bitmap_free(self->node_ids);
     mrc_deinit(&self->mrc);
     interact_deinit(&self->matrix);
     free(reorder_db);
@@ -439,7 +431,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     reorder_db->config.t_start_sifting = wctime();
     reorder_db->config.total_num_var = 0;
 
-    reorder_remark_node_ids(reorder_db, nodes);
+    mrc_collect_node_ids(&reorder_db->mrc, nodes);
 
     sylvan_clear_cache();
 
@@ -453,8 +445,8 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 #endif
     }
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
-    interact_init(&reorder_db->matrix, &reorder_db->levels, reorder_db->levels.count, nodes->table_size);
+    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;
@@ -648,45 +640,4 @@ int should_terminate_reordering(const struct reorder_config *reorder_config)
         return 1;
     }
     return 0;
-}
-
-void reorder_remark_node_ids(reorder_db_t self, llmsset_t dbs)
-{
-    roaring_bitmap_clear(self->node_ids);
-    atomic_bitmap_t bitmap = {
-            .container = dbs->bitmap2,
-            .size = dbs->table_size
-    };
-
-    self->node_ids = RUN(remark_node_ids_par, self, dbs, 0, bitmap.size, &bitmap);
-
-}
-
-TASK_IMPL_5(roaring_bitmap_t*, remark_node_ids_par, reorder_db_t, self, llmsset_t, dbs, uint64_t, first, uint64_t,
-            count, atomic_bitmap_t*, bitmap)
-{
-    if (count > NBITS_PER_BUCKET * 4) {
-        size_t split = count / 2;
-        SPAWN(remark_node_ids_par, self, dbs, first, split, bitmap);
-        roaring_bitmap_t *a = CALL(remark_node_ids_par, self, dbs, first + split, count - split, bitmap);
-        roaring_bitmap_t *b = SYNC(remark_node_ids_par);
-        roaring_bitmap_t* res = roaring_bitmap_or(a, b);
-        roaring_bitmap_free(a);
-        roaring_bitmap_free(b);
-        return res;
-    }
-
-    // skip buckets 0 and 1
-    if (first < 2) {
-        count = count + first - 2;
-        first = 2;
-    }
-
-    const size_t end = first + count;
-    roaring_bitmap_t *tmp = roaring_bitmap_create();
-
-    for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
-        roaring_bitmap_add(tmp, first);
-    }
-    return tmp;
 }
