@@ -19,10 +19,6 @@ static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
     return 0;
 }
 
-#if !SYLVAN_USE_LINEAR_PROBING
-VOID_TASK_DECL_4(sylvan_varswap_p00, uint32_t, int32_t, roaring_bitmap_t*, _Atomic (reorder_result_t)*)
-
-
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
@@ -90,13 +86,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids);
 
-//    for (int i = 0; i < reorder_db->mrc.node_ids->high_low_container.size; ++i) {
-//        SPAWN(sylvan_varswap_p00, pos, i, reorder_db->mrc.node_ids, &result);
-//    }
-//    for (int i = 0; i < reorder_db->mrc.node_ids->high_low_container.size; ++i) {
-//        SYNC(sylvan_varswap_p00);
-//    }
-
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
@@ -131,40 +120,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 }
 
 #if !SYLVAN_USE_LINEAR_PROBING
-
-VOID_TASK_IMPL_4(sylvan_varswap_p00,
-                 uint32_t, var,
-                 int32_t, index,
-                 roaring_bitmap_t*, node_ids,
-                 _Atomic (reorder_result_t)*, result)
-{
-
-    (void) var;
-    (void) index;
-    (void) node_ids;
-    (void) result;
-//    roaring_uint32_iterator_t it;
-//    roaring_bitmap_iter
-//
-//    printf("container[%d] first: %d, last: %zu\n", index, it.current_value, end);
-//
-//    while (it.has_value && it.current_value < end) {
-//        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) {
-//            return; // fail fast
-//        }
-//        size_t idx = it.current_value;
-//        roaring_advance_uint32_iterator(&it);
-//        mtbddnode_t node = MTBDD_GETNODE(idx);
-//        if (mtbddnode_isleaf(node)) continue; // a leaf
-//        uint32_t nvar = mtbddnode_getvariable(node);
-//        if (nvar == var || nvar == (var + 1)) {
-//            if (llmsset_clear_one_hash(nodes, index) < 0) {
-//                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
-//                return;
-//            }
-//        }
-//    }
-}
 /**
  * Implementation of the zero phase of variable swapping.
  * For all <var+1> nodes, make <var> and rehash.
