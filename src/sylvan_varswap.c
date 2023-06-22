@@ -309,7 +309,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  _Atomic (reorder_result_t)*, result,
                  roaring_bitmap_t*, node_ids)
 {
-    // divide and conquer (if count above BLOCKSIZE)
 //    if (count > (NBITS_PER_BUCKET * 8)) { // split per 16 buckets
 //        size_t split = count / 2;
 //        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
@@ -318,12 +317,15 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 //        return;
 //    }
 
-    const size_t end = first + count;
+    // standard reduction pattern with local roaring bitmap collecting new node indices
+    roaring_bitmap_t new_ids;
+    roaring_bitmap_init_cleared(&new_ids);
 
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
+    const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
         size_t index = it.current_value;
@@ -345,10 +347,13 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             f01 = node_gethigh(f0, n0);
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf0 = mrc_make_mapnode(&reorder_db->mrc, var + 1, f00, f1, &created);
+            newf0 = mrc_make_mapnode(&reorder_db->mrc, var + 1, f00, f1, &created, 0);
             if (newf0 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL);
                 return;
+            }
+            if (created){
+                roaring_bitmap_add(&new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);
@@ -378,17 +383,23 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             // or may already exist in the DAG as required to implement other functions.
 
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1);
+            newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1, 0);
             if (newf1 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
+            if (created1){
+                roaring_bitmap_add(&new_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+            }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
-            newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0);
+            newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0, 0);
             if (newf0 == mtbdd_invalid) {
-                roaring_free_uint32_iterator(&it);
+                atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
+            }
+            if (created0){
+                roaring_bitmap_add(&new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             // update node, which also removes the mark
@@ -396,6 +407,8 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             llmsset_rehash_bucket(nodes, index);
         }
     }
+
+    roaring_bitmap_or_inplace(reorder_db->mrc.node_ids, &new_ids);
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)

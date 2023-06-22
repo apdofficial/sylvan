@@ -119,16 +119,14 @@ int mrc_is_node_dead(const mrc_t* self, size_t idx);
 void mrc_delete_node(mrc_t *self, size_t index);
 
 /**
- * @brief Create a new node in the unique table.(currently not thread-safe!)
- * @details Updates MRC respectively
+ * @brief Create a new node in the unique table. (with <add_id> == 1, not thread-safe!)
  */
-MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created);
+MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created, int add_id);
 
 /**
- * @brief Create a new mapnode in the unique table.(currently not thread-safe!)
- * @details Updates MRC respectively
+ * @brief Create a new mapnode in the unique table. (with <add_id> == 1, not thread-safe!)
  */
-MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created);
+MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id);
 
 void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs);
 

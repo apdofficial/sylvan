@@ -355,7 +355,7 @@ void mrc_delete_node(mrc_t *self, size_t index)
 #endif
 }
 
-MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
+MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
     MTBDD new = mtbdd_varswap_makenode(var, low, high, created);
     if (new == mtbdd_invalid) {
@@ -364,7 +364,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
+        if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
@@ -374,7 +374,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     return new;
 }
 
-MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created)
+MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
@@ -383,7 +383,7 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
+        if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
         mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
