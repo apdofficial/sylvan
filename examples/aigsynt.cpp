@@ -26,7 +26,6 @@ double t_start;
 #define INFO(s, ...) fprintf(stdout, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__)
 #define Abort(s, ...) { fprintf(stderr, "\r[% 8.2f] " s, wctime()-t_start, ##__VA_ARGS__); exit(-1); }
 
-
 /* Configuration */
 static int workers = 1;
 static int verbose = 0;
@@ -145,6 +144,8 @@ VOID_TASK_0(gc_end)
     INFO("GC: end: %zu/%zu size\n", used, total);
 }
 
+#define MASK_INDEX ((uint64_t)0x000000ffffffffff)
+
 #define make_gate(gate) CALL(make_gate, gate)
 VOID_TASK_1(make_gate, int, gate)
 {
@@ -154,12 +155,6 @@ VOID_TASK_1(make_gate, int, gate)
 
     int lft = (int) aag.gatelft[gate] / 2;
     int rgt = (int) aag.gatergt[gate] / 2;
-
-    printf("gate %d\t lhs %d (%d) \t rhs %d (%d)\t ", gate, lft, aag.lookup[lft], rgt, aag.lookup[rgt]);
-
-//    size_t filled, total;
-//    sylvan_table_usage(&filled, &total);
-//    printf("(%zu/%zu)\t ", filled, total);
 
     MTBDD l, r;
     if (lft == 0) {
@@ -185,8 +180,11 @@ VOID_TASK_1(make_gate, int, gate)
     game.gates[gate] = sylvan_and(l, r);
     mtbdd_protect(&game.gates[gate]);
 
-    printf("nodecount: %zu\n", sylvan_nodecount(game.gates[gate]));
-
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("%zu \t", used);
+    printf("gate %d\t lhs %d (%d) \t rhs %d (%d)\t ", gate, lft, aag.lookup[lft], rgt, aag.lookup[rgt]);
+    printf("g %llu l %llu r %llu\n", game.gates[gate] & MASK_INDEX,  l & MASK_INDEX, r & MASK_INDEX);
 }
 
 #define solve_game() RUN(solve_game)
@@ -208,7 +206,7 @@ TASK_0(int, solve_game)
         make_gate(gate);
     }
 
-    INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
+    INFO("Gates have size %zu\n\n", mtbdd_nodecount_more(game.gates, aag.header.a));
     sylvan_stats_report(stdout);
 
     exit(0);
