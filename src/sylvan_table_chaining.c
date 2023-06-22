@@ -305,30 +305,14 @@ llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx)
 
 /**
  * Clear a single bucket hash.
- * (do not run parallel with lookup!!!)
+ * (do not run parallel with lookup!!! the lock on the chain is not supported by lookup...)
  * (for dynamic variable reordering)
  * (lock-free, but not wait-free)
  */
 int
 llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
 {
-    uint64_t* dataptr = ((uint64_t*)dbs->data) + 2*d_idx;
-    _Atomic(uint64_t)* tableptr_d = dbs->table + 2*d_idx;
-
-    // set next_idx to the next bucket in the chain
-    uint64_t next_idx = atomic_load_explicit(tableptr_d + 1, memory_order_relaxed);
-    if ((next_idx & BUCKET_MASK_INDEX) != 0) {
-        // now we will claim that we shall delete this one!
-        if (!atomic_compare_exchange_strong(tableptr_d + 1, &next_idx, (uint64_t)-1)) {
-            // some other worked is already clearing this hash! wait until it's done?
-            while (tableptr_d[1] == (uint64_t)-1) {} // wait explicitly until set to 0!
-            return 0;
-        }
-        next_idx &= BUCKET_MASK_INDEX;
-    } else {
-        next_idx = 0; // nothing after us, so we don't need to make a -1...
-    }
-
+    // compute the hash to find the ``head'' of the chain
     uint64_t hash = compute_hash(dbs, dataptr[0], dataptr[1], is_custom_bucket(dbs, d_idx));
 
 #if LLMSSET_MASK
@@ -337,40 +321,48 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
     _Atomic(uint64_t)* first_ptr = dbs->table + 2 * (hash % dbs->table_size);
 #endif
 
+    // lock the head of the chain using CAS to -1 (-1 as magical value meaning LOCKED)
+    uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
     for (;;) {
-        uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
-
-        if (first_idx == d_idx) { // we are head
-            // next part of the chain
-            // since we claimed our own bucket for deletion, we can just use a normal write
-            atomic_store_explicit(first_ptr, next_idx, memory_order_seq_cst);
-            return 1;
+        while (first_idx == (uint64_t)-1) {
+            // already locked, spin-wait until unlocked
+            first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
         }
+        // not locked; check if not 0 (that would mean data is not in the hash table)
+        if (first_idx == 0) return 0;
+        // OK, use CAS to lock the chain
+        if (atomic_compare_exchange_strong(first_ptr, &first_idx, (uint64_t)-1)) break;
+    }
 
-        uint64_t idx = first_idx; // start at first one
+    // set next_idx to the next bucket in the chain
+    uint64_t next_idx = atomic_load_explicit(dbs->table + 2*d_idx + 1, memory_order_relaxed);
+    next_idx &= BUCKET_MASK_INDEX;
 
+    if (first_idx == d_idx) {
+        // simple case: the head is d_idx
+        atomic_store_explicit(first_ptr, next_idx, memory_order_seq_cst);
+        return 1;
+    } else {
+        // the head is not d_idx, so follow the chain...
+        uint64_t idx = first_idx;
         for (;;) {
-            // we were not head, so find it in the chain!
             if (idx == 0) {
                 // if idx equals 0, then the item was not in the hash table. return 0.
                 // for example it was never created, or already removed...
-                // if you use clear one on the same thing twice it goes wrong
+                atomic_store_explicit(first_ptr, first_idx, memory_order_seq_cst);
                 return 0;
             }
 
             _Atomic(uint64_t)* chain_ptr = dbs->table + 2 * idx + 1;
             uint64_t chain = atomic_load_explicit(chain_ptr, memory_order_relaxed);
+            idx = chain & BUCKET_MASK_INDEX;
 
-            if (chain == (uint64_t)-1) break; // found delete-in-progress, restart
-            // TODO is there a deadlock possible in very rare cases???
-
-            if ((chain & BUCKET_MASK_INDEX) == d_idx) { // found our predecessor
-                if (!atomic_compare_exchange_strong(chain_ptr, &chain, (chain & BUCKET_MASK_HASH) | next_idx)) {
-                    break; // restart
-                }
+            if (idx == d_idx) { // found our predecessor
+                // update the chain
+                atomic_store_explicit(chain_ptr, (chain & BUCKET_MASK_HASH) | next_idx, memory_order_seq_cst);
+                // unlock
+                atomic_store_explicit(first_ptr, first_idx, memory_order_seq_cst);
                 return 1;
-            } else {
-                idx = chain & BUCKET_MASK_INDEX; // next
             }
         }
     }
