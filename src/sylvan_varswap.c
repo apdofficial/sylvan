@@ -183,7 +183,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 16)) { // split per x buckets (8 buckets == 1 worker region)
+    if (count > (NBITS_PER_BUCKET * 8)) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
@@ -194,12 +194,16 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
     // count number of marked
     size_t marked = 0;
 
-    const size_t end = first + count;
-
+    // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return marked;
 
+    // standard reduction pattern with local variables to avoid hotspots
+    int var_diff = 0;
+    int var_plus_one_diff = 0;
+
+    const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
         size_t index = it.current_value;
@@ -211,8 +215,8 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
         if (nvar == (var + 1)) {
             // if <var+1>, then replace with <var> and rehash
-            mrc_var_nnodes_add(&reorder_db->mrc, var, 1);
-            mrc_var_nnodes_add(&reorder_db->mrc, var + 1, -1);
+            var_diff++;
+            var_plus_one_diff--;
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, index) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -227,6 +231,8 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
         if (mtbddnode_getmark(node)) {
             // marked node, remove mark and rehash (we are apparently recovering)
             mtbddnode_setmark(node, 0);
+            var_diff--;
+            var_plus_one_diff++;
             if (llmsset_rehash_bucket(nodes, index) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL_MARKED);
                 return marked;
@@ -238,8 +244,8 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             MTBDD f0 = mtbddnode_getlow(node);
             if (f0 == mtbdd_false) {
                 // we are at the end of a chain
-                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
+                var_plus_one_diff++;
+                var_diff--;
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, index) != 1) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -250,8 +256,8 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                 uint32_t vf0 = mtbdd_getvar(f0);
                 if (vf0 > var + 1) {
                     // next in chain wasn't <var+1>...
-                    mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                    mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
+                    var_plus_one_diff++;
+                    var_diff--;
                     mtbddnode_setvariable(node, var + 1);
                     if (llmsset_rehash_bucket(nodes, index) != 1) {
                         atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -269,8 +275,8 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                 mtbddnode_setmark(node, 1);
                 marked++;
             } else {
-                mrc_var_nnodes_add(&reorder_db->mrc, var + 1, 1);
-                mrc_var_nnodes_add(&reorder_db->mrc, var, -1);
+                var_plus_one_diff++;
+                var_diff--;
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, index) != 1) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
@@ -279,6 +285,9 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             }
         }
     }
+
+    if (var_diff != 0) mrc_var_nnodes_add(&reorder_db->mrc, var, var_diff);
+    if (var_plus_one_diff != 0) mrc_var_nnodes_add(&reorder_db->mrc, var + 1, var_plus_one_diff);
 
     return marked;
 }
