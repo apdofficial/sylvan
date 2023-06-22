@@ -182,9 +182,9 @@ VOID_TASK_1(make_gate, int, gate)
 
     size_t used, total;
     sylvan_table_usage(&used, &total);
-    INFO("%zu \t", used);
-    printf("gate %d\t lhs %d (%d) \t rhs %d (%d)\t ", gate, lft, aag.lookup[lft], rgt, aag.lookup[rgt]);
-    printf("g %llu l %llu r %llu\n", game.gates[gate] & MASK_INDEX,  l & MASK_INDEX, r & MASK_INDEX);
+    printf("%6zu/%6zu (%6.2f%%) | ", used, total, (double)used/(double)total*100);
+    printf("gate %3d lhs %3d (%3d) rhs %3d (%3d) | ", gate, lft, aag.lookup[lft], rgt, aag.lookup[rgt]);
+    printf("%5llu = sylvan_and(%5llu, %5llu)  \n", game.gates[gate] & MASK_INDEX, l & MASK_INDEX, r & MASK_INDEX);
 }
 
 #define solve_game() RUN(solve_game)
@@ -196,7 +196,6 @@ TASK_0(int, solve_game)
     }
 
     INFO("Making the gate BDDs...\n");
-
     game.gates = new MTBDD[aag.header.a];
     for (uint64_t a = 0; a < aag.header.a; a++) {
         game.gates[a] = sylvan_invalid;
