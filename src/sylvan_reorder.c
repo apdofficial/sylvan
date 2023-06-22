@@ -136,9 +136,10 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 
 void sylvan_test_reduce_heap()
 {
+    if (reorder_db == NULL || reorder_db->is_initialised == false) return;
     if (llmsset_count_marked(nodes) >= reorder_db->config.size_threshold &&
         reorder_db->call_count < SYLVAN_REORDER_LIMIT) {
-        sylvan_reduce_heap(reorder_db->config.type);
+        sylvan_reorder_stop_world(reorder_db->config.type);
     }
 }
 
@@ -146,6 +147,7 @@ void sylvan_reduce_heap(reordering_type_t type)
 {
     if (reorder_db == NULL || reorder_db->is_initialised == false) return;
     sylvan_reorder_stop_world(type);
+    sylvan_gc();
 }
 
 /**
