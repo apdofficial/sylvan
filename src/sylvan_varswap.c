@@ -19,6 +19,7 @@ static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
     return 0;
 }
 
+#if !SYLVAN_USE_LINEAR_PROBING
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
