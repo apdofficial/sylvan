@@ -3,7 +3,7 @@
 
 #include <errno.h>
 
-VOID_TASK_DECL_4(mrc_gc_par, mrc_t*, roaring_bitmap_t*, uint64_t, uint64_t)
+VOID_TASK_DECL_5(mrc_gc_par, mrc_t*, roaring_bitmap_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
 TASK_DECL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*)
 
@@ -234,19 +234,22 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
-    roaring_bitmap_t *tmp = roaring_bitmap_copy(self->node_ids);
+    roaring_bitmap_t old_ids;
+    roaring_bitmap_init_cleared(&old_ids);
 
-    roaring_uint32_iterator_t it;
-    roaring_init_iterator(tmp, &it);
-    roaring_move_uint32_iterator_equalorlarger(&it, 2);
+    RUN(mrc_gc_par, self, self->node_ids, 0, nodes->table_size, &old_ids);
 
-    while (it.has_value) {
-        size_t index = it.current_value;
-        roaring_advance_uint32_iterator(&it);
-        if (mrc_is_node_dead(self, index)) {
-            mrc_delete_node(self, index);
-        }
+    roaring_uint32_iterator_t it_old;
+    roaring_init_iterator(&old_ids, &it_old);
+    size_t size = roaring_bitmap_get_cardinality(&old_ids);
+    uint32_t arr[size];
+    size_t x = 0;
+    while (it_old.has_value) {
+        arr[x] = it_old.current_value;
+        roaring_advance_uint32_iterator(&it_old);
+        x++;
     }
+    roaring_bitmap_remove_many(self->node_ids, size, arr);
 
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
@@ -261,28 +264,66 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 #endif
 }
 
-VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count)
+VOID_TASK_IMPL_5(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count, roaring_bitmap_t*, old_ids)
 {
-    if (count > NBITS_PER_BUCKET * 8) { // split it per bucket
-        size_t split = count / 2;
-        SPAWN(mrc_gc_par, self, node_ids, first, split);
-        CALL(mrc_gc_par, self, node_ids, first + split, count - split);
-        SYNC(mrc_gc_par);
-        return;
-    }
+//    if (count > NBITS_PER_BUCKET * 8) {
+//        size_t split = count / 2;
+//        SPAWN(mrc_gc_par, self, node_ids, first, split, old_ids);
+//        CALL(mrc_gc_par, self, node_ids, first + split, count - split, old_ids);
+//        SYNC(mrc_gc_par);
+//        return;
+//    }
 
-    const size_t end = first + count;
+    // standard reduction pattern with local roaring bitmap collecting old node indices
+    roaring_bitmap_t local_old_ids;
+    roaring_bitmap_init_cleared(&local_old_ids);
+
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
+    const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         size_t index = it.current_value;
         roaring_advance_uint32_iterator(&it);
         if (mrc_is_node_dead(self, index)) {
-            mrc_delete_node(self, index);
+            mrc_delete_node(self, index, &local_old_ids);
         }
     }
+
+    roaring_bitmap_or_inplace(old_ids, &local_old_ids);
+}
+
+void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
+{
+    mtbddnode_t f = MTBDD_GETNODE(index);
+    mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
+    mrc_nnodes_add(self, -1);
+    roaring_bitmap_add(local_old_ids, index);
+    if (!mtbddnode_isleaf(f)) {
+        MTBDD f1 = mtbddnode_gethigh(f);
+        size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
+            mrc_ref_nodes_add(self, f1_index, -1);
+            mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
+            if (mrc_is_node_dead(self, f1_index)) {
+                mrc_delete_node(self, f1_index, local_old_ids);
+            }
+        }
+        MTBDD f0 = mtbddnode_getlow(f);
+        size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
+            mrc_ref_nodes_add(self, f0_index, -1);
+            mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
+            if (mrc_is_node_dead(self, f0_index)) {
+                mrc_delete_node(self, f0_index, local_old_ids);
+            }
+        }
+    }
+#if !SYLVAN_USE_LINEAR_PROBING
+    llmsset_clear_one_hash(nodes, index);
+    llmsset_clear_one_data(nodes, index);
+#endif
 }
 
 void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs)
@@ -321,38 +362,6 @@ TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64
         roaring_bitmap_add(tmp, first);
     }
     return tmp;
-}
-
-void mrc_delete_node(mrc_t *self, size_t index)
-{
-    mtbddnode_t f = MTBDD_GETNODE(index);
-    mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
-    mrc_nnodes_add(self, -1);
-    roaring_bitmap_remove(self->node_ids, index);
-    if (!mtbddnode_isleaf(f)) {
-        MTBDD f1 = mtbddnode_gethigh(f);
-        size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
-            mrc_ref_nodes_add(self, f1_index, -1);
-            mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
-            if (mrc_is_node_dead(self, f1_index)) {
-                mrc_delete_node(self, f1_index);
-            }
-        }
-        MTBDD f0 = mtbddnode_getlow(f);
-        size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
-            mrc_ref_nodes_add(self, f0_index, -1);
-            mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
-            if (mrc_is_node_dead(self, f0_index)) {
-                mrc_delete_node(self, f0_index);
-            }
-        }
-    }
-#if !SYLVAN_USE_LINEAR_PROBING
-    llmsset_clear_one_hash(nodes, index);
-    llmsset_clear_one_data(nodes, index);
-#endif
 }
 
 MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)

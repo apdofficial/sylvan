@@ -116,7 +116,7 @@ int mrc_is_var_isolated(const mrc_t* self, size_t idx);
 
 int mrc_is_node_dead(const mrc_t* self, size_t idx);
 
-void mrc_delete_node(mrc_t *self, size_t index);
+void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *old_ids);
 
 /**
  * @brief Create a new node in the unique table. (with <add_id> == 1, not thread-safe!)
