@@ -1872,6 +1872,12 @@ typedef struct roaring_uint32_iterator_s {
 
 } roaring_uint32_iterator_t;
 
+bool loadfirstvalue_largeorequal(roaring_uint32_iterator_t *newit, uint32_t val);
+
+bool loadfirstvalue(roaring_uint32_iterator_t *newit);
+
+bool loadlastvalue(roaring_uint32_iterator_t* newit);
+
 /**
  * Initialize an iterator object that can be used to iterate through the
  * values. If there is a  value, then this iterator points to the first value

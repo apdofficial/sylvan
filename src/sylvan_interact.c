@@ -147,12 +147,9 @@ VOID_TASK_IMPL_5(interact_init, interact_t*, self, levels_t*, lvl_db, mrc_t*, mr
     atomic_bitmap_init(&global, nnodes);
     atomic_bitmap_init(&local, nnodes);
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(mrc->node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it, 2);
-
     // start the tree traversals only form nodes with external references
-    for (size_t index = atomic_bitmap_first(&reorder_db->mrc.ext_ref_nodes);
-         index < nodes->table_size; index = atomic_bitmap_next(&reorder_db->mrc.ext_ref_nodes, index)) {
+    for (size_t index = atomic_bitmap_first(&mrc->ext_ref_nodes);
+         index < nodes->table_size; index = atomic_bitmap_next(&mrc->ext_ref_nodes, index)) {
         // A node is a root of the DAG if it cannot be reached by nodes above it.
         // If a node was never reached during the previous searches,
         // then it is a root, and we start a new search from it.

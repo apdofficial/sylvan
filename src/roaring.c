@@ -17963,7 +17963,7 @@ static bool iter_new_container_partial_init(roaring_uint32_iterator_t *newit) {
     return newit->has_value;
 }
 
-static bool loadfirstvalue(roaring_uint32_iterator_t *newit) {
+bool loadfirstvalue(roaring_uint32_iterator_t *newit) {
     if (!iter_new_container_partial_init(newit))
         return newit->has_value;
 
@@ -17998,7 +17998,7 @@ static bool loadfirstvalue(roaring_uint32_iterator_t *newit) {
     return true;
 }
 
-static bool loadlastvalue(roaring_uint32_iterator_t* newit) {
+bool loadlastvalue(roaring_uint32_iterator_t* newit) {
     if (!iter_new_container_partial_init(newit))
         return newit->has_value;
 
@@ -18036,7 +18036,7 @@ static bool loadlastvalue(roaring_uint32_iterator_t* newit) {
 }
 
 // prerequesite: the value should be in range of the container
-static bool loadfirstvalue_largeorequal(roaring_uint32_iterator_t *newit, uint32_t val) {
+bool loadfirstvalue_largeorequal(roaring_uint32_iterator_t *newit, uint32_t val) {
     // Don't have to check return value because of prerequisite
     iter_new_container_partial_init(newit);
     uint16_t lb = val & 0xFFFF;

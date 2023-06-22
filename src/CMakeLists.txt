@@ -16,12 +16,12 @@ target_sources(sylvan
             sylvan_sl.c
             sylvan_stats.c
             sylvan_zdd.c
-
             roaring.c
+            roaring.h
             libpopcnt.h
             sylvan_bitmap.c
             sylvan_mrc.c
-        sylvan_reorder_int.c
+            sylvan_reorder_int.c
             sylvan_varswap.c
             sylvan_levels.c
             sylvan_reorder.c
@@ -45,11 +45,9 @@ target_sources(sylvan
             sylvan_zdd.h
             sylvan_zdd_int.h
             sylvan_table.h
-            roaring.c
-
             sylvan_bitmap.h
             sylvan_mrc.h
-        sylvan_reorder_int.h
+            sylvan_reorder_int.h
             sylvan_varswap.h
             sylvan_levels.h
             sylvan_reorder.h

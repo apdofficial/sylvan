@@ -10,11 +10,9 @@
 #include <fcntl.h>
 #include <span>
 
-#include <sylvan.h>
 #include <sylvan_int.h>
-#include <sylvan_table.h>
-#include <sylvan_reorder.h>
 #include "aag.h"
+
 
 using namespace sylvan;
 
@@ -40,6 +38,8 @@ static int dynamic_reorder = 0;
 static int sloan_w1 = 1;
 static int sloan_w2 = 8;
 
+//static FILE *log_file = nullptr;
+
 /* Global variables */
 static aag_file_t aag{
         .header = {
@@ -63,9 +63,11 @@ static aag_file_t aag{
         .gatergt = nullptr
 };
 static aag_buffer_t aag_buffer{
-        .content = nullptr,
+        .content = NULL,
         .size = 0,
-        .pos = 0
+        .pos = 0,
+        .file_descriptor = -1,
+        .filestat = {}
 };
 static safety_game_t game{
         .gates = nullptr,
@@ -150,6 +152,7 @@ VOID_TASK_0(gc_start)
 {
     size_t used, total;
     sylvan_table_usage(&used, &total);
+    printf("\n");
     INFO("GC: str: %zu/%zu size\n", used, total);
 }
 
@@ -157,25 +160,22 @@ VOID_TASK_0(gc_end)
 {
     size_t used, total;
     sylvan_table_usage(&used, &total);
-    INFO("GC: end: %zu/%zu size\n", used, total);
+    INFO("GC: end: %zu/%zu size\n\n", used, total);
 }
 
 VOID_TASK_0(reordering_start)
 {
-    size_t table_size = llmsset_count_marked(nodes);
-    INFO("RE: str: %zu size\n", table_size);
-}
-
-VOID_TASK_0(reordering_progress)
-{
-    size_t table_size = llmsset_count_marked(nodes);
-    INFO("RE: prg: %zu size\n", table_size);
+    sylvan_gc();
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("RE: str: %zu size\n", total);
 }
 
 VOID_TASK_0(reordering_end)
 {
-    size_t table_size = llmsset_count_marked(nodes);
-    INFO("RE: end: %zu size\n", table_size);
+    size_t used, total;
+    sylvan_table_usage(&used, &total);
+    INFO("RE: end: %zu size\n", total);
 }
 
 void order_statically()
@@ -324,7 +324,7 @@ VOID_TASK_1(make_gate, int, gate)
         make_gate(aag.lookup[lft]);
         l = game.gates[aag.lookup[lft]];
     } else {
-        l = sylvan_ithlevel(game.level_to_order[lft]); // always use even variables (prime is odd)
+        l = sylvan_ithvar(game.level_to_order[lft]); // always use even variables (prime is odd)
     }
     if (rgt == 0) {
         r = sylvan_false;
@@ -332,26 +332,37 @@ VOID_TASK_1(make_gate, int, gate)
         make_gate(aag.lookup[rgt]);
         r = game.gates[aag.lookup[rgt]];
     } else {
-        r = sylvan_ithlevel(game.level_to_order[rgt]); // always use even variables (prime is odd)
+        r = sylvan_ithvar(game.level_to_order[rgt]); // always use even variables (prime is odd)
     }
     if (aag.gatelft[gate] & 1) l = sylvan_not(l);
     if (aag.gatergt[gate] & 1) r = sylvan_not(r);
     game.gates[gate] = sylvan_and(l, r);
     mtbdd_protect(&game.gates[gate]);
-//    if (dynamic_reorder) sylvan_test_reduce_heap();
 }
 
 #define solve_game() RUN(solve_game)
 TASK_0(int, solve_game)
 {
-    sylvan_newlevels(aag.header.m + 1);
-    game.level_to_order = new int[aag.header.m + 1];
+    game.level_to_order = (int *) calloc(aag.header.m + 1, sizeof(int));
 
     if (static_reorder) {
         order_statically();
     } else {
         for (int i = 0; i <= (int) aag.header.m; i++) game.level_to_order[i] = i;
     }
+
+    INFO("Making the gate BDDs...\n");
+
+    game.gates = new MTBDD[aag.header.a];
+    for (uint64_t a = 0; a < aag.header.a; a++) game.gates[a] = sylvan_invalid;
+    for (uint64_t gate = 0; gate < aag.header.a; gate++) {
+        make_gate(gate);
+//        if (dynamic_reorder) sylvan_test_reduce_heap();
+    }
+    if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
+
+    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
+    if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
 
     game.c_inputs = sylvan_set_empty();
     game.u_inputs = sylvan_set_empty();
@@ -376,6 +387,7 @@ TASK_0(int, solve_game)
             }
         }
     }
+    INFO("There are %zu controllable and %zu uncontrollable inputs.\n", sylvan_set_count(game.c_inputs), sylvan_set_count(game.u_inputs));
 
 #if 0
     sylvan_print(Xc);
@@ -384,25 +396,12 @@ TASK_0(int, solve_game)
     printf("\n");
 #endif
 
-    INFO("There are %zu controllable and %zu uncontrollable inputs.\n", sylvan_set_count(game.c_inputs),
-         sylvan_set_count(game.u_inputs));
-
-    INFO("Making the gate BDDs...\n");
-
-    game.gates = new MTBDD[aag.header.a];
-    for (uint64_t a = 0; a < aag.header.a; a++) game.gates[a] = sylvan_invalid;
-    for (uint64_t gate = 0; gate < aag.header.a; gate++) make_gate(gate);
-    if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
-
-    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
 
 #if 0
     for (uint64_t g=0; g<A; g++) {
         INFO("gate %d has size %zu\n", (int)g, sylvan_nodecount(gates[g]));
     }
-#endif
 
-#if 0
     for (uint64_t g=0; g<A; g++) {
         MTBDD supp = sylvan_support(gates[g]);
         while (supp != sylvan_set_empty()) {
@@ -411,9 +410,7 @@ TASK_0(int, solve_game)
         }
         printf("\n");
     }
-#endif
 
-#if 0
     MTBDD lnext[L];
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
@@ -426,18 +423,14 @@ TASK_0(int, solve_game)
         lnext[l] = sylvan_equiv(sylvan_ithvar(latches[l]+1), nxt);
     }
     INFO("done making latches\n");
-#endif
 
-#if 0
     MTBDD Lvars = sylvan_set_empty();
     mtbdd_protect(&Lvars);
 
     for (uint64_t l = 0; l < aag.header.l; l++) {
         Lvars = sylvan_set_add(Lvars, game.level_to_order[aag.latches[l] / 2]);
     }
-#endif
 
-#if 0
     MTBDD LtoPrime = sylvan_map_empty();
     for (uint64_t l=0; l<L; l++) {
         LtoPrime = sylvan_map_add(LtoPrime, latches[l], latches[l]+1);
@@ -451,7 +444,7 @@ TASK_0(int, solve_game)
     for (uint64_t l = 0; l < aag.header.l; l++) {
         MTBDD nxt;
         if (aag.lookup[aag.l_next[l] / 2] == -1) {
-            nxt = sylvan_ithlevel(game.level_to_order[aag.l_next[l] / 2]);
+            nxt = sylvan_ithvar(game.level_to_order[aag.l_next[l] / 2]);
         } else {
             nxt = game.gates[aag.lookup[aag.l_next[l] / 2]];
         }
@@ -464,7 +457,7 @@ TASK_0(int, solve_game)
     MTBDD Unsafe;
     mtbdd_protect(&Unsafe);
     if (aag.lookup[aag.outputs[0] / 2] == -1) {
-        Unsafe = sylvan_ithlevel(aag.outputs[0] / 2);
+        Unsafe = sylvan_ithvar(aag.outputs[0] / 2);
     } else {
         Unsafe = game.gates[aag.lookup[aag.outputs[0] / 2]];
     }
@@ -512,52 +505,18 @@ TASK_0(int, solve_game)
 
 int main(int argc, char **argv)
 {
+    t_start = wctime();
     setlocale(LC_NUMERIC, "en_US.utf-8");
     parse_args(argc, argv);
-
-    t_start = wctime();
-
-    lace_start(workers, 0);
-
-    sylvan_set_limits(8LL * 1024 * 1024 * 1024, 1, 12);
-    sylvan_init_package();
-    sylvan_init_mtbdd();
-    sylvan_init_reorder();
-    sylvan_gc_enable();
-
-    sylvan_set_reorder_nodes_threshold(32);
-    sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit_sec(30);
-    sylvan_set_reorder_type(SYLVAN_REORDER_BOUNDED_SIFT);
-
-    // Set hooks for logging garbage collection & dynamic variable reordering
-    if (verbose) {
-//        sylvan_re_hook_prere(TASK(reordering_start));
-//        sylvan_re_hook_postre(TASK(reordering_end));
-//        sylvan_re_hook_progre(TASK(reordering_progress));
-//        sylvan_re_hook_termre(should_reordering_terminate);
-//        sylvan_gc_hook_pregc(TASK(gc_start));
-//        sylvan_gc_hook_postgc(TASK(gc_end));
-    }
-
     INFO("Model: %s\n", filename);
     if (filename == nullptr) {
         Abort("Invalid file name.\n");
     }
 
-    int fd = open(filename, O_RDONLY);
-
-    struct stat filestat{};
-    if (fstat(fd, &filestat) != 0) Abort("cannot stat file\n");
-
-    aag_buffer.size = filestat.st_size;
-    aag_buffer.content = (uint8_t *) mmap(nullptr, filestat.st_size, PROT_READ, MAP_SHARED, fd, 0);
-    if (aag_buffer.content == MAP_FAILED) Abort("mmap failed\n");
-    aag_buffer.pos = 0;
-
+    aag_buffer_open(&aag_buffer, filename, O_RDONLY);
     aag_file_read(&aag, &aag_buffer);
 
-    if (verbose) {
+    if (0) {
         INFO("----------header----------\n");
         INFO("# of variables            \t %lu\n", aag.header.m);
         INFO("# of inputs               \t %lu\n", aag.header.i);
@@ -571,6 +530,31 @@ int main(int argc, char **argv)
         INFO("--------------------------\n");
     }
 
+    lace_start(workers, 0);
+
+    // 1LL<<19: 8192 nodes (minimum)
+    // 1LL<<20: 16384 nodes
+    // 1LL<<21: 32768 nodes
+    // 1LL<<22: 65536 nodes
+    // 1LL<<23: 131072 nodes
+    // 1LL<<24: 262144 nodes
+    // 1LL<<25: 524288 nodes
+    sylvan_set_limits(1LL << 24, 1, 0);
+    sylvan_init_package();
+    sylvan_init_mtbdd();
+    sylvan_init_reorder();
+    sylvan_gc_disable();
+
+    sylvan_set_reorder_type(SYLVAN_REORDER_BOUNDED_SIFT);
+
+    // Set hooks for logging garbage collection & dynamic variable reordering
+    if (verbose) {
+//        sylvan_re_hook_prere(TASK(reordering_start));
+//        sylvan_re_hook_postre(TASK(reordering_end));
+        sylvan_gc_hook_pregc(TASK(gc_start));
+        sylvan_gc_hook_postgc(TASK(gc_end));
+    }
+
     int is_realizable = solve_game();
     if (is_realizable) {
         INFO("REALIZABLE\n");
@@ -581,6 +565,8 @@ int main(int argc, char **argv)
     // Report Sylvan statistics (if SYLVAN_STATS is set)
     if (verbose) sylvan_stats_report(stdout);
 
+    aag_buffer_close(&aag_buffer);
+    sylvan_quit();
     lace_stop();
 
     return 0;

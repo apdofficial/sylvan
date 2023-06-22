@@ -309,7 +309,7 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
                 // if idx equals 0, then the item was not in the hash table. return 0.
                 // for example it was never created, or already removed...
                 // if you use clear one on the same thing twice it goes wrong
-                return 0;
+                return -1;
             }
 
             _Atomic(uint64_t)* chain_ptr = dbs->table + 2 * idx + 1;

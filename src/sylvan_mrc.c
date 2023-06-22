@@ -41,7 +41,7 @@ void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_fetch_add(self->container + idx, val);
+    atomic_fetch_add_explicit(self->container + idx, val, memory_order_relaxed);
 }
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
@@ -85,12 +85,13 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes)
 
     mrc_nnodes_set(self, 2);
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(self->node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it, 2);
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(self->node_ids, &it);
+    roaring_move_uint32_iterator_equalorlarger(&it, 2);
 
-    while (it->has_value) {
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+    while (it.has_value) {
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         if (index == 0 || index == 1) continue;
         mrc_nnodes_add(self, 1);
 
@@ -115,14 +116,14 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes)
         }
     }
 
-    it = roaring_create_iterator(self->node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it, 2);
+    roaring_init_iterator(self->node_ids, &it);
+    roaring_move_uint32_iterator_equalorlarger(&it, 2);
 
     // set all nodes with ref == 0 to 1
     // every node nees to have at least 1 reference otherwise it will be garbage collected
-    while (it->has_value) {
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+    while (it.has_value) {
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         if (index == 0 || index == 1) continue;
         mtbddnode_t node = MTBDD_GETNODE(index);
         BDDVAR var = mtbddnode_getvariable(node);
@@ -189,7 +190,7 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_add(mrc_t *self, int val)
 {
-    atomic_fetch_add(&self->nnodes, val);
+    atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
 counter_t mrc_ext_ref_nodes_get(const mrc_t *self, size_t idx)
@@ -234,12 +235,14 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
     roaring_bitmap_t *tmp = roaring_bitmap_copy(self->node_ids);
-    roaring_uint32_iterator_t *it = roaring_create_iterator(tmp);
-    roaring_move_uint32_iterator_equalorlarger(it, 2);
 
-    while (it->has_value) {
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(tmp, &it);
+    roaring_move_uint32_iterator_equalorlarger(&it, 2);
+
+    while (it.has_value) {
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         if (mrc_is_node_dead(self, index)) {
             mrc_delete_node(self, index);
         }
@@ -269,12 +272,13 @@ VOID_TASK_IMPL_4(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
     }
 
     const size_t end = first + count;
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
-    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(node_ids, &it);
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
-    while (it->has_value && it->current_value < end) {
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+    while (it.has_value && it.current_value < end) {
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         if (mrc_is_node_dead(self, index)) {
             mrc_delete_node(self, index);
         }

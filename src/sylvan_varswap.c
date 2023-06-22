@@ -20,6 +20,9 @@ static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
 }
 
 #if !SYLVAN_USE_LINEAR_PROBING
+VOID_TASK_DECL_4(sylvan_varswap_p00, uint32_t, int32_t, roaring_bitmap_t*, _Atomic (reorder_result_t)*)
+
+
 /*!
    \brief Adjacent variable swap phase 0 (Chaining compatible)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
@@ -83,8 +86,17 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
+
     // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids);
+
+//    for (int i = 0; i < reorder_db->mrc.node_ids->high_low_container.size; ++i) {
+//        SPAWN(sylvan_varswap_p00, pos, i, reorder_db->mrc.node_ids, &result);
+//    }
+//    for (int i = 0; i < reorder_db->mrc.node_ids->high_low_container.size; ++i) {
+//        SYNC(sylvan_varswap_p00);
+//    }
+
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
@@ -94,7 +106,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     if (marked_count > 0) {
         // do the not so trivial cases (creates new nodes)
-        roaring_bitmap_t* tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
+        roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
         sylvan_varswap_p2(&result, tmp);
         if (sylvan_reorder_issuccess(result) == 0) {
             sylvan_varswap_p3(pos, &result, tmp);
@@ -119,6 +131,40 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 }
 
 #if !SYLVAN_USE_LINEAR_PROBING
+
+VOID_TASK_IMPL_4(sylvan_varswap_p00,
+                 uint32_t, var,
+                 int32_t, index,
+                 roaring_bitmap_t*, node_ids,
+                 _Atomic (reorder_result_t)*, result)
+{
+
+    (void) var;
+    (void) index;
+    (void) node_ids;
+    (void) result;
+//    roaring_uint32_iterator_t it;
+//    roaring_bitmap_iter
+//
+//    printf("container[%d] first: %d, last: %zu\n", index, it.current_value, end);
+//
+//    while (it.has_value && it.current_value < end) {
+//        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) {
+//            return; // fail fast
+//        }
+//        size_t idx = it.current_value;
+//        roaring_advance_uint32_iterator(&it);
+//        mtbddnode_t node = MTBDD_GETNODE(idx);
+//        if (mtbddnode_isleaf(node)) continue; // a leaf
+//        uint32_t nvar = mtbddnode_getvariable(node);
+//        if (nvar == var || nvar == (var + 1)) {
+//            if (llmsset_clear_one_hash(nodes, index) < 0) {
+//                atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
+//                return;
+//            }
+//        }
+//    }
+}
 /**
  * Implementation of the zero phase of variable swapping.
  * For all <var+1> nodes, make <var> and rehash.
@@ -132,8 +178,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
                  _Atomic (reorder_result_t)*, result,
                  roaring_bitmap_t*, node_ids)
 {
-    // divide and conquer (if count above BLOCKSIZE)
-    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets  (8 buckets == 1 worker region)
+    if (count > (NBITS_PER_BUCKET * 16)) {
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p0, var, first, split, result, node_ids);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids);
@@ -141,19 +186,20 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
         return;
     }
 
-    const size_t end = first + count;
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
-    roaring_move_uint32_iterator_equalorlarger(it, first);
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(node_ids, &it);
+    roaring_move_uint32_iterator_equalorlarger(&it, first);
 
-    while (it->has_value && it->current_value < end) {
+    const size_t end = first + count;
+    while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return; // fail fast
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            if (!llmsset_clear_one_hash(nodes, index)) {
+            if (llmsset_clear_one_hash(nodes, index) < 0) {
                 atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
                 return;
             }
@@ -181,7 +227,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             _Atomic (reorder_result_t)*, result,
             roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 8)) { // split per x buckets (8 buckets == 1 worker region)
+    if (count > (NBITS_PER_BUCKET * 16)) { // split per x buckets (8 buckets == 1 worker region)
         size_t split = count / 2;
         SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
         uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
@@ -194,13 +240,14 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
     const size_t end = first + count;
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
-    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return marked;
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(node_ids, &it);
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return marked;
 
-    while (it->has_value && it->current_value < end) {
+    while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
 
         mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) continue; // a leaf
@@ -276,6 +323,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             }
         }
     }
+
     return marked;
 }
 
@@ -297,7 +345,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
     // divide and conquer (if count above BLOCKSIZE)
-//    if (count > (NBITS_PER_BUCKET * 16 * 100000)) { // split per 16 buckets
+//    if (count > (NBITS_PER_BUCKET * 8)) { // split per 16 buckets
 //        size_t split = count / 2;
 //        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
 //        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
@@ -307,13 +355,14 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 
     const size_t end = first + count;
 
-    roaring_uint32_iterator_t *it = roaring_create_iterator(node_ids);
-    if (!roaring_move_uint32_iterator_equalorlarger(it, first)) return;
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(node_ids, &it);
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
-    while (it->has_value && it->current_value < end) {
+    while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
-        size_t index = it->current_value;
-        roaring_advance_uint32_iterator(it);
+        size_t index = it.current_value;
+        roaring_advance_uint32_iterator(&it);
         mtbddnode_t node = MTBDD_GETNODE(index);
         if (mtbddnode_isleaf(node)) continue; // a leaf
         if (!mtbddnode_getmark(node)) continue; // an unmarked node
@@ -366,9 +415,6 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
-                size_t used, total;
-                sylvan_table_usage(&used, &total);
-                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
                 return;
             }
@@ -376,10 +422,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
             newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
-                size_t used, total;
-                sylvan_table_usage(&used, &total);
-                printf("SYLVAN_REORDER_P2_CREATE_FAIL: %zu/%zu size\n", used, total);
-                atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
+                roaring_free_uint32_iterator(&it);
                 return;
             }
 
@@ -396,8 +439,8 @@ VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
         printf("\nRunning recovery after running out of memory...\n");
     }
 #if SYLVAN_USE_LINEAR_PROBING
-    // clear the entire table
-    llmsset_clear_hashes(nodes);
+        // clear the entire table
+        llmsset_clear_hashes(nodes);
 #else
     // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, result, node_ids);
