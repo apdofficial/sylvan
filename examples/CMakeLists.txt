@@ -24,6 +24,10 @@ add_example(nqueens nqueens.c)
 
 add_example(simple simple.cpp)
 
+add_example(aigsynt aigsynt.cpp)
+target_sources(aigsynt PRIVATE aag.h)
+
+
 # Check if we have Meddly
 find_library(MEDDLY_FOUND meddly)
 if(MEDDLY_FOUND)
