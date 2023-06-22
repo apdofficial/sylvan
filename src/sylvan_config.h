@@ -43,11 +43,15 @@
 #define SYLVAN_REORDER_MAX_VAR		    1000
 #define SYLVAN_REORDER_MAX_SWAPS	    10000
 #define SYLVAN_REORDER_GROWTH	        1.2f
-#define SYLVAN_REORDER_NODES_THRESHOLD	32
-#define SYLVAN_REORDER_TIME_LIMIT_MS	(1 * 15 * 1000)     // 15 seconds
-#define SYLVAN_REORDER_FIRST_REORDER	2000
+#define SYLVAN_REORDER_NODES_THRESHOLD	1
+#define SYLVAN_REORDER_TIME_LIMIT_MS	(10000 * 60 * 1000)
+#define SYLVAN_REORDER_SIZE_THRESHOLD	3000
 #define SYLVAN_REORDER_SIZE_RATIO	    2
-#define SYLVAN_REORDER_LIMIT	        20                  // maximum number of reordering calls allowed
+#define SYLVAN_REORDER_LIMIT	        20                              // maximum number of reordering calls allowed
+#define SYLVAN_REORDER_TYPE_DEFAULT     SYLVAN_REORDER_BOUNDED_SIFT
+#define SYLVAN_REORDER_PRINT_STAT       1
+#define SYLVAN_REORDER_MIN_MEM_REQ      (0.85f)
+
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
   *
@@ -56,4 +60,4 @@
   * too small is bad for the atomic operations, too large is bad for work-stealing
   * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
   */
-#define BLOCKSIZE 4096 //  4096
+#define BLOCKSIZE (NBITS_BUCKET * 8)

@@ -156,6 +156,32 @@ mtbdd_count_protected()
     return protect_count(&mtbdd_protected);
 }
 
+/* Called during dynamic variable reordering */
+VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
+{
+    uint64_t *it = refs_iter(&mtbdd_refs, 0, mtbdd_refs.refs_size);
+    while (it != NULL) {
+        MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
+        size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
+        uint64_t mask = BIT_MASK(index);
+        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    }
+}
+
+/* Called during dynamic variable reordering */
+VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
+{
+    uint64_t *it = protect_iter(&mtbdd_protected, 0, mtbdd_protected.refs_size);
+    while (it != NULL) {
+        BDD *dd = (BDD*)protect_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
+        size_t index = (*dd & SYLVAN_TABLE_MASK_INDEX);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
+        uint64_t mask = BIT_MASK(index);
+        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    }
+}
+
 /* Called during garbage collection */
 VOID_TASK_0(mtbdd_gc_mark_external_refs)
 {
@@ -185,6 +211,8 @@ VOID_TASK_0(mtbdd_gc_mark_protected)
         SYNC(mtbdd_gc_mark_rec);
     }
 }
+
+
 
 /* Infrastructure for internal markings */
 typedef struct mtbdd_refs_task
@@ -393,9 +421,6 @@ mtbdd_quit()
         protect_free(&mtbdd_protected);
         mtbdd_protected_created = 0;
     }
-
-    mtbdd_levels_free(levels);
-
     mtbdd_initialized = 0;
 }
 
@@ -416,8 +441,6 @@ sylvan_init_mtbdd()
         protect_create(&mtbdd_protected, 4096);
         mtbdd_protected_created = 1;
     }
-
-    levels = mtbdd_levels_create();
 
     RUN(mtbdd_refs_init);
 }
@@ -470,7 +493,7 @@ _mtbdd_makenode_exit(void)
 }
 
 MTBDD
-_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
     // Normalization to keep canonicity
     // low will have no mark
@@ -481,9 +504,11 @@ _mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
     struct mtbddnode n;
     mtbddnode_makenode(&n, var, low, high);
 
-    int created;
-    uint64_t index = llmsset_lookup(nodes, n.a, n.b, &created);
-    if (index == 0) return mtbdd_invalid;
+    uint64_t index = llmsset_lookup(nodes, n.a, n.b, created);
+    if (index == 0) {
+        return mtbdd_invalid;
+    }
+
 
     if (created) sylvan_stats_count(BDD_NODES_CREATED);
     else sylvan_stats_count(BDD_NODES_REUSED);
@@ -525,18 +550,18 @@ _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
  * Instead, returns mtbdd_invalid if we can't create the node.
  */
 MTBDD
-mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high)
+mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
     struct mtbddnode n;
     uint64_t index;
-    int created;
+    created = 0;
 
     // in an MTBDDMAP, the low edges eventually lead to 0 and cannot have a low mark
     assert(!MTBDD_HASMARK(low));
 
     mtbddnode_makemapnode(&n, var, low, high);
 
-    index = llmsset_lookup(nodes, n.a, n.b, &created);
+    index = llmsset_lookup(nodes, n.a, n.b, created);
     if (index == 0) return mtbdd_invalid;
 
     if (created) sylvan_stats_count(BDD_NODES_CREATED);
@@ -579,7 +604,11 @@ mtbdd_makemapnode(uint32_t var, MTBDD low, MTBDD high)
 MTBDD
 mtbdd_ithvar(uint32_t var)
 {
-    return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    if (reorder_db != NULL && reorder_db->is_initialised){
+        return levels_ithlevel(&reorder_db->levels, var);
+    } else {
+        return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    }
 }
 
 /* Operations */

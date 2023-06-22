@@ -78,7 +78,7 @@ TASK_0(int, test_rordering)
     }
 
     size_t not_optimal_order_size = bdd.NodeCount();
-    Sylvan::reduceHeap();
+    Sylvan::reduceHeap(SYLVAN_REORDER_SIFT);
     size_t not_optimal_order_reordered_size = bdd.NodeCount();
 
     std::vector<uint32_t> perm = { 0, 1, 2, 3, 4, 5 };
@@ -120,7 +120,7 @@ TASK_0(int, runtests)
 int main()
 {
     // Standard Lace initialization with 4 workers
-    lace_start(4, 0);
+    lace_start(1, 0);
 
     // Simple Sylvan initialization, also initialize BDD support
     Sylvan::initPackage(1LL<<16, 1LL<<16, 1LL<<16, 1LL<<16);

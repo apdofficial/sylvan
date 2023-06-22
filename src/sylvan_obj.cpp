@@ -433,36 +433,6 @@ Bdd::bddVar(uint32_t index)
 }
 
 Bdd
-Bdd::newLevel()
-{
-    return sylvan_newlevel();
-}
-
-int
-Bdd::newLevels(size_t amount)
-{
-    return sylvan_newlevels(amount);
-}
-
-void
-Bdd::resetLevels()
-{
-    sylvan_resetlevels();
-}
-
-Bdd
-Bdd::bddLevel(uint32_t index)
-{
-    return sylvan_level_to_order(index);
-}
-
-uint32_t
-bddVarToLevel(uint32_t index)
-{
-    return sylvan_order_to_level(index);
-}
-
-Bdd
 Bdd::bddCube(const BddSet &variables, uint8_t *values)
 {
     return sylvan_cube(variables.set.bdd, values);
@@ -610,36 +580,6 @@ Mtbdd
 Mtbdd::mtbddVar(uint32_t variable)
 {
     return mtbdd_makenode(variable, mtbdd_false, mtbdd_true);
-}
-
-Mtbdd
-Mtbdd::newLevel()
-{
-    return sylvan_newlevel();
-}
-
-int
-Mtbdd::newLevels(size_t amount)
-{
-    return sylvan_newlevels(amount);
-}
-
-void
-Mtbdd::resetLevels()
-{
-    sylvan_resetlevels();
-}
-
-Mtbdd
-Mtbdd::mtbddLevel(uint32_t index)
-{
-    return sylvan_ithlevel(index);
-}
-
-uint32_t
-Mtbdd::bddVarToLevel(uint32_t index)
-{
-    return sylvan_order_to_level(index);
 }
 
 Mtbdd
@@ -1093,24 +1033,12 @@ void Sylvan::setReorderTimeLimit(double time_limit)
     sylvan_set_reorder_timelimit_ms(time_limit);
 }
 
-void Sylvan::reduceHeap()
+void Sylvan::reduceHeap(reordering_type_t type)
 {
-    return sylvan_reduce_heap();
+    return sylvan_reduce_heap(type);
 }
 
 reorder_result_t Sylvan::reorderPerm(const std::vector<uint32_t> &perm)
 {
     return sylvan_reorder_perm(perm.data());
 }
-
-reorder_config_t Sylvan::getReorderConfig()
-{
-    return sylvan_get_reorder_config();
-}
-
-
-uint32_t Sylvan::getLevelsCount()
-{
-    return sylvan_levelscount();
-}
-

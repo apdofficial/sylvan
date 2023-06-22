@@ -23,8 +23,6 @@
 
 #include <lace.h>
 #include <sylvan.h>
-#include "sylvan_varswap.h"
-#include "sylvan_reorder.h"
 
 namespace sylvan
 {
@@ -1086,7 +1084,7 @@ namespace sylvan
             <li> Repeat 2 and 3 for all variables in given range.
             </ol>
         */
-        static void reduceHeap();
+        static void reduceHeap(reordering_type_t type);
 
         /**
           @brief Reorder the variables in the BDDs according to the given permutation.
@@ -1097,8 +1095,6 @@ namespace sylvan
           currently in use and and should be less or equal to the number of levels.
          */
         static reorder_result_t reorderPerm(const std::vector <uint32_t> &perm);
-
-        static reorder_config_t getReorderConfig();
 
         /**
          * @brief Get the number of created levels

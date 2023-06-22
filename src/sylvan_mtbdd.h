@@ -43,6 +43,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+//#include <sylvan_bitmap.h>
+
 /**
  * An MTBDD is a 64-bit value. The low 40 bits are an index into the unique table.
  * The highest 1 bit is the complement edge, indicating negation.
@@ -131,13 +133,8 @@ static const MTBDD sylvan_invalid    = 0xffffffffffffffffLL;
 #define sylvan_printsha         mtbdd_printsha
 #define sylvan_fprintsha        mtbdd_fprintsha
 #define sylvan_getsha           mtbdd_getsha
-#define sylvan_newlevel         mtbdd_newlevel
-#define sylvan_newlevels        mtbdd_newlevels
-#define sylvan_levelscount      mtbdd_levelscount
-#define sylvan_resetlevels      mtbdd_resetlevels
-#define sylvan_ithlevel         mtbdd_ithlevel
-#define sylvan_level_to_order   mtbdd_level_to_order
-#define sylvan_order_to_level   mtbdd_order_to_level
+#define sylvan_level_to_order(x)   levels_level_to_order(&reorder_db->levels, x)
+#define sylvan_order_to_level(x)   levels_order_to_level(&reorder_db->levels, x)
 /**
  * Initialize MTBDD functionality.
  * This initializes internal and external referencing datastructures,
@@ -168,10 +165,11 @@ static inline MTBDD mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
   * <var> is a 24-bit integer.
   * Please note that this does NOT check variable ordering!
  */
- MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high);
-static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
+ MTBDD _mtbdd_varswap_makenode(uint32_t var, MTBDD low, MTBDD high, int* created);
+static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
 {
-    return low == high ? low : _mtbdd_varswap_makenode(var, low, high);
+    *created = 0;
+    return low == high ? low : _mtbdd_varswap_makenode(var, low, high, created);
 }
 
 /**
@@ -180,7 +178,7 @@ static inline MTBDD mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high)
  * <var> is a 24-bit integer.
  * Please note that this does NOT check variable ordering!
  */
-MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high);
+MTBDD mtbdd_varswap_makemapnode(uint32_t var, MTBDD low, MTBDD high, int* created);
 
 
 /**
@@ -1073,6 +1071,14 @@ MTBDDMAP mtbdd_map_removeall(MTBDDMAP map, MTBDD variables);
  */
 VOID_TASK_DECL_1(mtbdd_gc_mark_rec, MTBDD);
 #define mtbdd_gc_mark_rec(mtbdd) RUN(mtbdd_gc_mark_rec, mtbdd)
+
+
+VOID_TASK_DECL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*);
+#define mtbdd_re_mark_external_refs(bitmap) RUN(mtbdd_re_mark_external_refs, bitmap)
+
+VOID_TASK_DECL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*);
+#define mtbdd_re_mark_protected(bitmap) RUN(mtbdd_re_mark_protected, bitmap)
+
 
 /**
  * Infrastructure for external references using a hash table.

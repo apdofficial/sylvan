@@ -1,9 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "sylvan.h"
 #include "sylvan_int.h"
-#include "sylvan_interact.h"
 
 __thread uint64_t seed = 1;
 

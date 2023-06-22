@@ -25,7 +25,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h> // for FILE
+#include <stdio.h>  // for FILE
 #include <stdlib.h> // for realloc
 #include <unistd.h>
 #include <pthread.h>
@@ -42,6 +42,7 @@
  * Sylvan header files outside the namespace
  */
 
+#include <roaring.h>
 #include <lace.h>
 #include <sylvan_tls.h>
 
@@ -52,15 +53,14 @@ namespace sylvan {
 /**
  * Sylvan header files inside the namespace
  */
-
 #include <sylvan_common.h>
 #include <sylvan_stats.h>
 #include <sylvan_mt.h>
+#include <sylvan_levels.h>
 #include <sylvan_mtbdd.h>
 #include <sylvan_bdd.h>
 #include <sylvan_ldd.h>
 #include <sylvan_zdd.h>
-#include <sylvan_levels.h>
 #include <sylvan_reorder.h>
 
 #ifdef __cplusplus

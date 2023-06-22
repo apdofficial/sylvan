@@ -2,7 +2,7 @@
  * Written by Josh Dybnis and released to the public domain, as explained at
  * http://creativecommons.org/licenses/publicdomain
  *
- * A platform independant wrapper around thread-local storage. On platforms that don't support
+ * A platform independent wrapper around thread-local storage. On platforms that don't support
  * __thread variables (e.g. Mac OS X), we have to use the pthreads library for thread-local storage
  */
 
@@ -24,7 +24,7 @@
         if (pthread_key_create(&name##_KEY, NULL) != 0) { assert(0); } \
     } while (0)
 
-#define SET_THREAD_LOCAL(name, value) pthread_setspecific(name##_KEY, (void *)(size_t)value);
+#define SET_THREAD_LOCAL(name, value) pthread_setspecific(name##_KEY, (void *)(size_t)(value));
 
 #define LOCALIZE_THREAD_LOCAL(name, type) type name = (type)(size_t)pthread_getspecific(name##_KEY)
 

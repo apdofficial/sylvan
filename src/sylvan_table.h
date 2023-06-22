@@ -75,11 +75,7 @@ typedef struct llmsset
 static inline void*
 llmsset_index_to_ptr(const llmsset_t dbs, size_t index)
 {
-#if SYLVAN_USE_LINEAR_PROBING
     return dbs->data + index * 16;
-#else
-    return dbs->data + index * 24 + 8;
-#endif
 }
 
 /**
@@ -189,10 +185,17 @@ TASK_DECL_1(int, llmsset_rehash, llmsset_t);
 int llmsset_rehash_bucket(const llmsset_t dbs, uint64_t d_idx);
 
 #if !SYLVAN_USE_LINEAR_PROBING
+VOID_TASK_DECL_0(llmsset_reset_all_regions)
+#define llmsset_reset_all_regions() RUN(llmsset_reset_all_regions)
 /**
- * Remove a single BDD from the table
+ * Clear a single bucket (hash part).
  */
-int llmsset_clear_one(const llmsset_t dbs, uint64_t index);
+int llmsset_clear_one_hash(llmsset_t dbs, uint64_t index);
+
+/**
+ * Clear a single bucket (data part).
+ */
+void llmsset_clear_one_data(llmsset_t dbs, uint64_t index);
 #endif
 
 /**
@@ -218,26 +221,6 @@ void llmsset_set_custom(const llmsset_t dbs, llmsset_hash_cb hash_cb, llmsset_eq
  */
 #define llmsset_hash sylvan_tabhash16
 #define llmsset_fnvhash sylvan_fnvhash16
-
-
-/**
- * Efficient nodes iterator implemented using bitmaps and using GCC built-in bit counting functions. (thread-safe)
- */
-
-/**
- * The terminal index used to stop the iteration.
- */
-#define llmsset_nindex npos
-
-/**
- * Index to the first node in the hash table.
- */
-#define llmsset_first() bitmap_atomic_first(nodes->bitmap2, nodes->table_size)
-
-/**
- * Index to the next node index relative to the provided node index.
- */
-#define llmsset_next(index) bitmap_atomic_next(nodes->bitmap2, nodes->table_size, index)
 
 #ifdef __cplusplus
 }

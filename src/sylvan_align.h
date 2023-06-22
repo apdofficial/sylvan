@@ -40,7 +40,7 @@ alloc_aligned(size_t size)
     size = (size + LINE_SIZE - 1) & (~(LINE_SIZE - 1));
     void* res;
 #if SYLVAN_USE_MMAP
-    res = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    res = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | 0x1000, -1, 0);
     if (res == MAP_FAILED) return 0;
 #else
 #if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
@@ -79,7 +79,7 @@ clear_aligned(void* ptr, size_t size)
     size = (size + LINE_SIZE - 1) & (~(LINE_SIZE - 1));
 #if SYLVAN_USE_MMAP
     // this is a trick to use mmap to try and reassign fresh zero'ed pages to the region
-    void* res = mmap(ptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    void* res = mmap(ptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | 0x1000 | MAP_FIXED, -1, 0);
     if (res == MAP_FAILED) memset(ptr, 0, size);
 #else
     memset(ptr, 0, size);

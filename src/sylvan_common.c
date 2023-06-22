@@ -16,7 +16,6 @@
  */
 
 #include <sylvan_int.h>
-#include <sylvan_levels.h>
 
 /**
  * Implementation of garbage collection
@@ -264,9 +263,9 @@ VOID_TASK_IMPL_0(sylvan_gc)
 }
 
 /**
- * The levels table usd with dynamic variable reordering.
+ * The reorder table used with dynamic variable reordering.
  */
-levels_t levels;
+reorder_db_t reorder_db;
 
 /**
  * The unique table

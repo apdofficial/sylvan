@@ -16,12 +16,16 @@ target_sources(sylvan
             sylvan_sl.c
             sylvan_stats.c
             sylvan_zdd.c
+
+            roaring.c
+            libpopcnt.h
+            sylvan_bitmap.c
+            sylvan_mrc.c
+        sylvan_reorder_int.c
             sylvan_varswap.c
             sylvan_levels.c
             sylvan_reorder.c
             sylvan_interact.c
-        sylvan_bitmap.c
-            libpopcnt.h
         PUBLIC
             sylvan.h
             sylvan_bdd.h
@@ -40,12 +44,16 @@ target_sources(sylvan
             sylvan_tls.h
             sylvan_zdd.h
             sylvan_zdd_int.h
+            sylvan_table.h
+            roaring.c
+
+            sylvan_bitmap.h
+            sylvan_mrc.h
+        sylvan_reorder_int.h
             sylvan_varswap.h
             sylvan_levels.h
             sylvan_reorder.h
-            sylvan_table.h
             sylvan_interact.h
-        sylvan_bitmap.h
         )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
@@ -89,3 +97,5 @@ if (SYLVAN_USE_LINEAR_PROBING)
 else ()
     target_sources(sylvan PRIVATE sylvan_table_chaining.c)
 endif ()
+
+
