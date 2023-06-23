@@ -18,6 +18,7 @@
 
 #include <sys/time.h>
 #include <stdatomic.h>
+#include "sylvan_align.h"
 
 #define STATS 0 // useful information w.r.t. dynamic reordering for debugging
 #define INFO 1  // useful information w.r.t. dynamic reordering
@@ -416,7 +417,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         if (i > 1) exit(1);
 #endif
         roaring_bitmap_run_optimize(reorder_db->mrc.node_ids);
-
+        CALL(llmsset_reset_all_regions);
         continue;
 
         siftingFailed:
