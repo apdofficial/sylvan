@@ -128,7 +128,8 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int* created
  */
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id);
 
-void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs);
+#define mrc_collect_node_ids(...) CALL(mrc_collect_node_ids, __VA_ARGS__)
+VOID_TASK_DECL_2(mrc_collect_node_ids, mrc_t*, llmsset_t)
 
 
 #ifdef __cplusplus

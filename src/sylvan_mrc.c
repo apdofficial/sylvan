@@ -5,7 +5,7 @@
 
 VOID_TASK_DECL_5(mrc_gc_par, mrc_t*, roaring_bitmap_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
-TASK_DECL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*)
+VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*, roaring_bitmap_t*)
 
 /**
  * Atomic counters
@@ -257,7 +257,7 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
         roaring_advance_uint32_iterator(&it);
     }
 
-    // calling bitmap remove per each node is more expensive than calling it once with all the ids
+    // calling bitmap remove per each node is more expensive than calling it once with many ids
     // thus, we group the ids into <arr> and let the bitmap delete them in one go
     roaring_uint32_iterator_t it_old;
     roaring_init_iterator(&old_ids, &it_old);
@@ -317,27 +317,30 @@ void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
 #endif
 }
 
-void mrc_collect_node_ids(mrc_t *self, llmsset_t dbs)
+VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
 {
     atomic_bitmap_t bitmap = {
             .container = dbs->bitmap2,
             .size = dbs->table_size
     };
-    roaring_bitmap_free(self->node_ids);
-    self->node_ids = RUN(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap);
+    roaring_bitmap_clear(self->node_ids);
+    CALL(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap, self->node_ids);
 }
 
-TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap)
+VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap, roaring_bitmap_t *, collected_ids)
 {
     if (count > NBITS_PER_BUCKET * 8) {
         size_t split = count / 2;
-        SPAWN(mrc_collect_node_ids_par, first, split, bitmap);
-        roaring_bitmap_t *a = CALL(mrc_collect_node_ids_par, first + split, count - split, bitmap);
-        roaring_bitmap_t *b = SYNC(mrc_collect_node_ids_par);
-        roaring_bitmap_t *res = roaring_bitmap_or(a, b);
-        roaring_bitmap_free(a);
-        roaring_bitmap_free(b);
-        return res;
+        roaring_bitmap_t a;
+        roaring_bitmap_init_cleared(&a);
+        SPAWN(mrc_collect_node_ids_par, first, split, bitmap, &a);
+        roaring_bitmap_t b;
+        roaring_bitmap_init_cleared(&b);
+        CALL(mrc_collect_node_ids_par, first + split, count - split, bitmap, &b);
+        roaring_bitmap_or_inplace(collected_ids, &b);
+        SYNC(mrc_collect_node_ids_par);
+        roaring_bitmap_or_inplace(collected_ids, &a);
+        return;
     }
 
     // skip buckets 0 and 1
@@ -347,12 +350,9 @@ TASK_IMPL_3(roaring_bitmap_t*, mrc_collect_node_ids_par, uint64_t, first, uint64
     }
 
     const size_t end = first + count;
-    roaring_bitmap_t *tmp = roaring_bitmap_create();
-
     for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
-        roaring_bitmap_add(tmp, first);
+        roaring_bitmap_add(collected_ids, first);
     }
-    return tmp;
 }
 
 MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
