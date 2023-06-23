@@ -37,15 +37,15 @@ VOID_TASK_DECL_5(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_r
 */
 VOID_TASK_DECL_6(sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*, roaring_bitmap_t*)
 
-#define sylvan_varswap_p1(pos, result, node_ids, p2) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, node_ids, p2)
+#define sylvan_varswap_p1(pos, result, ids, p2) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, ids, p2)
 
 /*!
    @brief Adjacent variable swap phase 2
    @details Handle the not so trivial cases. (creates new nodes)
 */
-VOID_TASK_DECL_4(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
+VOID_TASK_DECL_5(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*, roaring_bitmap_t*)
 
-#define sylvan_varswap_p2(result, node_ids) CALL(sylvan_varswap_p2, 0, nodes->table_size, result, node_ids)
+#define sylvan_varswap_p2(result, ids, p2) CALL(sylvan_varswap_p2, 0, nodes->table_size, result, ids, p2)
 
 /*!
    @brief Adjacent variable swap phase 3
@@ -79,27 +79,25 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
 //    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) { }
 
+    /// Phase 0: clear hashes of nodes with <var> and <var+1> or all nodes if linear probing is used
 #if SYLVAN_USE_LINEAR_PROBING
-    // clear the entire table
     llmsset_clear_hashes(nodes);
 #else
-
-    // clear hashes of nodes with <var> and <var+1>
     sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids);
-
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
+    /// Phase 1: handle all trivial cases where no node is created, add cases that are not trivial to <p2_ids>
     roaring_bitmap_t p2_ids;
     roaring_bitmap_init_cleared(&p2_ids);
-    // handle all trivial cases, mark cases that are not trivial (no nodes are created)
     sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids, &p2_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
     if (roaring_bitmap_get_cardinality(&p2_ids) > 0) {
-        // do the not so trivial cases (creates new nodes)
-        sylvan_varswap_p2(&result, &p2_ids);
+        /// Phase 2: handle the not so trivial cases (creates new nodes)
+        sylvan_varswap_p2(&result, &p2_ids, reorder_db->mrc.node_ids);
         if (sylvan_reorder_issuccess(result) == 0) {
+            /// Phase 3: recovery
             sylvan_varswap_p3(pos, &result, reorder_db->mrc.node_ids);
         }
     }
@@ -304,26 +302,37 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
  * Returns 0 if there was no error, or 1 if nodes could not be
  * rehashed, or 2 if nodes could not be created, or 3 if both.
  */
-VOID_TASK_IMPL_4(sylvan_varswap_p2,
+VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  size_t, first,
                  size_t, count,
                  _Atomic (reorder_result_t)*, result,
+                 roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
-//    if (count > (NBITS_PER_BUCKET * 8)) { // split per 16 buckets
+    // atm, llmsset_look_up seems to have a bug with multiple workers
+    // so run this only in 1 task
+//    if (count > (NBITS_PER_BUCKET)) {
 //        size_t split = count / 2;
-//        SPAWN(sylvan_varswap_p2, first, split, result, node_ids);
-//        CALL(sylvan_varswap_p2, first + split, count - split, result, node_ids);
+//        // standard reduction pattern with local roaring bitmaps collecting new node indices
+//        roaring_bitmap_t a;
+//        roaring_bitmap_init_cleared(&a);
+//        SPAWN(sylvan_varswap_p2, first, split, result, p2_ids, &a);
+//        roaring_bitmap_t b;
+//        roaring_bitmap_init_cleared(&b);
+//        CALL(sylvan_varswap_p2, first + split, count - split, result, p2_ids, &b);
+//        roaring_bitmap_or_inplace(node_ids, &b);
 //        SYNC(sylvan_varswap_p2);
+//        roaring_bitmap_or_inplace(node_ids, &a);
 //        return;
 //    }
 
     // standard reduction pattern with local roaring bitmap collecting new node indices
-    roaring_bitmap_t new_ids;
-    roaring_bitmap_init_cleared(&new_ids);
+
+    roaring_bitmap_t local_new_ids;
+    roaring_bitmap_init_cleared(&local_new_ids);
 
     roaring_uint32_iterator_t it;
-    roaring_init_iterator(node_ids, &it);
+    roaring_init_iterator(p2_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
     const size_t end = first + count;
@@ -354,7 +363,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 return;
             }
             if (created){
-                roaring_bitmap_add(&new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(&local_new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);
@@ -390,7 +399,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 return;
             }
             if (created1){
-                roaring_bitmap_add(&new_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(&local_new_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
@@ -400,7 +409,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
                 return;
             }
             if (created0){
-                roaring_bitmap_add(&new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(&local_new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             // update node, which also removes the mark
@@ -408,8 +417,7 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
             llmsset_rehash_bucket(nodes, index);
         }
     }
-
-    roaring_bitmap_or_inplace(reorder_db->mrc.node_ids, &new_ids);
+    roaring_bitmap_or_inplace(node_ids, &local_new_ids);
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
@@ -432,7 +440,7 @@ VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
     if (roaring_bitmap_get_cardinality(&p2_ids) > 0 && sylvan_reorder_issuccess(*result)) {
         // do the not so trivial cases (but won't create new nodes this time)
-        sylvan_varswap_p2(result, &p2_ids);
+        sylvan_varswap_p2(result, &p2_ids, reorder_db->mrc.node_ids);
         if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
     }
 }
