@@ -238,7 +238,7 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
 #if !SYLVAN_USE_LINEAR_PROBING
-    SPAWN(llmsset_reset_all_regions);
+//    SPAWN(llmsset_reset_all_regions);
 #endif
 
     roaring_bitmap_t old_ids;
@@ -280,7 +280,7 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     // this would generally result in occupying half of the buckets in the table since
     // all bucket would be owned by some thread but mrc_delete_node with chaining
     // would silently delete individual entries.
-    SYNC(llmsset_reset_all_regions);
+//    SYNC(llmsset_reset_all_regions);
 #endif
 
 }
