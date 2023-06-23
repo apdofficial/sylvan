@@ -244,8 +244,21 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     roaring_bitmap_t old_ids;
     roaring_bitmap_init_cleared(&old_ids);
 
-    RUN(mrc_gc_par, self, self->node_ids, 0, nodes->table_size, &old_ids);
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(self->node_ids, &it);
 
+    // we visit childrens of every node if they become dead
+    // there might be up to 7 atomic writes and 4 atomic reads for every node deletion
+    // for now it seems to be the limiting factor when it is parallelized, thus mrc_delete_node is invoked sequentially
+    while (it.has_value && it.current_value < nodes->table_size) {
+        if (mrc_is_node_dead(self, it.current_value)) {
+            mrc_delete_node(self, it.current_value, &old_ids);
+        }
+        roaring_advance_uint32_iterator(&it);
+    }
+
+    // calling bitmap remove per each node is more expensive than calling it once with all the ids
+    // thus, we group the ids into <arr> and let the bitmap delete them in one go
     roaring_uint32_iterator_t it_old;
     roaring_init_iterator(&old_ids, &it_old);
     size_t size = roaring_bitmap_get_cardinality(&old_ids);
@@ -270,38 +283,6 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     SYNC(llmsset_reset_all_regions);
 #endif
 
-}
-
-VOID_TASK_IMPL_5(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count,
-                 roaring_bitmap_t*, old_ids)
-{
-//    if (count > NBITS_PER_BUCKET * 100) {
-//        // standard reduction pattern with local roaring bitmaps collecting old node indices
-//        roaring_bitmap_t a;
-//        roaring_bitmap_init_cleared(&a);
-//        size_t split = count / 2;
-//        SPAWN(mrc_gc_par, self, node_ids, first, split, &a);
-//        roaring_bitmap_t b;
-//        roaring_bitmap_init_cleared(&b);
-//        CALL(mrc_gc_par, self, node_ids, first + split, count - split, &b);
-//        roaring_bitmap_or_inplace(old_ids, &b);
-//        SYNC(mrc_gc_par);
-//        roaring_bitmap_or_inplace(old_ids, &a);
-//        return ;
-//    }
-
-    roaring_uint32_iterator_t it;
-    roaring_init_iterator(node_ids, &it);
-    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
-
-    const size_t end = first + count;
-    while (it.has_value && it.current_value < end) {
-        size_t index = it.current_value;
-        roaring_advance_uint32_iterator(&it);
-        if (mrc_is_node_dead(self, index)) {
-            mrc_delete_node(self, index, old_ids);
-        }
-    }
 }
 
 void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
