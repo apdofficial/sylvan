@@ -35,9 +35,9 @@ VOID_TASK_DECL_5(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_r
    @details Handle all trivial cases where no node is created, mark cases that are not trivial.
    @return number of nodes that were marked
 */
-TASK_DECL_5(size_t, sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
+VOID_TASK_DECL_6(sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*, roaring_bitmap_t*)
 
-#define sylvan_varswap_p1(pos, result, node_ids) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, node_ids)
+#define sylvan_varswap_p1(pos, result, node_ids, p2) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, node_ids, p2)
 
 /*!
    @brief Adjacent variable swap phase 2
@@ -90,18 +90,18 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 #endif
 
+    roaring_bitmap_t p2_ids;
+    roaring_bitmap_init_cleared(&p2_ids);
     // handle all trivial cases, mark cases that are not trivial (no nodes are created)
-    size_t marked_count = sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids);
+    sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids, &p2_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
 
-    if (marked_count > 0) {
+    if (roaring_bitmap_get_cardinality(&p2_ids) > 0) {
         // do the not so trivial cases (creates new nodes)
-        roaring_bitmap_t *tmp = roaring_bitmap_copy(reorder_db->mrc.node_ids);
-        sylvan_varswap_p2(&result, tmp);
+        sylvan_varswap_p2(&result, &p2_ids);
         if (sylvan_reorder_issuccess(result) == 0) {
-            sylvan_varswap_p3(pos, &result, tmp);
+            sylvan_varswap_p3(pos, &result, reorder_db->mrc.node_ids);
         }
-        roaring_bitmap_free(tmp);
     }
 
     // collect garbage (dead nodes)
@@ -176,28 +176,32 @@ VOID_TASK_IMPL_5(sylvan_varswap_p0,
  * phase, except marked <var> nodes are unmarked. If the recovery flag is set, then only <var+1>
  * nodes are rehashed.
  */
-TASK_IMPL_5(size_t, sylvan_varswap_p1,
+VOID_TASK_IMPL_6(sylvan_varswap_p1,
             uint32_t, var,
             size_t, first,
             size_t, count,
             _Atomic (reorder_result_t)*, result,
-            roaring_bitmap_t*, node_ids)
+            roaring_bitmap_t*, node_ids,
+            roaring_bitmap_t*, p2_ids)
 {
     if (count > (NBITS_PER_BUCKET * 8)) {
         size_t split = count / 2;
-        SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids);
-        uint64_t res1 = CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids);
-        uint64_t res2 = SYNC(sylvan_varswap_p1);
-        return res1 + res2;
+        roaring_bitmap_t a;
+        roaring_bitmap_init_cleared(&a);
+        SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids, &a);
+        roaring_bitmap_t b;
+        roaring_bitmap_init_cleared(&b);
+        CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids, &b);
+        roaring_bitmap_or_inplace(p2_ids, &b);
+        SYNC(sylvan_varswap_p1);
+        roaring_bitmap_or_inplace(p2_ids, &a);
+        return;
     }
-
-    // count number of marked
-    size_t marked = 0;
 
     // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
-    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return marked;
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
     // standard reduction pattern with local variables to avoid hotspots
     int var_diff = 0;
@@ -205,7 +209,10 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
-        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return marked; // fail fast
+        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) {
+            return; // fail fast
+        }
+
         size_t index = it.current_value;
         roaring_advance_uint32_iterator(&it);
 
@@ -220,22 +227,20 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
             mtbddnode_setvariable(node, var);
             if (llmsset_rehash_bucket(nodes, index) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
-                return marked;
+                return;
             }
             continue;
         } else if (nvar != var) {
             continue; // not <var> or <var+1>
         }
 
-        // level = <var>
         if (mtbddnode_getmark(node)) {
-            // marked node, remove mark and rehash (we are apparently recovering)
-            mtbddnode_setmark(node, 0);
+            // (we are apparently recovering)
             var_diff--;
             var_plus_one_diff++;
             if (llmsset_rehash_bucket(nodes, index) != 1) {
                 atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL_MARKED);
-                return marked;
+                return;
             }
             continue;
         }
@@ -249,7 +254,7 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, index) != 1) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
-                    return marked;
+                    return;
                 }
             } else {
                 // not the end of a chain, so f0 is the next in chain
@@ -261,26 +266,24 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
                     mtbddnode_setvariable(node, var + 1);
                     if (llmsset_rehash_bucket(nodes, index) != 1) {
                         atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
-                        return marked;
+                        return;
                     }
                 } else {
-                    // mark for phase 2
-                    mtbddnode_setmark(node, 1);
-                    marked++;
+                    // add for phase 2
+                    roaring_bitmap_add(p2_ids, index);
                 }
             }
         } else {
             if (is_node_dependent_on(node, var)) {
-                // mark for phase 2
-                mtbddnode_setmark(node, 1);
-                marked++;
+                // add for phase 2
+                roaring_bitmap_add(p2_ids, index);
             } else {
                 var_plus_one_diff++;
                 var_diff--;
                 mtbddnode_setvariable(node, var + 1);
                 if (llmsset_rehash_bucket(nodes, index) != 1) {
                     atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL);
-                    return marked;
+                    return;
                 }
             }
         }
@@ -288,8 +291,6 @@ TASK_IMPL_5(size_t, sylvan_varswap_p1,
 
     if (var_diff != 0) mrc_var_nnodes_add(&reorder_db->mrc, var, var_diff);
     if (var_plus_one_diff != 0) mrc_var_nnodes_add(&reorder_db->mrc, var + 1, var_plus_one_diff);
-
-    return marked;
 }
 
 /**
@@ -327,12 +328,12 @@ VOID_TASK_IMPL_4(sylvan_varswap_p2,
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
-        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) return;  // fail fast
+        if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) {
+            return;  // fail fast
+        }
         size_t index = it.current_value;
         roaring_advance_uint32_iterator(&it);
         mtbddnode_t node = MTBDD_GETNODE(index);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
-        if (!mtbddnode_getmark(node)) continue; // an unmarked node
 
         BDDVAR var = mtbddnode_getvariable(node);
         if (mtbddnode_ismapnode(node)) {
@@ -424,12 +425,14 @@ VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, 
     sylvan_varswap_p0(pos, result, node_ids);
     if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
 #endif
+    roaring_bitmap_t p2_ids;
+    roaring_bitmap_init_cleared(&p2_ids);
     // at this point we already have nodes marked from P2 so we will unmark them now in P1
-    size_t marked_count = sylvan_varswap_p1(pos, result, node_ids);
+    sylvan_varswap_p1(pos, result, node_ids, &p2_ids);
     if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
-    if (marked_count > 0 && sylvan_reorder_issuccess(*result)) {
+    if (roaring_bitmap_get_cardinality(&p2_ids) > 0 && sylvan_reorder_issuccess(*result)) {
         // do the not so trivial cases (but won't create new nodes this time)
-        sylvan_varswap_p2(result, node_ids);
+        sylvan_varswap_p2(result, &p2_ids);
         if (sylvan_reorder_issuccess(*result) == 0) return; // fail fast
     }
 }
