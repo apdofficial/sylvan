@@ -250,7 +250,7 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     // we visit childrens of every node if they become dead
     // there might be up to 7 atomic writes and 4 atomic reads for every node deletion
     // for now it seems to be the limiting factor when it is parallelized, thus mrc_delete_node is invoked sequentially
-    while (it.has_value && it.current_value < nodes->table_size) {
+    while (it.has_value) {
         if (mrc_is_node_dead(self, it.current_value)) {
             mrc_delete_node(self, it.current_value, &old_ids);
         }
@@ -330,6 +330,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
 VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap, roaring_bitmap_t *, collected_ids)
 {
     if (count > NBITS_PER_BUCKET * 8) {
+        // standard reduction pattern with local roaring bitmap collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
