@@ -415,7 +415,6 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 #if STATS
         if (i > 1) exit(1);
 #endif
-        llmsset_reset_all_regions();
         roaring_bitmap_run_optimize(reorder_db->mrc.node_ids);
 
         continue;
