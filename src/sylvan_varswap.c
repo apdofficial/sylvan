@@ -136,7 +136,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
-    if (count > (nodes->table_size / lace_workers()) * 10) {
+    if (count > (nodes->table_size / lace_workers())) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -200,7 +200,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
             roaring_bitmap_t*, node_ids,
             roaring_bitmap_t*, p2_ids)
 {
-    if (count > (nodes->table_size / lace_workers()) * 5) {
+    if (count > (nodes->table_size / lace_workers())) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
