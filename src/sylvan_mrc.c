@@ -226,14 +226,21 @@ int mrc_is_var_isolated(const mrc_t *self, size_t idx)
 
 int mrc_is_node_dead(const mrc_t *self, size_t idx)
 {
-    if (self->ext_ref_nodes.size == 0 && self->ref_nodes.size == 0) return 0;
     counter_t int_count = mrc_ref_nodes_get(self, idx);
+    if (int_count > 0) return 0;
+    // mrc_ext_ref_nodes_get is an atomic bitmap call which is much more expensive than mrc_ref_nodes_get
+    // thus, invoke it only if really necessary
     counter_t ext_count = mrc_ext_ref_nodes_get(self, idx);
-    return int_count == 0 && ext_count == 0;
+    if (ext_count > 0) return 0;
+    return 1;
 }
 
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
+#if !SYLVAN_USE_LINEAR_PROBING
+    SPAWN(llmsset_reset_all_regions);
+#endif
+
     roaring_bitmap_t old_ids;
     roaring_bitmap_init_cleared(&old_ids);
 
@@ -260,23 +267,28 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     // this would generally result in occupying half of the buckets in the table since
     // all bucket would be owned by some thread but mrc_delete_node with chaining
     // would silently delete individual entries.
-    llmsset_reset_all_regions();
+    SYNC(llmsset_reset_all_regions);
 #endif
+
 }
 
-VOID_TASK_IMPL_5(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count, roaring_bitmap_t*, old_ids)
+VOID_TASK_IMPL_5(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t, first, uint64_t, count,
+                 roaring_bitmap_t*, old_ids)
 {
-//    if (count > NBITS_PER_BUCKET * 8) {
+//    if (count > NBITS_PER_BUCKET * 100) {
+//        // standard reduction pattern with local roaring bitmaps collecting old node indices
+//        roaring_bitmap_t a;
+//        roaring_bitmap_init_cleared(&a);
 //        size_t split = count / 2;
-//        SPAWN(mrc_gc_par, self, node_ids, first, split, old_ids);
-//        CALL(mrc_gc_par, self, node_ids, first + split, count - split, old_ids);
+//        SPAWN(mrc_gc_par, self, node_ids, first, split, &a);
+//        roaring_bitmap_t b;
+//        roaring_bitmap_init_cleared(&b);
+//        CALL(mrc_gc_par, self, node_ids, first + split, count - split, &b);
+//        roaring_bitmap_or_inplace(old_ids, &b);
 //        SYNC(mrc_gc_par);
-//        return;
+//        roaring_bitmap_or_inplace(old_ids, &a);
+//        return ;
 //    }
-
-    // standard reduction pattern with local roaring bitmap collecting old node indices
-    roaring_bitmap_t local_old_ids;
-    roaring_bitmap_init_cleared(&local_old_ids);
 
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
@@ -287,11 +299,9 @@ VOID_TASK_IMPL_5(mrc_gc_par, mrc_t*, self, roaring_bitmap_t*, node_ids, uint64_t
         size_t index = it.current_value;
         roaring_advance_uint32_iterator(&it);
         if (mrc_is_node_dead(self, index)) {
-            mrc_delete_node(self, index, &local_old_ids);
+            mrc_delete_node(self, index, old_ids);
         }
     }
-
-    roaring_bitmap_or_inplace(old_ids, &local_old_ids);
 }
 
 void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
@@ -326,7 +336,7 @@ void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
 #endif
 }
 
-void mrc_collect_node_ids(mrc_t* self, llmsset_t dbs)
+void mrc_collect_node_ids(mrc_t *self, llmsset_t dbs)
 {
     atomic_bitmap_t bitmap = {
             .container = dbs->bitmap2,
