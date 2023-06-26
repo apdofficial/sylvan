@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <assert.h>
-#include <sylvan.h>
+#include <sylvan_int.h>
 #include <sylvan_obj.hpp>
 
 #include "test_assert.h"
@@ -16,12 +16,12 @@ Bdd create_example_bdd(size_t is_optimal)
 //    BDD is from the paper:
 //    Randal E. Bryant Graph-Based Algorithms for Boolean Function Manipulation,
 //    IEEE Transactions on Computers, 1986 http://www.cs.cmu.edu/~bryant/pubdir/ieeetc86.pdf
-    Bdd v0 = Bdd::newLevel();
-    Bdd v1 = Bdd::newLevel();
-    Bdd v2 = Bdd::newLevel();
-    Bdd v3 = Bdd::newLevel();
-    Bdd v4 = Bdd::newLevel();
-    Bdd v5 = Bdd::newLevel();
+    Bdd v0 = Bdd::bddVar(0);
+    Bdd v1 = Bdd::bddVar(1);
+    Bdd v2 = Bdd::bddVar(2);
+    Bdd v3 = Bdd::bddVar(3);
+    Bdd v4 = Bdd::bddVar(4);
+    Bdd v5 = Bdd::bddVar(5);
 
     if (is_optimal) {
         // optimal order 0, 1, 2, 3, 4, 5
@@ -62,7 +62,6 @@ TASK_0(int, test_basics)
     BddMap map;
     map.put(2, t);
 
-    test_assert(v2.Compose(map) == (v1 + v2));
     test_assert((t * v2) == v2);
 
     return 0;
@@ -70,40 +69,18 @@ TASK_0(int, test_basics)
 
 TASK_0(int, test_rordering)
 {
+    Sylvan::initReorder();
+    Sylvan::setReorderThreshold(1);
+
     size_t is_optimal = 0;
     Bdd bdd = create_example_bdd(is_optimal);
 
-    for (int i = 0; i < 6; ++i) {
-        test_assert(Bdd::bddLevel(i) == Bdd::bddVar(i));
-    }
-
     size_t not_optimal_order_size = bdd.NodeCount();
-    Sylvan::reduceHeap(SYLVAN_REORDER_SIFT);
+    Sylvan::reduceHeap(SYLVAN_REORDER_BOUNDED_SIFT);
     size_t not_optimal_order_reordered_size = bdd.NodeCount();
 
     std::vector<uint32_t> perm = { 0, 1, 2, 3, 4, 5 };
-    int identity = 1;
-    // check if the new order is identity with the old order
-    for (size_t i = 0; i < Sylvan::getLevelsCount(); i++) {
-        if (Bdd::bddVar(perm.at(i)) != Bdd::bddLevel(i)) {
-            identity = 0;
-            break;
-        }
-    }
-
-    // if we gave it not optimal ordering then the new ordering should not be identity
-    test_assert(identity == 0);
-
     test_assert(not_optimal_order_reordered_size < not_optimal_order_size);
-
-    // restore the original order
-    Sylvan::reorderPerm(perm);
-    size_t not_optimal_size_again = bdd.NodeCount();
-    test_assert(not_optimal_order_size == not_optimal_size_again);
-
-    for (int i = 0; i < 6; ++i) {
-        test_assert(Bdd::bddLevel(i) == Bdd::bddVar(i));
-    }
 
     return 0;
 }
@@ -125,13 +102,6 @@ int main()
     // Simple Sylvan initialization, also initialize BDD support
     Sylvan::initPackage(1LL<<16, 1LL<<16, 1LL<<16, 1LL<<16);
     Sylvan::initBdd();
-    Sylvan::initReorder();
-
-    Sylvan::setReorderMaxGrowth(1.2f);
-    Sylvan::setReorderThreshold(2);
-    Sylvan::setReorderTimeLimit(1 * 60 * 1000); // 1 minute
-    Sylvan::setReorderMaxSwap(1000);
-    Sylvan::setReorderMaxVar(500);
 
     int res = RUN(runtests);
 

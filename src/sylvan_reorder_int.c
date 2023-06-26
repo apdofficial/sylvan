@@ -144,7 +144,8 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 inline uint64_t get_nodes_count()
 {
 #if SYLVAN_USE_LINEAR_PROBING
-    return llmsset_count_marked(nodes) + 2;
+    return mrc_nnodes_get(&reorder_db->mrc) + 2;
+//    return llmsset_count_marked(nodes) + 2;
 #else
     return mrc_nnodes_get(&reorder_db->mrc) + 2;
 #endif
@@ -204,7 +205,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 #if STATS
     x = s_state->pos;
     y = s_state->pos + 1;
-    printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
+    printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
            x, R, s_state->size, limitSize,
            mrc_var_nnodes_get(&reorder_db->mrc, x),
            mrc_var_nnodes_get(&reorder_db->mrc, y)
@@ -237,16 +238,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 
         if (s_state->size < limitSize) limitSize = s_state->size;
 #if STATS
-        printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
+        printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
                x, R, s_state->size, limitSize,
                mrc_var_nnodes_get(&reorder_db->mrc, x),
                mrc_var_nnodes_get(&reorder_db->mrc, y)
         );
-//        printf("\n");
-//        for (size_t i = 0; i < levels->count; i++) {
-//            printf("level %zu (%d) \t has %u nodes\n", i, levels->order_to_level[i], levels_var_count_load(levels, i));
-//        }
-//        printf("\n");
 #endif
         if (should_terminate_sifting(&reorder_db->config)) break;
     }
@@ -259,7 +255,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 #if STATS
     printf("\n");
     for (size_t i = 0; i < levels_count_get(&reorder_db->levels); i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i],
+        printf("level %zu (%d) \t has %hu nodes\n", i, reorder_db->levels.order_to_level[i],
                mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
@@ -322,7 +318,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
 #if STATS
     x = s_state->pos - 1;
-    printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
+    printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
            x, L, s_state->size, limitSize,
            mrc_var_nnodes_get(&reorder_db->mrc, x),
            mrc_var_nnodes_get(&reorder_db->mrc, y)
@@ -358,7 +354,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
 #if STATS
-        printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %zu, yNodes: %zu)\n",
+        printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
                x, L, s_state->size, limitSize,
                mrc_var_nnodes_get(&reorder_db->mrc, x),
                mrc_var_nnodes_get(&reorder_db->mrc, y)
@@ -382,7 +378,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 #if STATS
     printf("\n");
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
-        printf("level %zu (%d) \t has %zu nodes\n", i, reorder_db->levels.order_to_level[i],
+        printf("level %zu (%d) \t has %hu nodes\n", i, reorder_db->levels.order_to_level[i],
                mrc_var_nnodes_get(&reorder_db->mrc, i));
     }
     printf("\n");
@@ -435,7 +431,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
     sylvan_clear_cache();
 
-    if (reorder_db->config.print_stat) {
+    if (reorder_db->config.print_stat == true) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
 #if SYLVAN_USE_LINEAR_PROBING
@@ -465,10 +461,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
-#if INFO
-    double t_reorder = wctime();
-#endif
-    size_t after_size = llmsset_count_marked(nodes);
+    size_t after_size = get_nodes_count();
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
     size_t new_size_threshold = (after_size + 1) * SYLVAN_REORDER_SIZE_RATIO;
@@ -482,7 +475,7 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     interact_deinit(&reorder_db->matrix);
 
     double end = wctime() - reorder_db->config.t_start_sifting;
-    if (reorder_db->config.print_stat) {
+    if (reorder_db->config.print_stat == true) {
         printf("%zu nodes in %f sec\n", after_size, end);
     }
 
@@ -491,10 +484,6 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     }
 
     sylvan_timer_stop(SYLVAN_RE);
-
-#if INFO
-    printf("\npost reorder took %f seconds\n", wctime() - t_reorder);
-#endif
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)

@@ -70,25 +70,6 @@ namespace sylvan
         static Bdd bddVar(uint32_t index);
 
         /**
-         * @brief Create the next level and return the BDD representing the variable (ithlevel)
-         * @details The BDDs representing managed levels are always kept during garbage collection.
-         * NOTE: not currently thread-safe.
-         */
-        static Bdd newLevel();
-
-        /**
-         * @brief Create the next <amount> levels
-         * @details The MTBDDs representing managed levels are always kept during garbage collection.
-         * NOTE: Not currently thread-safe.
-         */
-        static int newLevels(size_t amount);
-
-        /**
-         * @brief  Reset all levels.
-         */
-        static void resetLevels();
-
-        /**
          * @brief Get a MTBDD representing just the level index in its positive form
          */
         static Bdd bddLevel(uint32_t index);

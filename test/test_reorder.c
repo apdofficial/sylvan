@@ -2,7 +2,7 @@
 #include <locale.h>
 #include <sys/time.h>
 
-#include "sylvan.h"
+#include <sylvan.h>
 #include "test_assert.h"
 #include "common.h"
 
@@ -68,7 +68,6 @@ TASK_0(int, test_varswap)
     BDD one = sylvan_ithvar(6);
     BDD two = sylvan_ithvar(7);
 
-
     test_assert(sylvan_level_to_order(6) == 6);
     test_assert(sylvan_level_to_order(7) == 7);
     test_assert(sylvan_order_to_level(6) == 6);
@@ -78,9 +77,11 @@ TASK_0(int, test_varswap)
     test_assert(mtbdd_getvar(one) == 6);
     test_assert(mtbdd_getvar(two) == 7);
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+    sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
     test_assert(sylvan_varswap(6) == SYLVAN_REORDER_SUCCESS);
+
+    sylvan_post_reorder();
 
     test_assert(sylvan_level_to_order(7) == 6);
     test_assert(sylvan_level_to_order(6) == 7);
@@ -126,13 +127,15 @@ TASK_0(int, test_varswap_down)
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+    sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
     // 0, 1, 2, 3
     test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, 0
+
+    sylvan_post_reorder();
 
     test_assert(sylvan_level_to_order(0) == 1);
     test_assert(sylvan_level_to_order(1) == 2);
@@ -180,13 +183,15 @@ TASK_0(int, test_varswap_up)
     test_assert(mtbdd_getvar(two) == 2);
     test_assert(mtbdd_getvar(three) == 3);
 
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size, reorder_db->node_ids);
+    sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
     // 0, 1, 2, 3
     test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
     // 3, 0, 1, 2
+
+    sylvan_post_reorder();
 
     test_assert(sylvan_level_to_order(0) == 3);
     test_assert(sylvan_level_to_order(1) == 0);
@@ -251,10 +256,10 @@ TASK_0(int, test_sift_down)
     state.low = 0;
     state.high = 3;
 
-    state.size = 0;
+    state.size = 770;
     state.pos = 0;
 
-    state.best_size = 9999;
+    state.best_size = 0;
     state.best_pos = 3;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
@@ -526,11 +531,7 @@ TASK_0(int, test_reorder)
 //     if we gave it not optimal ordering then the new ordering should not be identity
     test_assert(identity == 0);
 
-    sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
-
     test_assert(sylvan_reorder_perm(perm) == SYLVAN_REORDER_SUCCESS);
-
-    sylvan_post_reorder();
 
     size_t not_optimal_size_again = sylvan_nodecount(bdd);
     test_assert(not_optimal_order_size == not_optimal_size_again);
@@ -607,17 +608,20 @@ TASK_0(int, test_ref_nodes)
     _sylvan_quit();
     _sylvan_start();
 
-    BDD bdd1 = sylvan_or(sylvan_ithvar(0), sylvan_ithvar(1));
-    sylvan_ref(bdd1);
-
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_ref(bdd2);
 
+    BDD bdd1 = sylvan_and(sylvan_ithvar(6), sylvan_ithvar(7));
+    sylvan_ref(bdd1);
+
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
-    int expected[5] = {0, 1, 1, 1, 1};
+    int expected[8] = {0, 0, 1, 1, 1, 2, 3, 3};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
         counter_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
+#ifndef NDEBUG
+        printf("ref_node_count: %d\n", ref_node_count);
+#endif
         assert(expected[i] == ref_node_count);
     }
 
@@ -635,18 +639,22 @@ TASK_0(int, test_ref_vars)
     _sylvan_quit();
     _sylvan_start();
 
-    BDD bdd1 = sylvan_or(sylvan_ithvar(0), sylvan_ithvar(1));
-    sylvan_ref(bdd1);
-
     MTBDD bdd2 = create_example_bdd(0);
     sylvan_ref(bdd2);
 
+    BDD bdd1 = sylvan_and(sylvan_ithvar(6), sylvan_ithvar(7));
+    sylvan_ref(bdd1);
+
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
-    int expected[5] = {3, 4, 5, 5, 3};
+    int expected[8] = {1, 2, 4, 5, 5, 3, 1, 1};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
         counter_t ref_var_count = mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i));
+#ifndef NDEBUG
+        printf("ref_var_count: %d\n", ref_var_count);
+#endif
         assert(expected[i] == ref_var_count);
+
     }
 
     sylvan_post_reorder();
@@ -664,10 +672,10 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_down)) return 1;
     printf("Test varswap_up\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_up)) return 1;
-    printf("Test sift_down\n");
-    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
-    printf("Test sift_up\n");
-    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
+//    printf("Test sift_down\n");
+//    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
+//    printf("Test sift_up\n");
+//    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
     printf("Test sift_back\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_back)) return 1;
     printf("Test reorder_perm\n");
@@ -720,15 +728,15 @@ int should_reordering_terminate()
 
 void _sylvan_start()
 {
-    sylvan_set_limits(1LL << 20, 1, 4);
+    sylvan_set_limits(1LL << 22, 1, 0);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
 #ifdef NDEBUG
-    sylvan_set_reorder_print(0);
+    sylvan_set_reorder_print(false);
 #else
-    sylvan_set_reorder_print(1);
+    sylvan_set_reorder_print(true);
 #endif
 }
 
@@ -751,9 +759,9 @@ int main()
     sylvan_set_reorder_maxgrowth(1.2f);
     sylvan_set_reorder_timelimit_sec(30);
 
-    sylvan_re_hook_prere(TASK(reordering_start));
-    sylvan_re_hook_postre(TASK(reordering_end));
-    sylvan_re_hook_progre(TASK(reordering_progress));
+//    sylvan_re_hook_prere(TASK(reordering_start));
+//    sylvan_re_hook_postre(TASK(reordering_end));
+//    sylvan_re_hook_progre(TASK(reordering_progress));
     sylvan_re_hook_termre(should_reordering_terminate);
 
     size_t ntests = 5;

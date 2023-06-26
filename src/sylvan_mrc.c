@@ -3,8 +3,6 @@
 
 #include <errno.h>
 
-VOID_TASK_DECL_5(mrc_gc_par, mrc_t*, roaring_bitmap_t*, uint64_t, uint64_t, roaring_bitmap_t*)
-
 VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*, roaring_bitmap_t*)
 
 /**
@@ -33,10 +31,6 @@ void atomic_counters_deinit(atomic_counters_t *self)
 
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
-#ifndef NDEBUG
-    assert(self->container != NULL);
-    assert(self->size != 0);
-#endif
     counter_t curr = atomic_counters_get(self, idx);
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
@@ -46,10 +40,6 @@ void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 {
-#ifndef NDEBUG
-    assert(self->container != NULL);
-    assert(self->size != 0);
-#endif
     if (val >= COUNTER_T_MAX) return;               // overflow
     if (idx >= self->size) return;                  // out of bounds
     atomic_store(self->container + idx, val);
@@ -57,10 +47,6 @@ void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
-#ifndef NDEBUG
-    assert(self->container != NULL);
-    assert(self->size != 0);
-#endif
     return atomic_load_explicit(self->container + idx, memory_order_relaxed);
 }
 
@@ -237,10 +223,6 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
-//#if !SYLVAN_USE_LINEAR_PROBING
-//    SPAWN(llmsset_reset_all_regions);
-//#endif
-
     roaring_bitmap_t old_ids;
     roaring_bitmap_init_cleared(&old_ids);
 
@@ -274,13 +256,6 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
     sylvan_rehash_all();
-#else
-    // together lets all workers execute a local copy of the given task
-    // since we are removing nodes there will be sap ece left in the buckets which were already claimed.
-    // this would generally result in occupying half of the buckets in the table since
-    // all bucket would be owned by some thread but mrc_delete_node with chaining
-    // would silently delete individual entries.
-//    SYNC(llmsset_reset_all_regions);
 #endif
 
 }
@@ -330,7 +305,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
 VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap, roaring_bitmap_t *, collected_ids)
 {
     if (count > NBITS_PER_BUCKET * 8) {
-        // standard reduction pattern with local roaring bitmap collecting new node indices
+        // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
