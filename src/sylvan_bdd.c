@@ -102,7 +102,8 @@ TASK_IMPL_3(BDD, sylvan_and, BDD, a, BDD, b, BDDVAR, prev_level)
     } else if (bHigh == sylvan_true) {
         high = aHigh;
     } else {
-        bdd_refs_spawn(SPAWN(sylvan_and, aHigh, bHigh, level));
+//        bdd_refs_spawn(SPAWN(sylvan_and, aHigh, bHigh, level));
+        high = bdd_refs_push(CALL(sylvan_and, aHigh, bHigh, level));
         n=1;
     }
 
@@ -118,7 +119,7 @@ TASK_IMPL_3(BDD, sylvan_and, BDD, a, BDD, b, BDDVAR, prev_level)
 
     if (n) {
         bdd_refs_push(low);
-        high = bdd_refs_sync(SYNC(sylvan_and));
+//        high = bdd_refs_sync(SYNC(sylvan_and));
         bdd_refs_pop(1);
     }
 
