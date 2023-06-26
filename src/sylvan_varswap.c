@@ -38,7 +38,7 @@ VOID_TASK_DECL_6(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_r
 VOID_TASK_DECL_6(sylvan_varswap_p1, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*,
                  roaring_bitmap_t*)
 
-#define sylvan_varswap_p1(pos, result, ids, p2) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, ids, p2)
+#define sylvan_varswap_p1(pos, result, p1, p2) CALL(sylvan_varswap_p1, pos, 0, nodes->table_size, result, p1, p2)
 
 /*!
    @brief Adjacent variable swap phase 2
@@ -155,10 +155,6 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         return;
     }
 
-    // standard reduction pattern with local roaring bitmap collecting new node indices
-    roaring_bitmap_t local_new_ids;
-    roaring_bitmap_init_cleared(&local_new_ids);
-
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     roaring_move_uint32_iterator_equalorlarger(&it, first);
@@ -172,15 +168,13 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
         if (nvar == var || nvar == (var + 1)) {
-            roaring_bitmap_add(&local_new_ids, index);
+            roaring_bitmap_add(p1_ids, index);
             if (llmsset_clear_one_hash(nodes, index) < 0) {
                 atomic_store(result, SYLVAN_REORDER_P0_CLEAR_FAIL);
                 return;
             }
         }
     }
-
-    roaring_bitmap_or_inplace(p1_ids, &local_new_ids);
 }
 
 #endif
@@ -201,17 +195,17 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  size_t, first,
                  size_t, count,
                  _Atomic (reorder_result_t)*, result,
-                 roaring_bitmap_t*, node_ids,
+                 roaring_bitmap_t*, p1_ids,
                  roaring_bitmap_t*, p2_ids)
 {
     if (count > (NBITS_PER_BUCKET * 30)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
-        SPAWN(sylvan_varswap_p1, var, first, split, result, node_ids, &a);
+        SPAWN(sylvan_varswap_p1, var, first, split, result, p1_ids, &a);
         roaring_bitmap_t b;
         roaring_bitmap_init_cleared(&b);
-        CALL(sylvan_varswap_p1, var, first + split, count - split, result, node_ids, &b);
+        CALL(sylvan_varswap_p1, var, first + split, count - split, result, p1_ids, &b);
         roaring_bitmap_or_inplace(p2_ids, &b);
         SYNC(sylvan_varswap_p1);
         roaring_bitmap_or_inplace(p2_ids, &a);
@@ -220,7 +214,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
 
     // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
-    roaring_init_iterator(node_ids, &it);
+    roaring_init_iterator(p1_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
     // standard reduction pattern with local variables to avoid hotspots
