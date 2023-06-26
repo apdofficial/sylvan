@@ -1845,6 +1845,7 @@ lddmc_union_cube_copy(MDD a, uint32_t* values, int* copy, size_t count)
 int
 lddmc_member_cube(MDD a, uint32_t* values, size_t count)
 {
+    (void)count;
     while (1) {
         if (a == lddmc_false) return 0;
         if (a == lddmc_true) return 1;
@@ -1859,6 +1860,7 @@ lddmc_member_cube(MDD a, uint32_t* values, size_t count)
 int
 lddmc_member_cube_copy(MDD a, uint32_t* values, int* copy, size_t count)
 {
+    (void)count;
     while (1) {
         if (a == lddmc_false) return 0;
         if (a == lddmc_true) return 1;
