@@ -299,6 +299,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
             .size = dbs->table_size
     };
     roaring_bitmap_clear(self->node_ids);
+    roaring_bitmap_init_with_capacity(self->node_ids, llmsset_count_marked(dbs));
     CALL(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap, self->node_ids);
 }
 

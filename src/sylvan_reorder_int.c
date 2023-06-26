@@ -461,7 +461,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
 {
-    size_t after_size = get_nodes_count();
+    size_t after_size = get_nodes_count() - 2;
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
     size_t new_size_threshold = (after_size + 1) * SYLVAN_REORDER_SIZE_RATIO;

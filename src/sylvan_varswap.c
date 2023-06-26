@@ -204,7 +204,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p2_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 16)) {
+    if (count > (NBITS_PER_BUCKET * 30)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);

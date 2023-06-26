@@ -169,19 +169,26 @@ VOID_TASK_IMPL_1(sylvan_reorder_stop_world, reordering_type_t, type)
         sylvan_print_reorder_res(result);
         return;
     }
-    sylvan_pre_reorder(type);
-    switch (type) {
-        case SYLVAN_REORDER_SIFT:
-            result = sylvan_sift(0, 0);
-            break;
-        case SYLVAN_REORDER_BOUNDED_SIFT:
-            result = sylvan_bounded_sift(0, 0);
-            break;
-    }
-    re = 0;
-    sylvan_post_reorder();
-    if (sylvan_reorder_issuccess(result) == 0) {
-        sylvan_print_reorder_res(result);
+    int zero = 0;
+    if (atomic_compare_exchange_strong(&re, &zero, 1)) {
+        sylvan_pre_reorder(type);
+        switch (type) {
+            case SYLVAN_REORDER_SIFT:
+                result = NEWFRAME(sylvan_sift, 0, 0);
+                break;
+            case SYLVAN_REORDER_BOUNDED_SIFT:
+                result = NEWFRAME(sylvan_bounded_sift, 0, 0);
+                break;
+        }
+        re = 0;
+        sylvan_post_reorder();
+        if (sylvan_reorder_issuccess(result) == 0) {
+            sylvan_print_reorder_res(result);
+        }
+    } else {
+        /* wait for new frame to appear */
+        while (atomic_load_explicit(&lace_newframe.t, memory_order_relaxed) == 0) {}
+        lace_yield(__lace_worker, __lace_dq_head);
     }
 }
 
@@ -429,7 +436,8 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         continue;
 
         siftingFailed:
-        if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL || res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
+        if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL ||
+            res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
 #if INFO
             sylvan_print_reorder_res(res);
 #endif
