@@ -15,4 +15,3 @@ cmake-build-*/
 .idea/
 CMakeFiles/
 .vscode/
-*.aag
