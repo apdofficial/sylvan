@@ -327,7 +327,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 {
     // atm, llmsset_look_up seems to have a bug with multiple workers
     // so run this only in 1 task
-//    if (count > (NBITS_PER_BUCKET)) {
+//    if (count > (NBITS_PER_BUCKET * 64)) {
 //        size_t split = count / 2;
 //        // standard reduction pattern with local roaring bitmaps collecting new node indices
 //        roaring_bitmap_t a;
@@ -341,10 +341,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 //        roaring_bitmap_or_inplace(node_ids, &a);
 //        return;
 //    }
-
-    // standard reduction pattern with local roaring bitmap collecting new node indices
-    roaring_bitmap_t local_new_ids;
-    roaring_bitmap_init_cleared(&local_new_ids);
 
     roaring_uint32_iterator_t it;
     roaring_init_iterator(p2_ids, &it);
@@ -361,6 +357,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 
         BDDVAR var = mtbddnode_getvariable(node);
         if (mtbddnode_ismapnode(node)) {
+            exit(-1);
             MTBDD newf0, f1, f0, f01, f00;
             int created = 0;
 
@@ -378,7 +375,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 return;
             }
             if (created) {
-                roaring_bitmap_add(&local_new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(node_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
             }
 
             mtbddnode_makemapnode(node, var, f0, f01);
@@ -414,7 +411,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 return;
             }
             if (created1) {
-                roaring_bitmap_add(&local_new_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(node_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+                assert(llmsset_is_marked(nodes, newf1 & SYLVAN_TABLE_MASK_INDEX));
             }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
@@ -424,7 +422,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 return;
             }
             if (created0) {
-                roaring_bitmap_add(&local_new_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                roaring_bitmap_add(node_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                assert(llmsset_is_marked(nodes, newf0 & SYLVAN_TABLE_MASK_INDEX));
             }
 
             // update node, which also removes the mark
@@ -432,8 +431,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             llmsset_rehash_bucket(nodes, index);
         }
     }
-
-    roaring_bitmap_or_inplace(node_ids, &local_new_ids);
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
