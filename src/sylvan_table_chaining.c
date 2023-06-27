@@ -283,14 +283,12 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
     for (;;) {
         while (first_idx == (uint64_t) -1) {
             // already locked, spin-wait until unlocked
-            printf("spin-waiting...\n");
             first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
         }
         // not locked; check if not 0 (that would mean data is not in the hash table)
         if (first_idx == 0) return 0;
         // OK, use CAS to lock the chain
         if (atomic_compare_exchange_strong(first_ptr, &first_idx, (uint64_t) -1)) {
-            printf("locked the chain!\n");
             break;
         }
     }
@@ -320,7 +318,7 @@ llmsset_clear_one_hash(const llmsset_t dbs, uint64_t d_idx)
 
             if (idx == d_idx) { // found our predecessor
                 // update the chain
-                atomic_store_explicit(chain_ptr, (chain & MASK_INDEX) | next_idx, memory_order_seq_cst);
+                atomic_store_explicit(chain_ptr, (chain & MASK_HASH) | next_idx, memory_order_seq_cst);
                 // unlock
                 atomic_store_explicit(first_ptr, first_idx, memory_order_seq_cst);
                 return 1;
