@@ -182,8 +182,7 @@ cache_get(uint64_t a, uint64_t b, uint64_t c, uint64_t *res)
     if (bucket->a != a || bucket->b != b || bucket->c != c) return 0;
     *res = bucket->res;
     // abort if status field changed after compiler_barrier()
-    return 0;
-//    return atomic_load_explicit(s_bucket, memory_order_acquire) == s ? 1 : 0;
+    return atomic_load_explicit(s_bucket, memory_order_acquire) == s ? 1 : 0;
 }
 
 int

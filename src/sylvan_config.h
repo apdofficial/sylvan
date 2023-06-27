@@ -49,7 +49,7 @@
 #define SYLVAN_REORDER_SIZE_RATIO	    2
 #define SYLVAN_REORDER_LIMIT	        20                              // maximum number of reordering calls allowed
 #define SYLVAN_REORDER_TYPE_DEFAULT     SYLVAN_REORDER_BOUNDED_SIFT
-#define SYLVAN_REORDER_PRINT_STAT       0
+#define SYLVAN_REORDER_PRINT_STAT       1
 #define SYLVAN_REORDER_MIN_MEM_REQ      (0.85f)
 
  /**

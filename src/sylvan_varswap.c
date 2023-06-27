@@ -327,17 +327,17 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 {
     // atm, llmsset_look_up seems to have a bug with multiple workers
     // so run this only in 1 task
-//    if (count > (NBITS_PER_BUCKET * 64)) {
+//    if (count > (NBITS_PER_BUCKET * 16)) {
 //        size_t split = count / 2;
 //        // standard reduction pattern with local roaring bitmaps collecting new node indices
 //        roaring_bitmap_t a;
 //        roaring_bitmap_init_cleared(&a);
-//        SPAWN(sylvan_varswap_p2, first, split, result, p2_ids, &a);
+//        CALL(sylvan_varswap_p2, first, split, result, p2_ids, &a);
 //        roaring_bitmap_t b;
 //        roaring_bitmap_init_cleared(&b);
 //        CALL(sylvan_varswap_p2, first + split, count - split, result, p2_ids, &b);
 //        roaring_bitmap_or_inplace(node_ids, &b);
-//        SYNC(sylvan_varswap_p2);
+////        SYNC(sylvan_varswap_p2);
 //        roaring_bitmap_or_inplace(node_ids, &a);
 //        return;
 //    }
@@ -357,7 +357,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 
         BDDVAR var = mtbddnode_getvariable(node);
         if (mtbddnode_ismapnode(node)) {
-            exit(-1);
             MTBDD newf0, f1, f0, f01, f00;
             int created = 0;
 
@@ -412,7 +411,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             }
             if (created1) {
                 roaring_bitmap_add(node_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
-                assert(llmsset_is_marked(nodes, newf1 & SYLVAN_TABLE_MASK_INDEX));
             }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
@@ -423,7 +421,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             }
             if (created0) {
                 roaring_bitmap_add(node_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
-                assert(llmsset_is_marked(nodes, newf0 & SYLVAN_TABLE_MASK_INDEX));
             }
 
             // update node, which also removes the mark
