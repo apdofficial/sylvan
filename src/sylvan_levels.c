@@ -93,6 +93,22 @@ uint32_t levels_level_to_order(levels_t *self, uint32_t level)
     else return level;
 }
 
+uint32_t levels_swap(levels_t *self, uint32_t x, uint32_t y)
+{
+    if (x >= self->count || y >= self->count) return 0;
+
+    self->order_to_level[self->level_to_order[x]] = y;
+    self->order_to_level[self->level_to_order[y]] = x;
+
+    uint32_t tmp = self->level_to_order[x];
+
+    self->level_to_order[x] = self->level_to_order[y];
+    self->level_to_order[y] = tmp;
+
+    return 1;
+}
+
+
 /**
  * This function is called during garbage collection and
  * marks all managed level BDDs so they are kept.

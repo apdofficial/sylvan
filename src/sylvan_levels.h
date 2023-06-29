@@ -67,6 +67,8 @@ uint32_t levels_order_to_level(levels_t* self, uint32_t var);
  */
 uint32_t levels_level_to_order(levels_t* self, uint32_t level);
 
+uint32_t levels_swap(levels_t *self, uint32_t x, uint32_t y);
+
 /**
  * \brief  Add callback to mark managed references during garbage collection.
  * \details This is used for the dynamic variable reordering.
