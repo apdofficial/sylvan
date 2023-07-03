@@ -37,19 +37,23 @@ void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_fetch_add_explicit(self->container + idx, val, memory_order_relaxed);
+    _Atomic(counter_t) *ptr = self->container + idx;
+    atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
 }
 
 void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 {
     if (val >= COUNTER_T_MAX) return;               // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_store_explicit(self->container + idx, val, memory_order_relaxed);
+    _Atomic(counter_t) *ptr = self->container + idx;
+    atomic_store_explicit(ptr, val, memory_order_relaxed);
+
 }
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
-    return atomic_load_explicit(self->container + idx, memory_order_relaxed);
+    _Atomic(counter_t) *ptr = self->container + idx;
+    return atomic_load_explicit(ptr, memory_order_relaxed);
 }
 
 /**
@@ -106,22 +110,6 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes)
 
     roaring_init_iterator(self->node_ids, &it);
     roaring_move_uint32_iterator_equalorlarger(&it, 2);
-
-    // set all nodes with ref == 0 to 1
-    // every node nees to have at least 1 reference otherwise it will be garbage collected
-    while (it.has_value) {
-        size_t index = it.current_value;
-        roaring_advance_uint32_iterator(&it);
-        if (index == 0 || index == 1) continue;
-        mtbddnode_t node = MTBDD_GETNODE(index);
-        BDDVAR var = mtbddnode_getvariable(node);
-        if (mrc_ref_nodes_get(self, index) == 0) {
-            mrc_ref_nodes_add(self, index, 1);
-        }
-        if (mrc_ref_vars_get(self, var) == 0) {
-            mrc_ref_vars_add(self, var, 1);
-        }
-    }
 
     mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
     mtbdd_re_mark_protected(self->ext_ref_nodes.container);
@@ -330,7 +318,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
 
 VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap, roaring_bitmap_t *, collected_ids)
 {
-    if (count > NBITS_PER_BUCKET * 8) {
+    if (count > NBITS_PER_BUCKET * 16) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -359,7 +347,6 @@ VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, ato
 
 MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
-    (void) add_id;
     MTBDD new = mtbdd_varswap_makenode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
@@ -368,7 +355,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
         if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
-        mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
     } else {
@@ -379,7 +366,6 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
-    (void) add_id;
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
@@ -388,7 +374,7 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
         if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
-        mrc_ref_nodes_set(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
         mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
     } else {
