@@ -4,6 +4,8 @@
 #include <errno.h>
 
 VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*, roaring_bitmap_t*)
+VOID_TASK_DECL_3(mrc_delete_node_par, mrc_t*, size_t, roaring_bitmap_t*)
+VOID_TASK_DECL_4(mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
 /**
  * Atomic counters
@@ -42,7 +44,7 @@ void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
 {
     if (val >= COUNTER_T_MAX) return;               // overflow
     if (idx >= self->size) return;                  // out of bounds
-    atomic_store(self->container + idx, val);
+    atomic_store_explicit(self->container + idx, val, memory_order_relaxed);
 }
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
@@ -156,7 +158,7 @@ void mrc_var_nodes_set(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_set(mrc_t *self, int val)
 {
-    atomic_store(&self->nnodes, val);
+    atomic_store_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
 void mrc_ref_nodes_add(mrc_t *self, size_t idx, int val)
@@ -223,27 +225,16 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
 
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 {
-    roaring_bitmap_t old_ids;
-    roaring_bitmap_init_cleared(&old_ids);
+    roaring_bitmap_t dead_ids;
+    roaring_bitmap_init_with_capacity(&dead_ids, nodes->table_size);
 
-    roaring_uint32_iterator_t it;
-    roaring_init_iterator(self->node_ids, &it);
-
-    // we visit childrens of every node if they become dead
-    // there might be up to 7 atomic writes and 4 atomic reads for every node deletion
-    // for now it seems to be the limiting factor when it is parallelized, thus mrc_delete_node is invoked sequentially
-    while (it.has_value) {
-        if (mrc_is_node_dead(self, it.current_value)) {
-            mrc_delete_node(self, it.current_value, &old_ids);
-        }
-        roaring_advance_uint32_iterator(&it);
-    }
+    CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids);
 
     // calling bitmap remove per each node is more expensive than calling it once with many ids
     // thus, we group the ids into <arr> and let the bitmap delete them in one go
     roaring_uint32_iterator_t it_old;
-    roaring_init_iterator(&old_ids, &it_old);
-    size_t size = roaring_bitmap_get_cardinality(&old_ids);
+    roaring_init_iterator(&dead_ids, &it_old);
+    size_t size = roaring_bitmap_get_cardinality(&dead_ids);
     uint32_t arr[size];
     size_t x = 0;
     while (it_old.has_value) {
@@ -260,20 +251,52 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 
 }
 
-void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
+VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids)
+{
+    if (count > NBITS_PER_BUCKET * 16) {
+        // standard reduction pattern with local roaring bitmaps collecting dead node indices
+        size_t split = count / 2;
+        roaring_bitmap_t a;
+        roaring_bitmap_init_cleared(&a);
+        SPAWN(mrc_gc_go, self,first, split, &a);
+        roaring_bitmap_t b;
+        roaring_bitmap_init_cleared(&b);
+        CALL(mrc_gc_go, self, first + split, count - split,&b);
+        roaring_bitmap_or_inplace(dead_ids, &b);
+        SYNC(mrc_gc_go);
+        roaring_bitmap_or_inplace(dead_ids, &a);
+        return;
+    }
+
+    roaring_uint32_iterator_t it;
+    roaring_init_iterator(self->node_ids, &it);
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
+
+    const size_t end = first + count;
+    while (it.has_value && it.current_value < end) {
+        if (mrc_is_node_dead(self, it.current_value)) {
+            CALL(mrc_delete_node_par, self, it.current_value, dead_ids);
+        }
+        roaring_advance_uint32_iterator(&it);
+    }
+}
+
+VOID_TASK_IMPL_3(mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitmap_t*, old_ids)
 {
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
     mrc_nnodes_add(self, -1);
-    roaring_bitmap_add(local_old_ids, index);
+    roaring_bitmap_add(old_ids, index);
     if (!mtbddnode_isleaf(f)) {
+        size_t spawned = 0;
         MTBDD f1 = mtbddnode_gethigh(f);
         size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
         if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
             if (mrc_is_node_dead(self, f1_index)) {
-                mrc_delete_node(self, f1_index, local_old_ids);
+                CALL(mrc_delete_node_par, self, f1_index, old_ids);
+                spawned++;
             }
         }
         MTBDD f0 = mtbddnode_getlow(f);
@@ -282,9 +305,11 @@ void mrc_delete_node(mrc_t *self, size_t index, roaring_bitmap_t *local_old_ids)
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
             if (mrc_is_node_dead(self, f0_index)) {
-                mrc_delete_node(self, f0_index, local_old_ids);
+                CALL(mrc_delete_node_par, self, f0_index, old_ids);
+                spawned++;
             }
         }
+        for (size_t i = 0; i < spawned; ++i) SYNC(mrc_delete_node_par);
     }
 #if !SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_one_hash(nodes, index);
@@ -334,6 +359,7 @@ VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, ato
 
 MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
+    (void) add_id;
     MTBDD new = mtbdd_varswap_makenode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
@@ -353,6 +379,7 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
 
 MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created, int add_id)
 {
+    (void) add_id;
     MTBDD new = mtbdd_varswap_makemapnode(var, low, high, created);
     if (new == mtbdd_invalid) {
         return mtbdd_invalid;
