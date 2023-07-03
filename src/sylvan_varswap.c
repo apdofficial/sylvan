@@ -1,6 +1,8 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
+
+
 /**
  * @brief Check if a node is dependent on node with label <var> or <var>+1
  */
@@ -134,6 +136,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
@@ -148,7 +151,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         roaring_bitmap_or_inplace(p1_ids, &a);
         return;
     }
-
+#endif
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     roaring_move_uint32_iterator_equalorlarger(&it, first);
@@ -192,6 +195,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p1_ids,
                  roaring_bitmap_t*, p2_ids)
 {
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -205,7 +209,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_bitmap_or_inplace(p2_ids, &a);
         return;
     }
-
+#endif
     // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
     roaring_init_iterator(p1_ids, &it);
@@ -320,6 +324,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
@@ -334,6 +339,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
         roaring_bitmap_or_inplace(node_ids, &a);
         return;
     }
+#endif
 
     roaring_uint32_iterator_t it;
     roaring_init_iterator(p2_ids, &it);
