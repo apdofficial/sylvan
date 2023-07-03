@@ -213,7 +213,7 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 
 VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids)
 {
-    if (count > NBITS_PER_BUCKET * 16) {
+    if (count > NBITS_PER_BUCKET * 32) {
         // standard reduction pattern with local roaring bitmaps collecting dead node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -233,10 +233,10 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
     int deleted = 0;
-    int ref_vars[reorder_db->levels.count];
-    memset(&ref_vars, 0x00, sizeof (int) * reorder_db->levels.count);
-    int  var_nnodes[reorder_db->levels.count];
-    memset(&var_nnodes, 0x00, sizeof (int) * reorder_db->levels.count);
+    unsigned short ref_vars[reorder_db->levels.count];
+    memset(&ref_vars, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
+    unsigned short  var_nnodes[reorder_db->levels.count];
+    memset(&var_nnodes, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
@@ -265,11 +265,12 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
 #endif
         }
         roaring_advance_uint32_iterator(&it);
+
     }
     if (deleted > 0) mrc_nnodes_add(self, -deleted);
-    for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        if (ref_vars[i] != 0) mrc_ref_vars_add(&reorder_db->mrc, i, -ref_vars[i]);
-        if (var_nnodes[i] != 0) mrc_var_nnodes_add(&reorder_db->mrc, i, -var_nnodes[i]);
+    for (size_t j = 0; j < reorder_db->levels.count; ++j) {
+        if (ref_vars[j] != 0) mrc_ref_vars_add(&reorder_db->mrc, j, -ref_vars[j]);
+        if (var_nnodes[j] != 0) mrc_var_nnodes_add(&reorder_db->mrc, j, -var_nnodes[j]);
     }
 }
 

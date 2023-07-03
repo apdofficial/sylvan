@@ -134,7 +134,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 8)) {
+    if (count > (NBITS_PER_BUCKET * 32)) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -192,7 +192,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p1_ids,
                  roaring_bitmap_t*, p2_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 30)) {
+    if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
@@ -320,7 +320,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 8)) {
+    if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         roaring_bitmap_t a;
@@ -342,8 +342,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
     int new_nnodes = 0;
     unsigned short var_new_nnodes[reorder_db->levels.count];
     memset(&var_new_nnodes, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
-//    short var_ref_nnodes[nodes->table_size];
-//    memset(&var_ref_nnodes, 0x00, sizeof (short) * nodes->table_size);
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
@@ -374,19 +372,14 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             mtbddnode_makemapnode(node, var, f0, f01);
             llmsset_rehash_bucket(nodes, index);
 
-
-            mrc_ref_nodes_add(&reorder_db->mrc, index(f0), -1);
-//            var_ref_nnodes[index(f0)]--;
-            mrc_ref_nodes_add(&reorder_db->mrc, index(newf), 1);
-//            var_ref_nnodes[index(newf)]++;
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f0), -1, memory_order_relaxed);
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(newf), 1, memory_order_relaxed);
 
             if (created) {
                 new_nnodes++;
                 var_new_nnodes[var + 1]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f00), 1);
-//                var_ref_nnodes[index(f00)]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f1), 1);
-//                var_ref_nnodes[index(f1)]++;
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f00), 1, memory_order_relaxed);
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f1), 1, memory_order_relaxed);
                 roaring_bitmap_add(node_ids, index(newf));
             }
         } else {
@@ -414,56 +407,71 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             // or may already exist in the DAG as required to implement other functions.
 
             newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
-            newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
+            if (newf1 == mtbdd_invalid) {
+#if !SYLVAN_USE_LINEAR_PROBING
+                // since we are removing nodes there will be space left in the buckets which were already claimed.
+                // this would generally result in occupying half of the buckets in the table since
+                // all bucket would be owned by some thread but mrc_delete_node with chaining
+                // would silently delete individual entries.
+                CALL(llmsset_reset_all_regions);
+#endif
+                newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
+                if (newf1 == mtbdd_invalid) {
+                    atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
+                    return;
+                }
+            }
 
-            if (newf1 == mtbdd_invalid || newf0 == mtbdd_invalid) {
-                atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
-                return;
+            newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
+            if (newf0 == mtbdd_invalid) {
+#if !SYLVAN_USE_LINEAR_PROBING
+                // since we are removing nodes there will be space left in the buckets which were already claimed.
+                // this would generally result in occupying half of the buckets in the table since
+                // all bucket would be owned by some thread but mrc_delete_node with chaining
+                // would silently delete individual entries.
+                CALL(llmsset_reset_all_regions);
+#endif
+                newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
+                if (newf0 == mtbdd_invalid) {
+                    atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
+                    return;
+                }
             }
 
             // update node, which also removes the mark
             mtbddnode_makenode(node, var, newf0, newf1);
             llmsset_rehash_bucket(nodes, index);
 
-            mrc_ref_nodes_add(&reorder_db->mrc, index(f1), -1);
-//            var_ref_nnodes[index(f1)]--;
-            mrc_ref_nodes_add(&reorder_db->mrc, index(newf1), 1);
-//            var_ref_nnodes[index(newf1)]++;
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f1), -1, memory_order_relaxed);
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(newf1), 1, memory_order_relaxed);
 
             if (created1) {
                 new_nnodes++;
                 var_new_nnodes[var + 1]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f11), 1);
-//                var_ref_nnodes[index(f11)]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f01), 1);
-//                var_ref_nnodes[index(f01)]++;
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f11), 1, memory_order_relaxed);
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f01), 1, memory_order_relaxed);
                 roaring_bitmap_add(node_ids, index(newf1));
             }
 
-            mrc_ref_nodes_add(&reorder_db->mrc, index(f0), -1);
-//            var_ref_nnodes[index(f0)]--;
-            mrc_ref_nodes_add(&reorder_db->mrc, index(newf0), 1);
-//            var_ref_nnodes[index(newf0)]++;
-
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f0), -1, memory_order_relaxed);
+            atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(newf0), 1, memory_order_relaxed);
             if (created0) {
                 new_nnodes++;
                 var_new_nnodes[var + 1]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f00), 1);
-//                var_ref_nnodes[index(f00)]++;
-                mrc_ref_nodes_add(&reorder_db->mrc, index(f10), 1);
-//                var_ref_nnodes[index(f10)]++;
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f00), 1, memory_order_relaxed);
+                atomic_fetch_add_explicit(reorder_db->mrc.ref_nodes.container + index(f10), 1, memory_order_relaxed);
                 roaring_bitmap_add(node_ids, index(newf0));
             }
         }
+
     }
 
     if (new_nnodes > 0) mrc_nnodes_add(&reorder_db->mrc, new_nnodes);
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        if (var_new_nnodes[i] > 0) mrc_var_nnodes_add(&reorder_db->mrc, i, var_new_nnodes[i]);
+        if (var_new_nnodes[i] > 0) {
+            mrc_var_nnodes_add(&reorder_db->mrc, i, var_new_nnodes[i]);
+        }
     }
-//    for (size_t i = 2; i < nodes->table_size; ++i) {
-//        if (var_ref_nnodes[i] != 0) mrc_ref_nodes_add(&reorder_db->mrc, i, var_ref_nnodes[i]);
-//    }
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)

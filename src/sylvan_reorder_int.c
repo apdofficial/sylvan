@@ -421,9 +421,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
-#if INFO
-    double t_reorder = wctime();
-#endif
     reorder_db->config.t_start_sifting = wctime();
     reorder_db->config.total_num_var = 0;
 
@@ -431,18 +428,23 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 
     sylvan_clear_cache();
 
+
     if (reorder_db->config.print_stat == true) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
+        size_t filled, total;
+        sylvan_table_usage(&filled, &total);
 #if SYLVAN_USE_LINEAR_PROBING
         printf("BDD reordering with %s (probing): from %zu to ... ", buff, llmsset_count_marked(nodes));
 #else
-        printf("BDD reordering with %s (chaining): from %zu to ... ", buff, llmsset_count_marked(nodes));
+        printf("(%zu/%zu) BDD reordering with %s (chaining): from %zu to ... ", filled, total, buff,
+               llmsset_count_marked(nodes));
 #endif
     }
 
     mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
-    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count,
+                  nodes->table_size);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;
@@ -453,10 +455,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     for (re_hook_entry_t e = prere_list; e != NULL; e = e->next) {
         WRAP(e->cb);
     }
-
-#if INFO
-    printf("\npre reorder took %f seconds\n", wctime() - t_reorder);
-#endif
 }
 
 VOID_TASK_IMPL_0(sylvan_post_reorder)
@@ -474,8 +472,8 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     mrc_deinit(&reorder_db->mrc);
     interact_deinit(&reorder_db->matrix);
 
-    double end = wctime() - reorder_db->config.t_start_sifting;
     if (reorder_db->config.print_stat == true) {
+        double end = wctime() - reorder_db->config.t_start_sifting;
         printf("%zu nodes in %f sec\n", after_size, end);
     }
 

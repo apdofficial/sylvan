@@ -426,13 +426,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         if (i > 1) exit(1);
 #endif
         roaring_bitmap_run_optimize(reorder_db->mrc.node_ids);
-#if !SYLVAN_USE_LINEAR_PROBING
-        // since we are removing nodes there will be space left in the buckets which were already claimed.
-        // this would generally result in occupying half of the buckets in the table since
-        // all bucket would be owned by some thread but mrc_delete_node with chaining
-        // would silently delete individual entries.
-        CALL(llmsset_reset_all_regions);
-#endif
+
         continue;
 
         siftingFailed:
