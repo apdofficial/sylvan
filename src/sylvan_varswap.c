@@ -371,6 +371,10 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 atomic_store(result, SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL);
                 return;
             }
+            mtbddnode_makemapnode(node, var, f0, f01);
+            llmsset_rehash_bucket(nodes, index);
+
+
             mrc_ref_nodes_add(&reorder_db->mrc, index(f0), -1);
 //            var_ref_nnodes[index(f0)]--;
             mrc_ref_nodes_add(&reorder_db->mrc, index(newf), 1);
@@ -385,10 +389,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 //                var_ref_nnodes[index(f1)]++;
                 roaring_bitmap_add(node_ids, index(newf));
             }
-
-            mtbddnode_makemapnode(node, var, f0, f01);
-            llmsset_rehash_bucket(nodes, index);
-
         } else {
             MTBDD newf1, newf0, f1, f0, f11, f10, f01, f00;
             int created0, created1 = 0;
@@ -421,6 +421,10 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 return;
             }
 
+            // update node, which also removes the mark
+            mtbddnode_makenode(node, var, newf0, newf1);
+            llmsset_rehash_bucket(nodes, index);
+
             mrc_ref_nodes_add(&reorder_db->mrc, index(f1), -1);
 //            var_ref_nnodes[index(f1)]--;
             mrc_ref_nodes_add(&reorder_db->mrc, index(newf1), 1);
@@ -450,10 +454,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 //                var_ref_nnodes[index(f10)]++;
                 roaring_bitmap_add(node_ids, index(newf0));
             }
-
-            // update node, which also removes the mark
-            mtbddnode_makenode(node, var, newf0, newf1);
-            llmsset_rehash_bucket(nodes, index);
         }
     }
 

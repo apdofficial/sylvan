@@ -4,7 +4,7 @@
 #include <errno.h>
 
 VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*, roaring_bitmap_t*)
-VOID_TASK_DECL_3(mrc_delete_node_par, mrc_t*, size_t, roaring_bitmap_t*)
+TASK_DECL_3(size_t, mrc_delete_node_par, mrc_t*, size_t, roaring_bitmap_t*)
 VOID_TASK_DECL_4(mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
 /**
@@ -232,20 +232,52 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
     roaring_init_iterator(self->node_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
+    int deleted = 0;
+    int ref_vars[reorder_db->levels.count];
+    memset(&ref_vars, 0x00, sizeof (int) * reorder_db->levels.count);
+    int  var_nnodes[reorder_db->levels.count];
+    memset(&var_nnodes, 0x00, sizeof (int) * reorder_db->levels.count);
+
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         if (mrc_is_node_dead(self, it.current_value)) {
-            CALL(mrc_delete_node_par, self, it.current_value, dead_ids);
+            deleted++;
+            mtbddnode_t f = MTBDD_GETNODE(it.current_value);
+            var_nnodes[mtbddnode_getvariable(f)]++;
+            roaring_bitmap_add(dead_ids, it.current_value);
+            if (!mtbddnode_isleaf(f)) {
+                MTBDD f1 = mtbddnode_gethigh(f);
+                size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+                if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
+                    mrc_ref_nodes_add(self, f1_index, -1);
+                    ref_vars[mtbdd_getvar(f1)]++;
+                }
+                MTBDD f0 = mtbddnode_getlow(f);
+                size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+                if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
+                    mrc_ref_nodes_add(self, f0_index, -1);
+                    ref_vars[mtbdd_getvar(f0)]++;
+                }
+            }
+#if !SYLVAN_USE_LINEAR_PROBING
+            llmsset_clear_one_hash(nodes, it.current_value);
+            llmsset_clear_one_data(nodes, it.current_value);
+#endif
         }
         roaring_advance_uint32_iterator(&it);
     }
+    if (deleted > 0) mrc_nnodes_add(self, -deleted);
+    for (size_t i = 0; i < reorder_db->levels.count; ++i) {
+        if (ref_vars[i] != 0) mrc_ref_vars_add(&reorder_db->mrc, i, -ref_vars[i]);
+        if (var_nnodes[i] != 0) mrc_var_nnodes_add(&reorder_db->mrc, i, -var_nnodes[i]);
+    }
 }
 
-VOID_TASK_IMPL_3(mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitmap_t*, old_ids)
+TASK_IMPL_3(size_t, mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitmap_t*, old_ids)
 {
+    size_t deleted = 1;
     mtbddnode_t f = MTBDD_GETNODE(index);
     mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
-    mrc_nnodes_add(self, -1);
     roaring_bitmap_add(old_ids, index);
     if (!mtbddnode_isleaf(f)) {
         size_t spawned = 0;
@@ -255,7 +287,7 @@ VOID_TASK_IMPL_3(mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitma
             mrc_ref_nodes_add(self, f1_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
             if (mrc_is_node_dead(self, f1_index)) {
-                CALL(mrc_delete_node_par, self, f1_index, old_ids);
+                SPAWN(mrc_delete_node_par, self, f1_index, old_ids);
                 spawned++;
             }
         }
@@ -265,16 +297,18 @@ VOID_TASK_IMPL_3(mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitma
             mrc_ref_nodes_add(self, f0_index, -1);
             mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
             if (mrc_is_node_dead(self, f0_index)) {
-                CALL(mrc_delete_node_par, self, f0_index, old_ids);
-                spawned++;
+                deleted += CALL(mrc_delete_node_par, self, f0_index, old_ids);
             }
         }
-        for (size_t i = 0; i < spawned; ++i) SYNC(mrc_delete_node_par);
+        if(spawned) {
+            deleted += SYNC(mrc_delete_node_par);
+        }
     }
 #if !SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_one_hash(nodes, index);
     llmsset_clear_one_data(nodes, index);
 #endif
+    return deleted;
 }
 
 VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
