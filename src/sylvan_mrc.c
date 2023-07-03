@@ -12,7 +12,6 @@ VOID_TASK_DECL_4(mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
  */
 void atomic_counters_init(atomic_counters_t *self, size_t new_size)
 {
-    assert(self != NULL);
     atomic_counters_deinit(self);
     self->container = (atomic_counter_t *) alloc_aligned(sizeof(atomic_counter_t[new_size]));
     if (self->container == NULL) {
@@ -33,21 +32,14 @@ void atomic_counters_deinit(atomic_counters_t *self)
 
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
+#ifndef NDEBUG
     counter_t curr = atomic_counters_get(self, idx);
     if (curr == 0 && val < 0) return;               // underflow
     if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
+#endif
     if (idx >= self->size) return;                  // out of bounds
     _Atomic(counter_t) *ptr = self->container + idx;
     atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
-}
-
-void atomic_counters_set(atomic_counters_t *self, size_t idx, counter_t val)
-{
-    if (val >= COUNTER_T_MAX) return;               // overflow
-    if (idx >= self->size) return;                  // out of bounds
-    _Atomic(counter_t) *ptr = self->container + idx;
-    atomic_store_explicit(ptr, val, memory_order_relaxed);
-
 }
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
@@ -122,26 +114,6 @@ void mrc_deinit(mrc_t *self)
     atomic_counters_deinit(&self->ref_vars);
     atomic_counters_deinit(&self->var_nnodes);
     atomic_bitmap_deinit(&self->ext_ref_nodes);
-}
-
-void mrc_isolated_count_set(mrc_t *self, int val)
-{
-    self->isolated_count = val;
-}
-
-void mrc_ref_nodes_set(mrc_t *self, size_t idx, int val)
-{
-    atomic_counters_set(&self->ref_nodes, idx, val);
-}
-
-void mrc_ref_vars_set(mrc_t *self, size_t idx, int val)
-{
-    atomic_counters_set(&self->ref_vars, idx, val);
-}
-
-void mrc_var_nodes_set(mrc_t *self, size_t idx, int val)
-{
-    atomic_counters_set(&self->var_nnodes, idx, val);
 }
 
 void mrc_nnodes_set(mrc_t *self, int val)

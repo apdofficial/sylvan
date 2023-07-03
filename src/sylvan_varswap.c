@@ -319,10 +319,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
-
-    // atm, llmsset_look_up seems to have a bug with multiple workers
-    // so run this only in 1 task
-    if (count > (NBITS_PER_BUCKET * 16)) {
+    if (count > (NBITS_PER_BUCKET * 8)) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         roaring_bitmap_t a;
@@ -341,8 +338,11 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
     roaring_init_iterator(p2_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
-    const size_t end = first + count;
+    int new_nnodes = 0;
+    int var_new_nnodes[reorder_db->levels.count];
+    memset(&var_new_nnodes, 0x00, sizeof (int) * reorder_db->levels.count);
 
+    const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         if (atomic_load_explicit(result, memory_order_relaxed) != SYLVAN_REORDER_SUCCESS) {
             return;  // fail fast
@@ -369,7 +369,17 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                 atomic_store(result, SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL);
                 return;
             }
-            if (created) roaring_bitmap_add(node_ids, newf & SYLVAN_TABLE_MASK_INDEX);
+
+            if (created) {
+                new_nnodes++;
+                var_new_nnodes[var + 1]++;
+                roaring_bitmap_add(node_ids, newf & SYLVAN_TABLE_MASK_INDEX);
+                mrc_ref_nodes_add(&reorder_db->mrc, newf & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, 1);
+            } else {
+                mrc_ref_nodes_add(&reorder_db->mrc, newf & SYLVAN_TABLE_MASK_INDEX, 1);
+            }
 
             mtbddnode_makemapnode(node, var, f0, f01);
             llmsset_rehash_bucket(nodes, index);
@@ -398,8 +408,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             // degenerate nodes (e.g., in the case that F11 = F01 or F10 == F00),
             // or may already exist in the DAG as required to implement other functions.
 
-            newf1 = mrc_make_node(&reorder_db->mrc, var + 1, f01, f11, &created1, 0);
-            newf0 = mrc_make_node(&reorder_db->mrc, var + 1, f00, f10, &created0, 0);
+            newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
+            newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
 
             if (newf1 == mtbdd_invalid || newf0 == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_CREATE_FAIL);
@@ -407,15 +417,40 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             }
 
             mrc_ref_nodes_add(&reorder_db->mrc, f1 & SYLVAN_TABLE_MASK_INDEX, -1);
-            if (created1) roaring_bitmap_add(node_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+            if (created1) {
+                new_nnodes++;
+                var_new_nnodes[var + 1]++;
+                roaring_bitmap_add(node_ids, newf1 & SYLVAN_TABLE_MASK_INDEX);
+                mrc_ref_nodes_add(&reorder_db->mrc, newf1 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f11 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f01 & SYLVAN_TABLE_MASK_INDEX, 1);
+            } else {
+                mrc_ref_nodes_add(&reorder_db->mrc, newf1 & SYLVAN_TABLE_MASK_INDEX, 1);
+            }
+
             mrc_ref_nodes_add(&reorder_db->mrc, f0 & SYLVAN_TABLE_MASK_INDEX, -1);
-            if (created0) roaring_bitmap_add(node_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+            if (created0) {
+                new_nnodes++;
+                var_new_nnodes[var + 1]++;
+                roaring_bitmap_add(node_ids, newf0 & SYLVAN_TABLE_MASK_INDEX);
+                mrc_ref_nodes_add(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f00 & SYLVAN_TABLE_MASK_INDEX, 1);
+                mrc_ref_nodes_add(&reorder_db->mrc, f10 & SYLVAN_TABLE_MASK_INDEX, 1);
+            } else {
+                mrc_ref_nodes_add(&reorder_db->mrc, newf0 & SYLVAN_TABLE_MASK_INDEX, 1);
+            }
 
             // update node, which also removes the mark
             mtbddnode_makenode(node, var, newf0, newf1);
             llmsset_rehash_bucket(nodes, index);
         }
     }
+
+    if (new_nnodes > 0) mrc_nnodes_add(&reorder_db->mrc, new_nnodes);
+    for (size_t i = 0; i < reorder_db->levels.count; ++i) {
+        if (var_new_nnodes[i] > 0) mrc_var_nnodes_add(&reorder_db->mrc, i, var_new_nnodes[i]);
+    }
+
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)

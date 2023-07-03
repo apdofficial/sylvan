@@ -9,7 +9,7 @@ extern "C" {
 
 // use 16-bit counter (used by MRC)
 // max value is 65535, thus if node is referenced more than 65535 (keep it at 65535), it is unlikely it will be ever deleted
-typedef unsigned short counter_t;
+typedef size_t counter_t;
 typedef _Atomic(counter_t) atomic_counter_t;
 
 /**
@@ -63,14 +63,6 @@ void mrc_deinit(mrc_t* self);
 /**
  * setters
  */
-void mrc_isolated_count_set(mrc_t* self, int val);
-
-void mrc_ref_nodes_set(mrc_t* self, size_t idx, int val);
-
-void mrc_ref_vars_set(mrc_t* self, size_t idx, int val);
-
-void mrc_var_nodes_set(mrc_t* self, size_t idx, int val);
-
 void mrc_nnodes_set(mrc_t* self, int val);
 
 /**
