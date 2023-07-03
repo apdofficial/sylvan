@@ -364,7 +364,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             f00 = node_getlow(f0, n0);
             f01 = node_gethigh(f0, n0);
 
-            newf = mrc_make_mapnode(&reorder_db->mrc, var + 1, f00, f1, &created, 0);
+            newf = mtbdd_varswap_makemapnode(var + 1, f00, f1, &created);
             if (newf == mtbdd_invalid) {
                 atomic_store(result, SYLVAN_REORDER_P2_MAPNODE_CREATE_FAIL);
                 return;
