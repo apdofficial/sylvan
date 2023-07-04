@@ -4,7 +4,7 @@
 
 static size_t levels_size = 0; // size of the arrays in levels_t used to realloc memory
 
-size_t levels_count_get(levels_t* self)
+size_t levels_get_count(levels_t* self)
 {
     return self->count;
 }
@@ -12,7 +12,7 @@ size_t levels_count_get(levels_t* self)
 uint64_t levels_new_one(levels_t* self)
 {
     levels_new_many(self, 1);
-    return self->table[levels_count_get(self) - 1];
+    return self->table[levels_get_count(self) - 1];
 }
 
 int levels_new_many(levels_t* self, size_t amount)
@@ -31,7 +31,6 @@ int levels_new_many(levels_t* self, size_t amount)
         }
     }
     for (size_t i = 0; i < amount; i++) {
-        (void)self->count;
         self->table[self->count] = mtbdd_makenode(self->count, mtbdd_false, mtbdd_true);
         self->level_to_order[self->count] = self->count;
         self->order_to_level[self->count] = self->count;
@@ -72,6 +71,7 @@ void levels_reset(levels_t* self)
 
 uint64_t levels_ithlevel(levels_t* self, uint32_t level)
 {
+//    printf("levels_ithlevel: %d\n", level);
     if (level < self->count) {
         return self->table[self->level_to_order[level]];
     } else {

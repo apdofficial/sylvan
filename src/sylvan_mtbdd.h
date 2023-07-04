@@ -133,8 +133,11 @@ static const MTBDD sylvan_invalid    = 0xffffffffffffffffLL;
 #define sylvan_printsha         mtbdd_printsha
 #define sylvan_fprintsha        mtbdd_fprintsha
 #define sylvan_getsha           mtbdd_getsha
-#define sylvan_level_to_order(x)   levels_level_to_order(&reorder_db->levels, x)
-#define sylvan_order_to_level(x)   levels_order_to_level(&reorder_db->levels, x)
+
+#define sylvan_level_to_order(x)    levels_level_to_order(&reorder_db->levels, x)
+#define sylvan_order_to_level(x)    levels_order_to_level(&reorder_db->levels, x)
+#define sylvan_levels_count()         levels_get_count(&reorder_db->levels)
+
 /**
  * Initialize MTBDD functionality.
  * This initializes internal and external referencing datastructures,
