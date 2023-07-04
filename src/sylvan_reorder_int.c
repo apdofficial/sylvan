@@ -432,12 +432,7 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     if (reorder_db->config.print_stat == true) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
-#if SYLVAN_USE_LINEAR_PROBING
-        printf("(%zu/%zu) BDD reordering with %s (probing): from %zu to ... ", filled, total, buff,
-               llmsset_count_marked(nodes));
-#else
         printf("BDD reordering with %s: from %zu to ... ", buff, llmsset_count_marked(nodes));
-#endif
     }
 
     reorder_db->call_count++;
