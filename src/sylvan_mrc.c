@@ -251,13 +251,13 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
                 MTBDD f1 = mtbddnode_gethigh(f);
                 size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
                 if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
-                    mrc_ref_nodes_add(self, f1_index, -1);
+                    atomic_fetch_add_explicit(self->ref_nodes.container + f1_index, -1, memory_order_relaxed);
                     ref_vars[mtbdd_getvar(f1)]++;
                 }
                 MTBDD f0 = mtbddnode_getlow(f);
                 size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
                 if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
-                    mrc_ref_nodes_add(self, f0_index, -1);
+                    atomic_fetch_add_explicit(self->ref_nodes.container + f0_index, -1, memory_order_relaxed);
                     ref_vars[mtbdd_getvar(f0)]++;
                 }
             }
