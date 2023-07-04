@@ -333,7 +333,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
     };
     roaring_bitmap_clear(self->node_ids);
     roaring_bitmap_init_with_capacity(self->node_ids, llmsset_count_marked(dbs));
-    CALL(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap, self->node_ids);
+    CALL(mrc_collect_node_ids_par, 0, dbs->table_size, &bitmap, self->node_ids);
 }
 
 VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap,

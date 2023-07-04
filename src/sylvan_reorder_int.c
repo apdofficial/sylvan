@@ -144,8 +144,8 @@ VOID_TASK_IMPL_0(reorder_db_call_progress_hooks)
 inline uint64_t get_nodes_count()
 {
 #if SYLVAN_USE_LINEAR_PROBING
-    return mrc_nnodes_get(&reorder_db->mrc) + 2;
-//    return llmsset_count_marked(nodes) + 2;
+//    return mrc_nnodes_get(&reorder_db->mrc) + 2;
+    return llmsset_count_marked(nodes) + 2;
 #else
     return mrc_nnodes_get(&reorder_db->mrc) + 2;
 #endif
@@ -424,27 +424,21 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     reorder_db->config.t_start_sifting = wctime();
     reorder_db->config.total_num_var = 0;
 
-    mrc_collect_node_ids(&reorder_db->mrc, nodes);
-
     sylvan_clear_cache();
-
+    mrc_collect_node_ids(&reorder_db->mrc, nodes);
+    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
+    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
 
     if (reorder_db->config.print_stat == true) {
         char buff[100];
         sylvan_reorder_type_description(type, buff, 100);
-        size_t filled, total;
-        sylvan_table_usage(&filled, &total);
 #if SYLVAN_USE_LINEAR_PROBING
-        printf("BDD reordering with %s (probing): from %zu to ... ", buff, llmsset_count_marked(nodes));
-#else
-        printf("(%zu/%zu) BDD reordering with %s (chaining): from %zu to ... ", filled, total, buff,
+        printf("(%zu/%zu) BDD reordering with %s (probing): from %zu to ... ", filled, total, buff,
                llmsset_count_marked(nodes));
+#else
+        printf("BDD reordering with %s: from %zu to ... ", buff, llmsset_count_marked(nodes));
 #endif
     }
-
-    mrc_init(&reorder_db->mrc, reorder_db->levels.count, nodes->table_size);
-    interact_init(&reorder_db->matrix, &reorder_db->levels, &reorder_db->mrc, reorder_db->levels.count,
-                  nodes->table_size);
 
     reorder_db->call_count++;
     reorder_db->mrc.isolated_count = 0;
@@ -463,7 +457,8 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
     size_t new_size_threshold = (after_size + 1) * SYLVAN_REORDER_SIZE_RATIO;
-    if (reorder_db->call_count < SYLVAN_REORDER_LIMIT || new_size_threshold > reorder_db->config.size_threshold) {
+//    size_t new_size_threshold = reorder_db->config.size_threshold * SYLVAN_REORDER_SIZE_RATIO;
+    if (reorder_db->call_count < SYLVAN_REORDER_LIMIT && new_size_threshold > reorder_db->config.size_threshold) {
         reorder_db->config.size_threshold = new_size_threshold;
     } else {
         reorder_db->config.size_threshold += SYLVAN_REORDER_LIMIT;
@@ -474,7 +469,7 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
 
     if (reorder_db->config.print_stat == true) {
         double end = wctime() - reorder_db->config.t_start_sifting;
-        printf("%zu nodes in %f sec\n", after_size, end);
+        printf("%zu nodes in %f sec\n",  after_size, end);
     }
 
     for (re_hook_entry_t e = postre_list; e != NULL; e = e->next) {
@@ -557,10 +552,10 @@ void sylvan_reorder_type_description(reordering_type_t type, char *buf, size_t b
     assert(buf_len >= 100);
     switch (type) {
         case SYLVAN_REORDER_BOUNDED_SIFT:
-            sprintf(buf, "bounded sifting");
+            sprintf(buf, "sifting");
             break;
         case SYLVAN_REORDER_SIFT:
-            sprintf(buf, "sifting");
+            sprintf(buf, "unbounded sifting");
     }
 }
 

@@ -321,7 +321,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
-#if !PARALLEL
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices

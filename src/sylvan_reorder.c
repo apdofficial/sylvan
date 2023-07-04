@@ -37,64 +37,75 @@ TASK_DECL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, uint32_t)
 
 void sylvan_init_reorder()
 {
+    if(reorder_db != NULL && reorder_db->is_initialised) return;
     reorder_db = reorder_db_init();
 }
 
 void sylvan_quit_reorder()
 {
+    if(!reorder_db->is_initialised) return;
     reorder_db_deinit(reorder_db);
 }
 
 void sylvan_set_reorder_nodes_threshold(uint32_t threshold)
 {
+    if(!reorder_db->is_initialised) return;
     assert(threshold > 0);
     reorder_db->config.threshold = threshold;
 }
 
 void sylvan_set_reorder_maxgrowth(float max_growth)
 {
+    if(!reorder_db->is_initialised) return;
     assert(max_growth > 1.0f);
     reorder_db->config.max_growth = max_growth;
 }
 
 void sylvan_set_reorder_maxswap(uint32_t max_swap)
 {
+    if(!reorder_db->is_initialised) return;
     assert(max_swap > 1);
     reorder_db->config.max_swap = max_swap;
 }
 
 void sylvan_set_reorder_maxvar(uint32_t max_var)
 {
+    if(!reorder_db->is_initialised) return;
     assert(max_var > 1);
     reorder_db->config.max_var = max_var;
 }
 
 void sylvan_set_reorder_timelimit_min(double time_limit)
 {
+    if(!reorder_db->is_initialised) return;
     assert(time_limit > 0);
     sylvan_set_reorder_timelimit_sec(time_limit * 60);
 }
 
 void sylvan_set_reorder_timelimit_sec(double time_limit)
 {
+    if(!reorder_db->is_initialised) return;
     assert(time_limit > 0);
     sylvan_set_reorder_timelimit_ms(time_limit * 1000);
 }
 
 void sylvan_set_reorder_timelimit_ms(double time_limit)
 {
+    if(!reorder_db->is_initialised) return;
     assert(time_limit > 0);
     reorder_db->config.time_limit_ms = time_limit;
 }
 
 void sylvan_set_reorder_verbose(int is_verbose)
 {
+    if(!reorder_db->is_initialised) return;
     assert(is_verbose >= 0);
     reorder_db->config.print_stat = is_verbose;
 }
 
 void sylvan_set_reorder_type(reordering_type_t type)
 {
+    if(!reorder_db->is_initialised) return;
     reorder_db->config.type = type;
 }
 
@@ -140,8 +151,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_reorder_perm, const uint32_t*, permutation)
 void sylvan_test_reduce_heap()
 {
     if (reorder_db == NULL || reorder_db->is_initialised == false) return;
-    if (llmsset_count_marked(nodes) >= reorder_db->config.size_threshold &&
-        reorder_db->call_count < SYLVAN_REORDER_LIMIT) {
+    if (llmsset_count_marked(nodes) >= reorder_db->config.size_threshold && reorder_db->call_count < SYLVAN_REORDER_LIMIT) {
         sylvan_reorder_stop_world(reorder_db->config.type);
     }
 }
@@ -150,7 +160,6 @@ void sylvan_reduce_heap(reordering_type_t type)
 {
     if (reorder_db == NULL || reorder_db->is_initialised == false) return;
     sylvan_reorder_stop_world(type);
-    sylvan_gc();
 }
 
 /**
@@ -430,11 +439,12 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
         continue;
 
         siftingFailed:
-        if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL ||
-            res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
 #if INFO
             sylvan_print_reorder_res(res);
 #endif
+        if (res == SYLVAN_REORDER_P2_CREATE_FAIL || res == SYLVAN_REORDER_P3_CLEAR_FAIL ||
+            res == SYLVAN_REORDER_NOT_ENOUGH_MEMORY) {
+
             sylvan_post_reorder();
             sylvan_gc();
             sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);

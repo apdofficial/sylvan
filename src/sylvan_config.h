@@ -45,13 +45,12 @@
 #define SYLVAN_REORDER_GROWTH	        1.2f
 #define SYLVAN_REORDER_NODES_THRESHOLD	1
 #define SYLVAN_REORDER_TIME_LIMIT_MS	(10000 * 60 * 1000)
-#define SYLVAN_REORDER_SIZE_THRESHOLD	5000
-#define SYLVAN_REORDER_SIZE_RATIO	    (1.6)
-#define SYLVAN_REORDER_LIMIT	        20                              // maximum number of reordering calls allowed
+#define SYLVAN_REORDER_SIZE_THRESHOLD	4000
+#define SYLVAN_REORDER_SIZE_RATIO	    (2)
+#define SYLVAN_REORDER_LIMIT	        10                              // maximum number of reordering calls allowed
 #define SYLVAN_REORDER_TYPE_DEFAULT     SYLVAN_REORDER_BOUNDED_SIFT
 #define SYLVAN_REORDER_PRINT_STAT       1
-#define SYLVAN_REORDER_MIN_MEM_REQ      (0.95f)
-
+#define SYLVAN_REORDER_MIN_MEM_REQ      (0.9f)
 #define PARALLEL                        1
 
  /**
