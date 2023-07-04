@@ -52,7 +52,7 @@
 #define SYLVAN_REORDER_PRINT_STAT       1
 #define SYLVAN_REORDER_MIN_MEM_REQ      (0.95f)
 
-#define PARALLEL 0
+#define PARALLEL                        1
 
  /**
   * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.

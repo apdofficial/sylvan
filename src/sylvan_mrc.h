@@ -5,7 +5,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define COUNTER_T_MAX UINT16_MAX
+#define COUNTER_T_MAX UINT64_MAX
 
 // use 16-bit counter (used by MRC)
 // max value is 65535, thus if node is referenced more than 65535 (keep it at 65535), it is unlikely it will be ever deleted

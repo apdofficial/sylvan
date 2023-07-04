@@ -1,8 +1,6 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
-
-
 /**
  * @brief Check if a node is dependent on node with label <var> or <var>+1
  */
@@ -27,7 +25,8 @@ static inline int is_node_dependent_on(mtbddnode_t node, BDDVAR var)
    \details Clear hashes of nodes with var and var+1, Removes exactly the nodes
    that will be changed from the hash table.
 */
-VOID_TASK_DECL_6(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*, roaring_bitmap_t*)
+VOID_TASK_DECL_6(sylvan_varswap_p0, uint32_t, size_t, size_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*,
+                 roaring_bitmap_t*)
 
 #define sylvan_varswap_p0(pos, result, ids, p1) CALL(sylvan_varswap_p0, pos, 0, nodes->table_size, result, ids, p1)
 #endif
@@ -136,7 +135,6 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
-#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
@@ -151,7 +149,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         roaring_bitmap_or_inplace(p1_ids, &a);
         return;
     }
-#endif
+
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
     roaring_move_uint32_iterator_equalorlarger(&it, first);
@@ -195,7 +193,6 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p1_ids,
                  roaring_bitmap_t*, p2_ids)
 {
-#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -209,7 +206,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_bitmap_or_inplace(p2_ids, &a);
         return;
     }
-#endif
+
     // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
     roaring_init_iterator(p1_ids, &it);
@@ -305,12 +302,12 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
     if (var_plus_one_diff != 0) mrc_var_nnodes_add(&reorder_db->mrc, var + 1, var_plus_one_diff);
 }
 
-#define index(x) (x & SYLVAN_TABLE_MASK_INDEX)
+#define index(x) ((x) & SYLVAN_TABLE_MASK_INDEX)
 /**
  * Implementation of second phase of variable swapping.
  * For all nodes marked in the first phase:
  * - determine F00, F01, F10, F11
- * - obtain nodes F0 [var+1,F00,F10] and F1 [var+1,F01,F11]
+ * - obtain nodes F0 [var+1,F00,F10] and F1 [var+1, F01, F11]
  *   (and F0<>F1, trivial proof)
  * - in-place substitute outgoing edges with new F0 and F1
  * - and rehash into hash table
@@ -324,7 +321,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, p2_ids,
                  roaring_bitmap_t*, node_ids)
 {
-#if PARALLEL
+#if !PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
@@ -347,7 +344,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 
     int new_nnodes = 0;
     unsigned short var_new_nnodes[reorder_db->levels.count];
-    memset(&var_new_nnodes, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
+    memset(&var_new_nnodes, 0x00, sizeof(unsigned short) * reorder_db->levels.count);
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
@@ -415,10 +412,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
             if (newf1 == mtbdd_invalid) {
 #if !SYLVAN_USE_LINEAR_PROBING
-                // since we are removing nodes there will be space left in the buckets which were already claimed.
-                // this would generally result in occupying half of the buckets in the table since
-                // all bucket would be owned by some thread but mrc_delete_node with chaining
-                // would silently delete individual entries.
                 CALL(llmsset_reset_all_regions);
 #endif
                 newf1 = mtbdd_varswap_makenode(var + 1, f01, f11, &created1);
@@ -431,10 +424,6 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
             newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
             if (newf0 == mtbdd_invalid) {
 #if !SYLVAN_USE_LINEAR_PROBING
-                // since we are removing nodes there will be space left in the buckets which were already claimed.
-                // this would generally result in occupying half of the buckets in the table since
-                // all bucket would be owned by some thread but mrc_delete_node with chaining
-                // would silently delete individual entries.
                 CALL(llmsset_reset_all_regions);
 #endif
                 newf0 = mtbdd_varswap_makenode(var + 1, f00, f10, &created0);
@@ -474,17 +463,15 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
 
     if (new_nnodes > 0) mrc_nnodes_add(&reorder_db->mrc, new_nnodes);
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        if (var_new_nnodes[i] > 0) {
-            mrc_var_nnodes_add(&reorder_db->mrc, i, var_new_nnodes[i]);
-        }
+        if (var_new_nnodes[i] > 0) mrc_var_nnodes_add(&reorder_db->mrc, i, var_new_nnodes[i]);
     }
 }
 
 VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
 {
-    if (reorder_db->config.print_stat) {
-        printf("\nRunning recovery after running out of memory...\n");
-    }
+//    if (reorder_db->config.print_stat) {
+    printf("\nRunning recovery after running out of memory...\n");
+//    }
 
     roaring_bitmap_t p2_ids;
     roaring_bitmap_init_cleared(&p2_ids);

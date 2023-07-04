@@ -139,27 +139,6 @@ mtbddnode_setvariable(mtbddnode_t n, uint32_t newvar)
     n->b = ((uint64_t)newvar)<<40 | (n->b & 0x000000ffffffffff);
 }
 
-static inline int __attribute__((unused))
-mtbddnode_getflag(mtbddnode_t n)
-{
-    return n->a & mtbdd_flag ? 1 : 0;
-}
-
-/**
- * @brief Set a flag on a node.
- * @detail Currently has two use-cases:
- * - Marking nodes which <var> visited during a tree search when determining a variable interaction matrix
- * - Marking nodes which need to be handheld during phase 2 of the variable swap.
- *
- * @note Set the flag to 0 once you are done with it.
- */
-static inline void __attribute__((unused))
-mtbddnode_setflag(mtbddnode_t n, int is_marked)
-{
-    if (is_marked) n->a |= mtbdd_flag;
-    else n->a &= ~mtbdd_flag;
-}
-
 static inline void __attribute__((unused))
 mtbddnode_makeleaf(mtbddnode_t n, uint32_t type, uint64_t value)
 {

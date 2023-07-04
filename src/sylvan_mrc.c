@@ -4,7 +4,9 @@
 #include <errno.h>
 
 VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*, roaring_bitmap_t*)
-TASK_DECL_3(size_t, mrc_delete_node_par, mrc_t*, size_t, roaring_bitmap_t*)
+
+TASK_DECL_3(size_t, mrc_delete_node, mrc_t*, size_t, roaring_bitmap_t*)
+
 VOID_TASK_DECL_4(mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
 /**
@@ -32,19 +34,25 @@ void atomic_counters_deinit(atomic_counters_t *self)
 
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
-#ifndef NDEBUG
     counter_t curr = atomic_counters_get(self, idx);
-    if (curr == 0 && val < 0) return;               // underflow
-    if ((curr + val) >= COUNTER_T_MAX) return;      // overflow
-#endif
+    if (curr == 0 && val < 0) {
+//        printf("underflow\n");
+        return;
+//        exit(-1);
+    }
+    if ((curr + val) >= COUNTER_T_MAX) {
+//        printf("overflow\n");
+        return;
+//        exit(-1);
+    }
     if (idx >= self->size) return;                  // out of bounds
-    _Atomic(counter_t) *ptr = self->container + idx;
+    _Atomic (counter_t) *ptr = self->container + idx;
     atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
 }
 
 counter_t atomic_counters_get(const atomic_counters_t *self, size_t idx)
 {
-    _Atomic(counter_t) *ptr = self->container + idx;
+    _Atomic (counter_t) *ptr = self->container + idx;
     return atomic_load_explicit(ptr, memory_order_relaxed);
 }
 
@@ -138,6 +146,15 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 
 void mrc_nnodes_add(mrc_t *self, int val)
 {
+    size_t curr = mrc_nnodes_get(self);
+    if (curr == 0 && val < 0) {
+        printf("mrc_nnodes_add: underflow\n");
+        exit(-1);
+    }
+    if ((curr + val) >= COUNTER_T_MAX) {
+        printf("mrc_nnodes_add: overflow\n");
+        exit(-1);
+    }
     atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
@@ -180,7 +197,7 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
     // thus, invoke it only if really necessary
     counter_t ext_count = mrc_ext_ref_nodes_get(self, idx);
     if (ext_count > 0) return 0;
-    return 1;
+    return llmsset_is_marked(nodes, idx) == 1;
 }
 
 VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
@@ -207,38 +224,24 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+#else
+    CALL(llmsset_reset_all_regions);
 #endif
 
 }
 
+
 VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids)
 {
-#if PARALLEL
-    if (count > NBITS_PER_BUCKET * 32) {
-        // standard reduction pattern with local roaring bitmaps collecting dead node indices
-        size_t split = count / 2;
-        roaring_bitmap_t a;
-        roaring_bitmap_init_cleared(&a);
-        SPAWN(mrc_gc_go, self,first, split, &a);
-        roaring_bitmap_t b;
-        roaring_bitmap_init_cleared(&b);
-        CALL(mrc_gc_go, self, first + split, count - split,&b);
-        roaring_bitmap_or_inplace(dead_ids, &b);
-        SYNC(mrc_gc_go);
-        roaring_bitmap_or_inplace(dead_ids, &a);
-        return;
-    }
-#endif
-
     roaring_uint32_iterator_t it;
     roaring_init_iterator(self->node_ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
 
     int deleted = 0;
     unsigned short ref_vars[reorder_db->levels.count];
-    memset(&ref_vars, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
-    unsigned short  var_nnodes[reorder_db->levels.count];
-    memset(&var_nnodes, 0x00, sizeof (unsigned short) * reorder_db->levels.count);
+    memset(&ref_vars, 0x00, sizeof(unsigned short) * reorder_db->levels.count);
+    unsigned short var_nnodes[reorder_db->levels.count];
+    memset(&var_nnodes, 0x00, sizeof(unsigned short) * reorder_db->levels.count);
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
@@ -247,18 +250,25 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
             mtbddnode_t f = MTBDD_GETNODE(it.current_value);
             var_nnodes[mtbddnode_getvariable(f)]++;
             roaring_bitmap_add(dead_ids, it.current_value);
+
             if (!mtbddnode_isleaf(f)) {
                 MTBDD f1 = mtbddnode_gethigh(f);
-                size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-                if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
+                uint64_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+                if (f1_index != sylvan_invalid && f1_index != 0 && f1_index != 1) {
                     atomic_fetch_add_explicit(self->ref_nodes.container + f1_index, -1, memory_order_relaxed);
                     ref_vars[mtbdd_getvar(f1)]++;
                 }
+                if(mrc_is_node_dead(self, f1_index)) {
+                    deleted += CALL(mrc_delete_node, self, f1_index, dead_ids);
+                }
                 MTBDD f0 = mtbddnode_getlow(f);
-                size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-                if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
+                uint64_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+                if (f0_index != sylvan_invalid && f0_index != 0 && f0_index != 1) {
                     atomic_fetch_add_explicit(self->ref_nodes.container + f0_index, -1, memory_order_relaxed);
                     ref_vars[mtbdd_getvar(f0)]++;
+                }
+                if(mrc_is_node_dead(self, f0_index)) {
+                    deleted += CALL(mrc_delete_node, self, f0_index, dead_ids);
                 }
             }
 #if !SYLVAN_USE_LINEAR_PROBING
@@ -276,35 +286,36 @@ VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roar
     }
 }
 
-TASK_IMPL_3(size_t, mrc_delete_node_par, mrc_t*, self, size_t, index, roaring_bitmap_t*, old_ids)
+TASK_IMPL_3(size_t, mrc_delete_node, mrc_t*, self, size_t, index, roaring_bitmap_t*, dead_ids)
 {
     size_t deleted = 1;
     mtbddnode_t f = MTBDD_GETNODE(index);
-    mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
-    roaring_bitmap_add(old_ids, index);
+    atomic_fetch_add_explicit(self->var_nnodes.container + mtbddnode_getvariable(f), -1, memory_order_relaxed);
+    roaring_bitmap_add(dead_ids, index);
+
     if (!mtbddnode_isleaf(f)) {
         size_t spawned = 0;
         MTBDD f1 = mtbddnode_gethigh(f);
-        size_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1 && mtbdd_isnode(f1)) {
-            mrc_ref_nodes_add(self, f1_index, -1);
-            mrc_ref_vars_add(self, mtbdd_getvar(f1), -1);
+        uint64_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
+        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1) {
+            atomic_fetch_add_explicit(self->ref_nodes.container + f1_index, -1, memory_order_relaxed);
+            atomic_fetch_add_explicit(self->ref_vars.container + mtbdd_getvar(f1), -1, memory_order_relaxed);
             if (mrc_is_node_dead(self, f1_index)) {
-                SPAWN(mrc_delete_node_par, self, f1_index, old_ids);
+                SPAWN(mrc_delete_node, self, f1_index, dead_ids);
                 spawned++;
             }
         }
         MTBDD f0 = mtbddnode_getlow(f);
-        size_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1 && mtbdd_isnode(f0)) {
-            mrc_ref_nodes_add(self, f0_index, -1);
-            mrc_ref_vars_add(self, mtbdd_getvar(f0), -1);
+        uint64_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
+        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1) {
+            atomic_fetch_add_explicit(self->ref_nodes.container + f0_index, -1, memory_order_relaxed);
+            atomic_fetch_add_explicit(self->ref_vars.container + mtbdd_getvar(f0), -1, memory_order_relaxed);
             if (mrc_is_node_dead(self, f0_index)) {
-                deleted += CALL(mrc_delete_node_par, self, f0_index, old_ids);
+                deleted += CALL(mrc_delete_node, self, f0_index, dead_ids);
             }
         }
         if(spawned) {
-            deleted += SYNC(mrc_delete_node_par);
+            deleted += SYNC(mrc_delete_node);
         }
     }
 #if !SYLVAN_USE_LINEAR_PROBING
@@ -325,7 +336,8 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
     CALL(mrc_collect_node_ids_par, 0, bitmap.size, &bitmap, self->node_ids);
 }
 
-VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap, roaring_bitmap_t *, collected_ids)
+VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap,
+                 roaring_bitmap_t *, collected_ids)
 {
 #if PARALLEL
     if (count > NBITS_PER_BUCKET * 16) {
