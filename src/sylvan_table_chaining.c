@@ -148,11 +148,9 @@ llmsset_lookup2(const llmsset_t dbs, uint64_t a, uint64_t b, int *created, const
 #if LLMSSET_MASK
     _Atomic (uint64_t) *first_ptr = &dbs->table[2 * (hash & dbs->mask)];
 #else
-    _Atomic(uint64_t)* bucket = &dbs->table[2*(hash % dbs->table_size)];
+    _Atomic(uint64_t)* first_ptr = &dbs->table[2*(hash % dbs->table_size)];
 #endif
 
-    // chain works like a linked list, index (BUCKET_MASK_INDEX) in a bucket points to the next node
-    // head points to the first node in the chain, it only contains the index
     uint64_t first_idx = atomic_load_explicit(first_ptr, memory_order_relaxed);
     uint64_t end = 0;
     uint64_t bucket_idx = first_idx;

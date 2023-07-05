@@ -99,7 +99,7 @@ size_t mrc_nnodes_get(const mrc_t* self);
  * If the children become dead, delete them as well, repeat until no more dead nodes exist.
  */
 #define mrc_gc(...) RUN(mrc_gc, __VA_ARGS__)
-VOID_TASK_DECL_1(mrc_gc, mrc_t*)
+VOID_TASK_DECL_2(mrc_gc, mrc_t*, roaring_bitmap_t*)
 
 /**
  * utility functions
