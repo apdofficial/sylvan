@@ -452,8 +452,8 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
 
     // new size threshold for next reordering is double the size of non-terminal nodes + the terminal nodes
     size_t new_size_threshold = (after_size + 1) * SYLVAN_REORDER_SIZE_RATIO;
-//    size_t new_size_threshold = reorder_db->config.size_threshold * SYLVAN_REORDER_SIZE_RATIO;
-    if (reorder_db->call_count < SYLVAN_REORDER_LIMIT && new_size_threshold > reorder_db->config.size_threshold) {
+
+    if (reorder_db->call_count < SYLVAN_REORDER_LIMIT || new_size_threshold > reorder_db->config.size_threshold) {
         reorder_db->config.size_threshold = new_size_threshold;
     } else {
         reorder_db->config.size_threshold += SYLVAN_REORDER_LIMIT;
