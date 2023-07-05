@@ -7,7 +7,7 @@ VOID_TASK_DECL_4(mrc_collect_node_ids_par, uint64_t, uint64_t, atomic_bitmap_t*,
 
 TASK_DECL_3(size_t, mrc_delete_node, mrc_t*, size_t, roaring_bitmap_t*)
 
-VOID_TASK_DECL_4(mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
+TASK_DECL_4(size_t, mrc_gc_go, mrc_t*, uint64_t, uint64_t, roaring_bitmap_t*)
 
 /**
  * Atomic counters
@@ -35,17 +35,9 @@ void atomic_counters_deinit(atomic_counters_t *self)
 void atomic_counters_add(atomic_counters_t *self, size_t idx, int val)
 {
     counter_t curr = atomic_counters_get(self, idx);
-    if (curr == 0 && val < 0) {
-//        printf("underflow\n");
-        return;
-//        exit(-1);
-    }
-    if ((curr + val) >= COUNTER_T_MAX) {
-//        printf("overflow\n");
-        return;
-//        exit(-1);
-    }
-    if (idx >= self->size) return;                  // out of bounds
+    if (curr == 0 && val < 0) return;
+    if ((curr + val) >= COUNTER_T_MAX) return;
+    if (idx >= self->size) return;
     _Atomic (counter_t) *ptr = self->container + idx;
     atomic_fetch_add_explicit(ptr, val, memory_order_relaxed);
 }
@@ -147,14 +139,8 @@ void mrc_var_nnodes_add(mrc_t *self, size_t idx, int val)
 void mrc_nnodes_add(mrc_t *self, int val)
 {
     size_t curr = mrc_nnodes_get(self);
-    if (curr == 0 && val < 0) {
-        printf("mrc_nnodes_add: underflow\n");
-        exit(-1);
-    }
-    if ((curr + val) >= COUNTER_T_MAX) {
-        printf("mrc_nnodes_add: overflow\n");
-        exit(-1);
-    }
+    if (curr == 0 && val < 0) return;
+    if ((curr + val) >= COUNTER_T_MAX) return;
     atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
@@ -205,21 +191,30 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
     roaring_bitmap_t dead_ids;
     roaring_bitmap_init_with_capacity(&dead_ids, nodes->table_size);
 
-    CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids);
+#ifndef NDEBUG
+    printf("MRC-GC: (%5zu/%5zu) from %5zu to ...", llmsset_count_marked(nodes), llmsset_get_size(nodes), mrc_nnodes_get(self));
+#endif
+    size_t deleted_nnodes = CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids);
+
+#ifndef NDEBUG
+    printf("%zu (deleted: %zu)\n", llmsset_count_marked(nodes), mrc_nnodes_get(self) - deleted_nnodes);
+    assert(deleted_nnodes <= mrc_nnodes_get(self));
+    assert(deleted_nnodes == roaring_bitmap_get_cardinality(&dead_ids));
+#endif
+    if (deleted_nnodes == 0) return;
 
     // calling bitmap remove per each node is more expensive than calling it once with many ids
     // thus, we group the ids into <arr> and let the bitmap delete them in one go
     roaring_uint32_iterator_t it_old;
     roaring_init_iterator(&dead_ids, &it_old);
-    size_t size = roaring_bitmap_get_cardinality(&dead_ids);
-    uint32_t arr[size];
+    uint32_t arr[deleted_nnodes];
     size_t x = 0;
     while (it_old.has_value) {
         arr[x] = it_old.current_value;
         roaring_advance_uint32_iterator(&it_old);
         x++;
     }
-    roaring_bitmap_remove_many(self->node_ids, size, arr);
+    roaring_bitmap_remove_many(self->node_ids, deleted_nnodes, arr);
 
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
@@ -227,95 +222,53 @@ VOID_TASK_IMPL_1(mrc_gc, mrc_t*, self)
 #else
     CALL(llmsset_reset_all_regions);
 #endif
-
 }
 
+#define index(x) ((x) & SYLVAN_TABLE_MASK_INDEX)
 
-VOID_TASK_IMPL_4(mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids)
+TASK_IMPL_4(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids)
 {
     roaring_uint32_iterator_t it;
     roaring_init_iterator(self->node_ids, &it);
-    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return;
+    if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return 0;
 
-    int deleted = 0;
-    unsigned short ref_vars[reorder_db->levels.count];
-    memset(&ref_vars, 0x00, sizeof(unsigned short) * reorder_db->levels.count);
-    unsigned short var_nnodes[reorder_db->levels.count];
-    memset(&var_nnodes, 0x00, sizeof(unsigned short) * reorder_db->levels.count);
+    size_t deleted = 0;
 
     const size_t end = first + count;
     while (it.has_value && it.current_value < end) {
         if (mrc_is_node_dead(self, it.current_value)) {
-            deleted++;
-            mtbddnode_t f = MTBDD_GETNODE(it.current_value);
-            var_nnodes[mtbddnode_getvariable(f)]++;
-            roaring_bitmap_add(dead_ids, it.current_value);
-
-            if (!mtbddnode_isleaf(f)) {
-                MTBDD f1 = mtbddnode_gethigh(f);
-                uint64_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-                if (f1_index != sylvan_invalid && f1_index != 0 && f1_index != 1) {
-                    atomic_fetch_add_explicit(self->ref_nodes.container + f1_index, -1, memory_order_relaxed);
-                    ref_vars[mtbdd_getvar(f1)]++;
-                }
-                if(mrc_is_node_dead(self, f1_index)) {
-                    deleted += CALL(mrc_delete_node, self, f1_index, dead_ids);
-                }
-                MTBDD f0 = mtbddnode_getlow(f);
-                uint64_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-                if (f0_index != sylvan_invalid && f0_index != 0 && f0_index != 1) {
-                    atomic_fetch_add_explicit(self->ref_nodes.container + f0_index, -1, memory_order_relaxed);
-                    ref_vars[mtbdd_getvar(f0)]++;
-                }
-                if(mrc_is_node_dead(self, f0_index)) {
-                    deleted += CALL(mrc_delete_node, self, f0_index, dead_ids);
-                }
-            }
-#if !SYLVAN_USE_LINEAR_PROBING
-            llmsset_clear_one_hash(nodes, it.current_value);
-            llmsset_clear_one_data(nodes, it.current_value);
-#endif
+            deleted += CALL(mrc_delete_node, self, it.current_value, dead_ids);
         }
         roaring_advance_uint32_iterator(&it);
-
     }
-    if (deleted > 0) mrc_nnodes_add(self, -deleted);
-    for (size_t j = 0; j < reorder_db->levels.count; ++j) {
-        if (ref_vars[j] != 0) mrc_ref_vars_add(&reorder_db->mrc, j, -ref_vars[j]);
-        if (var_nnodes[j] != 0) mrc_var_nnodes_add(&reorder_db->mrc, j, -var_nnodes[j]);
-    }
+    if (deleted > 0) mrc_nnodes_add(self, -(int)deleted);
+    return deleted;
 }
 
 TASK_IMPL_3(size_t, mrc_delete_node, mrc_t*, self, size_t, index, roaring_bitmap_t*, dead_ids)
 {
     size_t deleted = 1;
     mtbddnode_t f = MTBDD_GETNODE(index);
-    atomic_fetch_add_explicit(self->var_nnodes.container + mtbddnode_getvariable(f), -1, memory_order_relaxed);
+    // roaring_bitmap_add does not allow concurrent writes, thus we invoke recursive mrc_delete_node function sequentially
     roaring_bitmap_add(dead_ids, index);
+    mrc_var_nnodes_add(self, mtbddnode_getvariable(f), -1);
 
     if (!mtbddnode_isleaf(f)) {
-        size_t spawned = 0;
         MTBDD f1 = mtbddnode_gethigh(f);
-        uint64_t f1_index = f1 & SYLVAN_TABLE_MASK_INDEX;
-        if (f1 != sylvan_invalid && (f1_index) != 0 && (f1_index) != 1) {
-            atomic_fetch_add_explicit(self->ref_nodes.container + f1_index, -1, memory_order_relaxed);
-            atomic_fetch_add_explicit(self->ref_vars.container + mtbdd_getvar(f1), -1, memory_order_relaxed);
-            if (mrc_is_node_dead(self, f1_index)) {
-                SPAWN(mrc_delete_node, self, f1_index, dead_ids);
-                spawned++;
+        if (f1 != sylvan_invalid && index(f1) != 0 && index(f1) != 1) {
+            mrc_ref_nodes_add(&reorder_db->mrc, index(f1), -1);
+            mrc_ref_vars_add(&reorder_db->mrc, mtbdd_getvar(f1), -1);
+            if (mrc_is_node_dead(self, index(f1))) {
+                deleted += CALL(mrc_delete_node, self, index(f1), dead_ids);
             }
         }
         MTBDD f0 = mtbddnode_getlow(f);
-        uint64_t f0_index = f0 & SYLVAN_TABLE_MASK_INDEX;
-        if (f0 != sylvan_invalid && (f0_index) != 0 && (f0_index) != 1) {
-            atomic_fetch_add_explicit(self->ref_nodes.container + f0_index, -1, memory_order_relaxed);
-            atomic_fetch_add_explicit(self->ref_vars.container + mtbdd_getvar(f0), -1, memory_order_relaxed);
-            if (mrc_is_node_dead(self, f0_index)) {
-                deleted += CALL(mrc_delete_node, self, f0_index, dead_ids);
+        if (f0 != sylvan_invalid && index(f0) != 0 && index(f0) != 1) {
+            mrc_ref_nodes_add(&reorder_db->mrc, index(f0), -1);
+            mrc_ref_vars_add(&reorder_db->mrc, mtbdd_getvar(f0), -1);
+            if (mrc_is_node_dead(self, index(f0))) {
+                deleted += CALL(mrc_delete_node, self, index(f0), dead_ids);
             }
-        }
-        if(spawned) {
-            deleted += SYNC(mrc_delete_node);
         }
     }
 #if !SYLVAN_USE_LINEAR_PROBING
@@ -376,12 +329,12 @@ MTBDD mrc_make_node(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *created
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
-        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
-        mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
-        mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+        if (add_id) roaring_bitmap_add(self->node_ids, index(new));
+        mrc_ref_nodes_add(self, index(new), 1);
+        mrc_ref_nodes_add(self, index(high), 1);
+        mrc_ref_nodes_add(self, index(low), 1);
     } else {
-        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, index(new), 1);
     }
     return new;
 }
@@ -395,12 +348,12 @@ MTBDD mrc_make_mapnode(mrc_t *self, BDDVAR var, MTBDD low, MTBDD high, int *crea
     if (*created) {
         mrc_nnodes_add(self, 1);
         mrc_var_nnodes_add(self, var, 1);
-        if (add_id) roaring_bitmap_add(self->node_ids, new & SYLVAN_TABLE_MASK_INDEX);
-        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
-        mrc_ref_nodes_add(self, high & SYLVAN_TABLE_MASK_INDEX, 1);
-        mrc_ref_nodes_add(self, low & SYLVAN_TABLE_MASK_INDEX, 1);
+        if (add_id) roaring_bitmap_add(self->node_ids, index(new));
+        mrc_ref_nodes_add(self, index(new), 1);
+        mrc_ref_nodes_add(self, index(high), 1);
+        mrc_ref_nodes_add(self, index(low), 1);
     } else {
-        mrc_ref_nodes_add(self, new & SYLVAN_TABLE_MASK_INDEX, 1);
+        mrc_ref_nodes_add(self, index(new), 1);
     }
     return new;
 }

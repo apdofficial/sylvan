@@ -4,6 +4,11 @@
 
 static size_t levels_size = 0; // size of the arrays in levels_t used to realloc memory
 
+size_t levels_get(levels_t* self, uint64_t level)
+{
+    return self->table[self->level_to_order[level]];
+}
+
 size_t levels_get_count(levels_t* self)
 {
     return self->count;
@@ -31,7 +36,7 @@ int levels_new_many(levels_t* self, size_t amount)
         }
     }
     for (size_t i = 0; i < amount; i++) {
-        self->table[self->count] = mtbdd_makenode(self->count, mtbdd_false, mtbdd_true);
+        self->table[self->count] = sylvan_invalid;
         self->level_to_order[self->count] = self->count;
         self->order_to_level[self->count] = self->count;
         self->count++;
@@ -71,14 +76,20 @@ void levels_reset(levels_t* self)
 
 uint64_t levels_ithlevel(levels_t* self, uint32_t level)
 {
-//    printf("levels_ithlevel: %d\n", level);
     if (level < self->count) {
-        return self->table[self->level_to_order[level]];
+        if (levels_get(self, level) == sylvan_invalid){
+            levels_new_node(self, level, mtbdd_false, mtbdd_true);
+        }
+        if (!llmsset_is_marked(nodes, levels_get(self, level) & SYLVAN_TABLE_MASK_INDEX)) {
+            levels_new_node(self, level, mtbdd_false, mtbdd_true);
+        }
     } else {
         size_t amount = level - self->count + 1;
         levels_new_many(self, amount);
-        return self->table[self->level_to_order[level]];
+        levels_new_node(self, level, mtbdd_false, mtbdd_true);
     }
+
+    return levels_get(self, level);
 }
 
 uint32_t levels_order_to_level(levels_t *self, uint32_t var)
@@ -116,7 +127,9 @@ uint32_t levels_swap(levels_t *self, uint32_t x, uint32_t y)
 VOID_TASK_0(mtbdd_gc_mark_managed_refs)
 {
     for (size_t i = 0; i < reorder_db->levels.count; i++) {
-        llmsset_mark(nodes, MTBDD_STRIPMARK(reorder_db->levels.table[i]));
+        if (reorder_db->levels.table[i] != sylvan_invalid){
+            llmsset_mark(nodes, MTBDD_STRIPMARK(reorder_db->levels.table[i]));
+        }
     }
 }
 
