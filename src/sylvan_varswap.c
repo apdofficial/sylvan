@@ -140,7 +140,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
-    if (count > (NBITS_PER_BUCKET * 32)) {
+    if (count > (NBITS_PER_BUCKET * 16)) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -235,7 +235,6 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_advance_uint32_iterator(&it);
 
         mtbddnode_t node = MTBDD_GETNODE(index);
-        if (mtbddnode_isleaf(node)) continue; // a leaf
         uint32_t nvar = mtbddnode_getvariable(node);
 
         if (nvar == (var + 1)) {
@@ -250,17 +249,6 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
             continue;
         } else if (nvar != var) {
             continue; // not <var> or <var+1>
-        }
-
-        if (mtbddnode_getmark(node)) {
-            // (we are apparently recovering)
-            var_diff--;
-            var_plus_one_diff++;
-            if (llmsset_rehash_bucket(nodes, index) != 1) {
-                atomic_store(result, SYLVAN_REORDER_P1_REHASH_FAIL_MARKED);
-                return;
-            }
-            continue;
         }
 
         if (mtbddnode_ismapnode(node)) {
