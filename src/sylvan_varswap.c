@@ -140,6 +140,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, node_ids,
                  roaring_bitmap_t*, p1_ids)
 {
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 16)) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
@@ -150,12 +151,11 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids, &b);
         roaring_bitmap_or_inplace(p1_ids, &b);
-        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p0);
         roaring_bitmap_or_inplace(p1_ids, &a);
-        roaring_bitmap_clear(&a);
         return;
     }
+#endif
 
     roaring_uint32_iterator_t it;
     roaring_init_iterator(node_ids, &it);
@@ -200,6 +200,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p1_ids,
                  roaring_bitmap_t*, p2_ids)
 {
+#if PARALLEL
     if (count > (NBITS_PER_BUCKET * 32)) {
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -209,13 +210,11 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p1, var, first + split, count - split, result, p1_ids, &b);
         roaring_bitmap_or_inplace(p2_ids, &b);
-        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p1);
         roaring_bitmap_or_inplace(p2_ids, &a);
-        roaring_bitmap_clear(&a);
         return;
     }
-
+#endif
     // initialize the iterator on stack to speed it up and bind lifetime to this scope
     roaring_uint32_iterator_t it;
     roaring_init_iterator(p1_ids, &it);
@@ -329,10 +328,8 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p2, first + split, count - split, result, p2_ids, &b);
         roaring_bitmap_or_inplace(node_ids, &b);
-        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p2);
         roaring_bitmap_or_inplace(node_ids, &a);
-        roaring_bitmap_clear(&a);
         return;
     }
 #endif

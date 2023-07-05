@@ -104,6 +104,7 @@ TASK_IMPL_3(BDD, sylvan_and, BDD, a, BDD, b, BDDVAR, prev_level)
         high = aHigh;
     } else {
         bdd_refs_spawn(SPAWN(sylvan_and, aHigh, bHigh, level));
+//        high = bdd_refs_push(CALL(sylvan_and, aHigh, bHigh, level));
         n=1;
     }
 
