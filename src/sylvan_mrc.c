@@ -186,7 +186,7 @@ int mrc_is_node_dead(const mrc_t *self, size_t idx)
     return llmsset_is_marked(nodes, idx) == 1;
 }
 
-VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, p1_ids)
+VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, ids)
 {
     roaring_bitmap_t dead_ids;
     roaring_bitmap_init_with_capacity(&dead_ids, nodes->table_size);
@@ -194,7 +194,7 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, p1_ids)
 #ifndef NDEBUG
     printf("MRC-GC: (%5zu/%5zu) from %5zu to ...", llmsset_count_marked(nodes), llmsset_get_size(nodes), mrc_nnodes_get(self));
 #endif
-    size_t deleted_nnodes = CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids, p1_ids);
+    size_t deleted_nnodes = CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids, ids);
 
 #ifndef NDEBUG
     printf("%zu (deleted: %zu)\n", llmsset_count_marked(nodes), mrc_nnodes_get(self) - deleted_nnodes);
@@ -226,14 +226,10 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, p1_ids)
 
 #define index(x) ((x) & SYLVAN_TABLE_MASK_INDEX)
 
-TASK_IMPL_5(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids, roaring_bitmap_t *, p1_ids)
+TASK_IMPL_5(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids, roaring_bitmap_t *, ids)
 {
     roaring_uint32_iterator_t it;
-#if SYLVAN_USE_LINEAR_PROBING
-    roaring_init_iterator(self->node_ids, &it);
-#else
-    roaring_init_iterator(p1_ids, &it);
-#endif
+    roaring_init_iterator(ids, &it);
     if (!roaring_move_uint32_iterator_equalorlarger(&it, first)) return 0;
 
     size_t deleted = 0;

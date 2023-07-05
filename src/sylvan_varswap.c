@@ -84,16 +84,14 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     roaring_bitmap_t p2_ids;
     roaring_bitmap_init_cleared(&p2_ids);
 
-    roaring_bitmap_t p1_ids;
-    roaring_bitmap_init_cleared(&p1_ids);
-
     /// Phase 0: clear hashes of nodes with <var> and <var+1> or all nodes if linear probing is used
 #if SYLVAN_USE_LINEAR_PROBING
     llmsset_clear_hashes(nodes);
     /// Phase 1: handle all trivial cases where no node is created, add cases that are not trivial to <p2_ids>
     sylvan_varswap_p1(pos, &result, reorder_db->mrc.node_ids, &p2_ids);
 #else
-
+    roaring_bitmap_t p1_ids;
+    roaring_bitmap_init_cleared(&p1_ids);
     sylvan_varswap_p0(pos, &result, reorder_db->mrc.node_ids, &p1_ids);
     if (sylvan_reorder_issuccess(result) == 0) return result; // fail fast
     /// Phase 1: handle all trivial cases where no node is created, add cases that are not trivial to <p2_ids>
@@ -111,8 +109,13 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         }
     }
 
+#if SYLVAN_USE_LINEAR_PROBING
+    // collect garbage (dead nodes)
+    mrc_gc(&reorder_db->mrc, reorder_db->mrc.node_ids);
+#else
     // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, &p1_ids);
+#endif
 
     isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
     reorder_db->mrc.isolated_count += isolated;
