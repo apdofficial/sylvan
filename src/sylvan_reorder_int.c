@@ -41,17 +41,12 @@ reorder_db_t reorder_db_init()
 
     db->mrc = (mrc_t) {
             .node_ids = roaring_bitmap_create(),
-            .isolated_count = 0,
             .nnodes = 0,
-            .ref_nodes = (atomic_counters_t) {
+            .ref_nodes = (atomic_counters32_t) {
                     .container = NULL,
                     .size = 0,
             },
-            .ref_vars = (atomic_counters_t) {
-                    .container = NULL,
-                    .size = 0,
-            },
-            .var_nnodes = (atomic_counters_t) {
+            .var_nnodes = (atomic_counters32_t) {
                     .container = NULL,
                     .size = 0,
             },
@@ -318,7 +313,6 @@ VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
     }
 
     reorder_db->call_count++;
-    reorder_db->mrc.isolated_count = 0;
 
     sylvan_stats_count(SYLVAN_RE_COUNT);
     sylvan_timer_start(SYLVAN_RE);
