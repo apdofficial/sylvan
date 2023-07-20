@@ -5,11 +5,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define COUNTER_T_MAX UINT64_MAX
+#define COUNTER_T_MAX UINT32_MAX
 
 // use 16-bit counter (used by MRC)
-// max value is 65535, thus if node is referenced more than 65535 (keep it at 65535), it is unlikely it will be ever deleted
-typedef size_t counter_t;
+// max value is 65535, thus if node is referenced more than 65535 (keep it at 65535),
+// it is unlikely it will be ever deleted
+typedef uint32_t counter_t;
 typedef _Atomic(counter_t) atomic_counter_t;
 
 /**
@@ -17,7 +18,7 @@ typedef _Atomic(counter_t) atomic_counter_t;
  * Used for tracking the number of references to the unique table nodes.
  * Incrementing has UINT8_MAX as ceiling. Decrementing has 0 as floor.
  * The reason is to use  as little as possible emmoru. It is unlikely a node referenced
- * UINT8_MAX times would be ever removed from the unique table. If you encounter this,
+ * UINT16_MAX times would be ever removed from the unique table. If you encounter this,
  * change uint16_t to a bigger type.
  */
 typedef struct atomic_counters_s
@@ -44,13 +45,13 @@ counter_t atomic_counters_get(const atomic_counters_t* self, size_t idx);
  */
 typedef struct mrc_s
 {
-    roaring_bitmap_t*       node_ids;               // compressed roaring bitmap holding node indices of the nodes unique table
-    int                     isolated_count;         // number of isolated projection functions
-    _Atomic(size_t)         nnodes;                 // number of nodes all nodes in DD
-    atomic_counters_t       ref_nodes;              // number of internal references per node (use node unique table index)
-    atomic_counters_t       ref_vars;               // number of internal references per variable (use variable order)
-    atomic_counters_t       var_nnodes;             // number of nodes per variable (use variable order)
-    atomic_bitmap_t         ext_ref_nodes;          // bitmap of nodes with external references (1 -> has some, 0 -> has none)
+    roaring_bitmap_t*   node_ids;       // indices of the nodes unique table
+    int                 isolated_count; // number of isolated projection functions
+    _Atomic(size_t)     nnodes;         // number of nodes all nodes in DD
+    atomic_counters_t   ref_nodes;      // number of internal references per node
+    atomic_counters_t   ref_vars;       // number of internal references per variable
+    atomic_counters_t   var_nnodes;     // number of nodes per variable
+    atomic_bitmap_t     ext_ref_nodes;  // nodes with external references
 } mrc_t;
 
 /**

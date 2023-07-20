@@ -140,7 +140,6 @@ void mrc_nnodes_add(mrc_t *self, int val)
 {
     size_t curr = mrc_nnodes_get(self);
     if (curr == 0 && val < 0) return;
-    if ((curr + val) >= COUNTER_T_MAX) return;
     atomic_fetch_add_explicit(&self->nnodes, val, memory_order_relaxed);
 }
 
@@ -191,16 +190,7 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, ids)
     roaring_bitmap_t dead_ids;
     roaring_bitmap_init_with_capacity(&dead_ids, nodes->table_size);
 
-//#ifndef NDEBUG
-//    printf("MRC-GC: (%5zu/%5zu) from %5zu to ...", llmsset_count_marked(nodes), llmsset_get_size(nodes), mrc_nnodes_get(self));
-//#endif
     size_t deleted_nnodes = CALL(mrc_gc_go, self, 0, nodes->table_size, &dead_ids, ids);
-
-//#ifndef NDEBUG
-//    printf("%zu (deleted: %zu)\n", llmsset_count_marked(nodes), mrc_nnodes_get(self) - deleted_nnodes);
-//    assert(deleted_nnodes <= mrc_nnodes_get(self));
-//    assert(deleted_nnodes == roaring_bitmap_get_cardinality(&dead_ids));
-//#endif
     if (deleted_nnodes == 0) return;
 
     // calling bitmap remove per each node is more expensive than calling it once with many ids

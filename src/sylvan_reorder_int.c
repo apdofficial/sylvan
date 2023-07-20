@@ -154,9 +154,6 @@ inline uint64_t get_nodes_count()
 TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
 {
     if (!reorder_db->is_initialised) return SYLVAN_REORDER_NOT_INITIALISED;
-#if STATS
-    printf("\n");
-#endif
     reorder_result_t res;
     int R;  // upper bound on node decrease
     int limitSize;
@@ -168,56 +165,23 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
     s_state->size = (int) get_nodes_count();
     xIndex = reorder_db->levels.level_to_order[s_state->pos];
 
-    limitSize = s_state->size = s_state->size - reorder_db->mrc.isolated_count;
+    limitSize = s_state->size;
     R = 0;
-
-    // Let <x> be the variable at level <pos>. (s_state->pos)
-    // Let <y> be the variable at level <pos+1>. (s_state->pos+1)
-    // Let Ni be the number of nodes at level i.
-    // Let n be the number of levels. (levels->count)
-
-    // Then the size of DD can not be reduced below:
-    // LB(DN) = Nj + ∑ Ni | 0<i<pos
-
-    // The part of the DD above <x> will not change.
-    // The part of the DD below <x> that does not interact with <x> will not change.
-    // The rest may vanish in the best case, except for
-    // the nodes at level <high>, which will not vanish, regardless.
-#if STATS
-    printf("R: %d, limitSize: %d, all_nodes: %d, all_isolated: %d\n",
-           R, limitSize, s_state->size, reorder_db->mrc.isolated_count);
-#endif
     // Initialize the upper bound
     for (y = s_state->high; y > s_state->pos; y--) {
         yIndex = reorder_db->levels.level_to_order[y];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
-            R += (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
-#if STATS
-            printf("R: %d, xindex: %d, yindex: %d\n", R, xIndex, yIndex);
-#endif
-        } else {
-#if STATS
-            printf("R: %d, xindex: %d, yindex: %d (no interaction)\n", R, xIndex, yIndex);
-#endif
+            R += (int) mrc_var_nnodes_get(&reorder_db->mrc, y);
         }
     }
 
-#if STATS
-    x = s_state->pos;
-    y = s_state->pos + 1;
-    printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
-           x, R, s_state->size, limitSize,
-           mrc_var_nnodes_get(&reorder_db->mrc, x),
-           mrc_var_nnodes_get(&reorder_db->mrc, y)
-    );
-#endif
     for (; s_state->pos < s_state->high && s_state->size - R < limitSize; ++s_state->pos) {
         x = s_state->pos;
         y = s_state->pos + 1;
         //  Update the upper bound on node decrease
         yIndex = reorder_db->levels.level_to_order[y];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
-            R -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
+            R -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y);
         }
         res = sylvan_varswap(x);
         s_state->size = (int) get_nodes_count();
@@ -237,13 +201,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         }
 
         if (s_state->size < limitSize) limitSize = s_state->size;
-#if STATS
-        printf("sift down pos: x: %d (R: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
-               x, R, s_state->size, limitSize,
-               mrc_var_nnodes_get(&reorder_db->mrc, x),
-               mrc_var_nnodes_get(&reorder_db->mrc, y)
-        );
-#endif
         if (should_terminate_sifting(&reorder_db->config)) break;
     }
 
@@ -252,24 +209,12 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftdown, sifting_state_t *, s_state)
         s_state->best_pos = s_state->pos;
     }
 
-#if STATS
-    printf("\n");
-    for (size_t i = 0; i < levels_count_get(&reorder_db->levels); i++) {
-        printf("level %zu (%d) \t has %hu nodes\n", i, reorder_db->levels.order_to_level[i],
-               mrc_var_nnodes_get(&reorder_db->mrc, i));
-    }
-    printf("\n");
-#endif
     return SYLVAN_REORDER_SUCCESS;
 }
 
 TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 {
     if (!reorder_db->is_initialised) return SYLVAN_REORDER_NOT_INITIALISED;
-#if STATS
-    printf("\n");
-#endif
-
     reorder_result_t res;
     int L;  // lower bound on DD size
     int limitSize;
@@ -281,108 +226,45 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
     s_state->size = (int) get_nodes_count();
     yIndex = reorder_db->levels.level_to_order[s_state->pos];
 
-    // Let <x> be the variable at level <pos-1>. (s_state->pos-1)
-    // Let <y> be the variable at level <pos>. (s_state->pos)
-    // Let Ni be the number of nodes at level i.
-    // Let n be the number of levels. (levels->count)
-
-    // Then the size of DD can not be reduced below:
-    // LB(UP) = N0 + ∑ Ni | i<pos<n
-
-    // The part of the DD below <y> will not change.
-    // The part of the DD above <y> that does not interact with <y> will not change.
-    // The rest may vanish in the best case, except for
-    // the nodes at level <low>, which will not vanish, regardless.
-
-    limitSize = L = (int) (s_state->size - reorder_db->mrc.isolated_count);
-#if STATS
-    printf("L: %d, limitSize: %d, all_nodes: %d, all_isolated: %d\n",
-           L, limitSize, s_state->size, reorder_db->mrc.isolated_count);
-#endif
+    limitSize = L = s_state->size;
     for (x = s_state->low + 1; x < s_state->pos; x++) {
         xIndex = reorder_db->levels.level_to_order[x];
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
-            L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, x) - mrc_is_var_isolated(&reorder_db->mrc, xIndex);
-#if STATS
-            printf("L: %d, xindex: %d, yindex: %d\n", L, xIndex, yIndex);
-#endif
-        } else {
-#if STATS
-            printf("L: %d, xindex: %d, yindex: %d(no interaction)\n", L, xIndex, yIndex);
-#endif
+            L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, x);
         }
     }
-
     y = s_state->pos;
+    L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y);
 
-    L -= (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, yIndex);
-#if STATS
-    x = s_state->pos - 1;
-    printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
-           x, L, s_state->size, limitSize,
-           mrc_var_nnodes_get(&reorder_db->mrc, x),
-           mrc_var_nnodes_get(&reorder_db->mrc, y)
-    );
-#endif
     for (; s_state->pos > s_state->low && L <= limitSize; --s_state->pos) {
         x = s_state->pos - 1;
         y = s_state->pos;
         xIndex = reorder_db->levels.level_to_order[x];
-
         res = sylvan_varswap(x);
         if (!sylvan_reorder_issuccess(res)) return res;
-
         s_state->size = (int) get_nodes_count();
         reorder_db->config.varswap_count++;
-
         // check the max allowed size growth
         if ((double) (s_state->size) > (double) s_state->best_size * reorder_db->config.max_growth) {
             --s_state->pos;
             break;
         }
-
         // update the best position
         if (s_state->size <= s_state->best_size) {
             s_state->best_size = s_state->size;
             s_state->best_pos = s_state->pos;
         }
-
         // Update the lower bound on DD size
         if (interact_test(&reorder_db->matrix, xIndex, yIndex)) {
-            L += (int) mrc_var_nnodes_get(&reorder_db->mrc, y) - mrc_is_var_isolated(&reorder_db->mrc, xIndex);
+            L += (int) mrc_var_nnodes_get(&reorder_db->mrc, y);
         }
-
         if ((int) s_state->size < limitSize) limitSize = (int) s_state->size;
-#if STATS
-        printf("sift up pos: x: %d (L: %d, size: %d, limitSize: %d) (xNodes: %hu, yNodes: %hu)\n",
-               x, L, s_state->size, limitSize,
-               mrc_var_nnodes_get(&reorder_db->mrc, x),
-               mrc_var_nnodes_get(&reorder_db->mrc, y)
-        );
-#endif
-#if 0
-        printf("\n");
-        for (size_t i = 0; i < levels->count; i++) {
-            printf("level %zu (%d) \t has %u nodes\n", i, levels->order_to_level[i], levels_var_count_load(levels, i));
-        }
-        printf("\n");
-#endif
         if (should_terminate_sifting(&reorder_db->config)) break;
     }
-
     if (s_state->size <= s_state->best_size) {
         s_state->best_size = s_state->size;
         s_state->best_pos = s_state->pos;
     }
-
-#if STATS
-    printf("\n");
-    for (size_t i = 0; i < reorder_db->levels.count; i++) {
-        printf("level %zu (%d) \t has %hu nodes\n", i, reorder_db->levels.order_to_level[i],
-               mrc_var_nnodes_get(&reorder_db->mrc, i));
-    }
-    printf("\n");
-#endif
     return SYLVAN_REORDER_SUCCESS;
 }
 

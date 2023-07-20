@@ -380,6 +380,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
     for (int i = 0; i < (int) reorder_db->levels.count; i++) {
         int lvl = ordered_levels[i];
+        if (lvl == -1) break;
         s_state.pos = reorder_db->levels.order_to_level[level_to_order[lvl]];
         if (s_state.pos < s_state.low || s_state.pos > s_state.high) continue;
 
