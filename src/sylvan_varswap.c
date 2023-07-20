@@ -136,8 +136,10 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids, &b);
         roaring_bitmap_or_inplace(p1_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p0);
         roaring_bitmap_or_inplace(p1_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif
@@ -195,8 +197,10 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p1, var, first + split, count - split, result, p1_ids, &b);
         roaring_bitmap_or_inplace(p2_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p1);
         roaring_bitmap_or_inplace(p2_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif
@@ -313,8 +317,10 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p2, first + split, count - split, result, p2_ids, &b);
         roaring_bitmap_or_inplace(node_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p2);
         roaring_bitmap_or_inplace(node_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif

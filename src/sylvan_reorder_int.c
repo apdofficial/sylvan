@@ -266,17 +266,11 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftup, sifting_state_t *, s_state)
 TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 {
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
-#if STATS
-    printf("\n");
-#endif
     if (!reorder_db->is_initialised) return SYLVAN_REORDER_NOT_INITIALISED;
     if (s_state->pos == s_state->best_pos) return res;
     for (; s_state->pos <= s_state->best_pos; s_state->pos++) {
         if (s_state->size == s_state->best_size) return res;
         if (s_state->pos == UINT32_MAX) return res;
-#if STATS
-        printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos, s_state->pos + 1, s_state->size);
-#endif
         res = sylvan_varswap(s_state->pos);
         s_state->size = (int) get_nodes_count();
         if (!sylvan_reorder_issuccess(res)) return res;
@@ -285,9 +279,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
     for (; s_state->pos >= s_state->best_pos; s_state->pos--) {
         if (s_state->pos == 0) break;
         if (s_state->size == s_state->best_size) return res;
-#if STATS
-        printf("sift back: x: %d \t y: %d (size: %d)\n", s_state->pos - 1, s_state->pos, s_state->size);
-#endif
         res = sylvan_varswap(s_state->pos - 1);
         s_state->size = (int) get_nodes_count();
         if (!sylvan_reorder_issuccess(res)) return res;
