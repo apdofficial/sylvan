@@ -1,6 +1,7 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
+#define TASK_SIZE 2048
 /**
  * @brief Check if a node is dependent on node with label <var> or <var>+1
  */
@@ -126,7 +127,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, p1_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 16)) {
+    if (count > TASK_SIZE) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -188,7 +189,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p2_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 32)) {
+    if (count > TASK_SIZE) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
@@ -307,7 +308,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 32)) {
+    if (count > TASK_SIZE) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         roaring_bitmap_t a;
