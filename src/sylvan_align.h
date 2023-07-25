@@ -40,8 +40,13 @@ alloc_aligned(size_t size)
     size = (size + LINE_SIZE - 1) & (~(LINE_SIZE - 1));
     void* res;
 #if SYLVAN_USE_MMAP
-    res = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | 0x1000, -1, 0);
+#if __APPLE__
+    res = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | 0x1000, -1, 0);
     if (res == MAP_FAILED) return 0;
+#else
+    res = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (res == MAP_FAILED) return 0;
+#endif
 #else
 #if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
     res = _aligned_malloc(size, LINE_SIZE);
