@@ -16,12 +16,13 @@ size_t levels_get_count(levels_t* self)
 
 uint64_t levels_new_one(levels_t* self)
 {
-    levels_new_many(self, 1);
+    levels_new_many(1);
     return self->table[levels_get_count(self) - 1];
 }
 
-int levels_new_many(levels_t* self, size_t amount)
+int levels_new_many(size_t amount)
 {
+    levels_t* self = &reorder_db->levels;
     if (self->count + amount >= levels_size) {
         // just round up to the next multiple of 64 value
         // probably better than doubling anyhow...
@@ -36,7 +37,7 @@ int levels_new_many(levels_t* self, size_t amount)
         }
     }
     for (size_t i = 0; i < amount; i++) {
-        self->table[self->count] = sylvan_invalid;
+        self->table[self->count] = mtbdd_makenode(self->count, sylvan_false, sylvan_true);
         self->level_to_order[self->count] = self->count;
         self->order_to_level[self->count] = self->count;
         self->count++;
@@ -85,7 +86,7 @@ uint64_t levels_ithlevel(levels_t* self, uint32_t level)
         }
     } else {
         size_t amount = level - self->count + 1;
-        levels_new_many(self, amount);
+        levels_new_many(amount);
         levels_new_node(self, level, mtbdd_false, mtbdd_true);
     }
 

@@ -76,7 +76,7 @@ TASK_0(int, test_rordering)
     Bdd bdd = create_example_bdd(is_optimal);
 
     size_t not_optimal_order_size = bdd.NodeCount();
-    Sylvan::reduceHeap(SYLVAN_REORDER_BOUNDED_SIFT);
+    Sylvan::reduceHeap();
     size_t not_optimal_order_reordered_size = bdd.NodeCount();
 
     std::vector<uint32_t> perm = { 0, 1, 2, 3, 4, 5 };
