@@ -1053,9 +1053,19 @@ namespace sylvan
         static void setReorderTimeLimit(double time_limit);
 
         /**
-          @brief Reduce the heap size in the entire forest if needed.
+          @brief Reduce the heap size in the entire forest.
+
+          @details Implementation of Rudell's sifting algorithm.
+            <ol>
+            <li> Order all the variables according to the number of entries
+            in each unique table.
+            <li> Sift the variable up and down, remembering each time the
+            total size of the bdd size.
+            <li> Select the best permutation.
+            <li> Repeat 2 and 3 for all variables in given range.
+            </ol>
         */
-        static void testReduceHeap();
+        static void reduceHeap(reordering_type_t type);
 
         /**
           @brief Reorder the variables in the BDDs according to the given permutation.
@@ -1066,6 +1076,11 @@ namespace sylvan
           currently in use and and should be less or equal to the number of levels.
          */
         static reorder_result_t reorderPerm(const std::vector <uint32_t> &perm);
+
+        /**
+         * @brief Get the number of created levels
+         */
+        static uint32_t getLevelsCount();
 
         /**
          * @brief Frees all memory in use by Sylvan.
