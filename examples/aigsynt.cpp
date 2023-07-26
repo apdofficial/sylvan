@@ -357,7 +357,7 @@ TASK_0(int, solve_game)
     for (uint64_t a = 0; a < aag.header.a; a++) game.gates[a] = sylvan_invalid;
     for (uint64_t gate = 0; gate < aag.header.a; gate++) {
         make_gate(gate);
-//        if (dynamic_reorder) sylvan_test_reduce_heap();
+        if (dynamic_reorder) sylvan_test_reduce_heap();
     }
     if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
 
@@ -415,7 +415,7 @@ TASK_0(int, solve_game)
     for (uint64_t l=0; l<L; l++) {
         MTBDD nxt;
         if (lookup[l_next[l]/2] == -1) {
-            nxt = sylvan_ithlevel(l_next[l]&1);
+            nxt = sylvan_ithvar(l_next[l]&1);
         } else {
             nxt = gates[lookup[l_next[l]]];
         }

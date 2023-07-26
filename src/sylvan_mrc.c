@@ -231,7 +231,8 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, ids)
 
 #define index(x) ((x) & SYLVAN_TABLE_MASK_INDEX)
 
-TASK_IMPL_5(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids, roaring_bitmap_t *, ids)
+TASK_IMPL_5(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, roaring_bitmap_t *, dead_ids,
+            roaring_bitmap_t *, ids)
 {
     roaring_uint32_iterator_t it;
     roaring_init_iterator(ids, &it);
@@ -246,7 +247,7 @@ TASK_IMPL_5(size_t, mrc_gc_go, mrc_t*, self, uint64_t, first, uint64_t, count, r
         }
         roaring_advance_uint32_iterator(&it);
     }
-    if (deleted > 0) mrc_nnodes_add(self, -(int)deleted);
+    if (deleted > 0) mrc_nnodes_add(self, -(int) deleted);
     return deleted;
 }
 
@@ -317,6 +318,9 @@ VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, ato
 
     const size_t end = first + count;
     for (first = atomic_bitmap_next(bitmap, first - 1); first < end; first = atomic_bitmap_next(bitmap, first)) {
+        mtbddnode_t node = MTBDD_GETNODE(first);
+        BDDVAR var = mtbddnode_getvariable(node);
+        levels_ithlevel(&reorder_db->levels, var); // register variable
         roaring_bitmap_add(collected_ids, first);
     }
 }
