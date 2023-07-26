@@ -132,9 +132,6 @@ void mrc_init(mrc_t *self, size_t nvars, size_t nnodes)
         }
     }
 
-    roaring_init_iterator(self->node_ids, &it);
-    roaring_move_uint32_iterator_equalorlarger(&it, 2);
-
     mtbdd_re_mark_external_refs(self->ext_ref_nodes.container);
     mtbdd_re_mark_protected(self->ext_ref_nodes.container);
 }
@@ -295,7 +292,7 @@ VOID_TASK_IMPL_2(mrc_collect_node_ids, mrc_t*, self, llmsset_t, dbs)
 VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, atomic_bitmap_t*, bitmap,
                  roaring_bitmap_t *, collected_ids)
 {
-    if (count > NBITS_PER_BUCKET * 16) {
+    if (count > 1024) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -307,8 +304,11 @@ VOID_TASK_IMPL_4(mrc_collect_node_ids_par, uint64_t, first, uint64_t, count, ato
         roaring_bitmap_or_inplace(collected_ids, &b);
         SYNC(mrc_collect_node_ids_par);
         roaring_bitmap_or_inplace(collected_ids, &a);
+        roaring_bitmap_clear(&a);
+        roaring_bitmap_clear(&b);
         return;
     }
+
     // skip buckets 0 and 1
     if (first < 2) {
         count = count + first - 2;

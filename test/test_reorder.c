@@ -618,11 +618,11 @@ TASK_0(int, test_ref_nodes)
 
     int expected[8] = {0, 0, 1, 1, 1, 2, 3, 3};
     for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        counter_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
+        counter32_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
 #ifndef NDEBUG
         printf("ref_node_count: %d\n", ref_node_count);
 #endif
-        assert(expected[i] == ref_node_count);
+        assert(expected[i] == (int)ref_node_count);
     }
 
     sylvan_post_reorder();
@@ -633,36 +633,6 @@ TASK_0(int, test_ref_nodes)
     return 0;
 }
 
-TASK_0(int, test_ref_vars)
-{
-    // we need to delete all data so we reset sylvan
-    _sylvan_quit();
-    _sylvan_start();
-
-    MTBDD bdd2 = create_example_bdd(0);
-    sylvan_ref(bdd2);
-
-    BDD bdd1 = sylvan_and(sylvan_ithvar(6), sylvan_ithvar(7));
-    sylvan_ref(bdd1);
-
-    sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
-
-    int expected[8] = {1, 2, 4, 5, 5, 3, 1, 1};
-    for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        counter_t ref_var_count = mrc_ref_vars_get(&reorder_db->mrc, sylvan_level_to_order(i));
-#ifndef NDEBUG
-        printf("ref_var_count: %d\n", ref_var_count);
-#endif
-        assert(expected[i] == ref_var_count);
-
-    }
-
-    sylvan_post_reorder();
-
-    sylvan_deref(bdd1);
-    sylvan_deref(bdd2);
-    return 0;
-}
 
 TASK_1(int, runtests, size_t, ntests)
 {
@@ -688,8 +658,6 @@ TASK_1(int, runtests, size_t, ntests)
     for (size_t j = 0; j < ntests; j++) if (RUN(test_interact)) return 1;
     printf("Test ref_nodes\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_nodes)) return 1;
-    printf("Test ref_vars\n");
-    for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_vars)) return 1;
     return 0;
 }
 

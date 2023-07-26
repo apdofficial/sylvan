@@ -23,7 +23,7 @@ typedef struct levels_s {
 /**
  * @brief Get the number of levels
  */
-size_t levels_get_count(levels_t* self);
+size_t levels_get_count();
 
 /**
  * @brief Create the next level and return the BDD representing the variable (ithlevel)
