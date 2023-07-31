@@ -40,7 +40,7 @@
 #endif
 
 // Variable ordering default parameter values
-#define SYLVAN_REORDER_MAX_VAR		    1000
+#define SYLVAN_REORDER_MAX_VAR		    100
 #define SYLVAN_REORDER_MAX_SWAPS	    10000
 #define SYLVAN_REORDER_GROWTH	        1.2f
 #define SYLVAN_REORDER_NODES_THRESHOLD	1
@@ -52,13 +52,3 @@
 #define SYLVAN_REORDER_PRINT_STAT       1
 #define SYLVAN_REORDER_MIN_MEM_REQ      (0.9f)
 #define PARALLEL                        1
-
- /**
-  * @brief Block size tunes the granularity of the parallel distribution for dynamic variable reordering.
-  *
-  * @details 4096, because that is not very small, and not very large
-  * typical kind of parameter that is open to tweaking, though I don't expect it matters so much
-  * too small is bad for the atomic operations, too large is bad for work-stealing
-  * with 2^20 - 2^25 nodes table size, this is 256 - 8192 tasks
-  */
-#define BLOCKSIZE (NBITS_BUCKET * 8)

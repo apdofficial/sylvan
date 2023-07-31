@@ -213,7 +213,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
     }
     // mark and sort variable levels based on the threshold
     int ordered_levels[reorder_db->levels.count];
-    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
+    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, reorder_db->config.threshold);
     levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
