@@ -56,7 +56,7 @@ target_sources(sylvan
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
 target_compile_features(sylvan PUBLIC c_std_11 cxx_std_11)
-target_compile_options(sylvan PRIVATE -Wall -Wextra -Werror -fno-strict-aliasing -Wno-deprecated)
+target_compile_options(sylvan PRIVATE -Wall -Wextra -Werror -fno-strict-aliasing -Wno-deprecated -fPIC)
 target_include_directories(sylvan PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(sylvan PUBLIC m pthread lace)
 
