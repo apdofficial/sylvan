@@ -73,6 +73,8 @@ reorder_db_t reorder_db_init()
 
     db->is_initialised = 1;
     db->config = (reorder_config_t) {};
+    db->is_reordering = false;
+
     reorder_set_default_config(&db->config);
 
     sylvan_register_quit(&sylvan_quit_reorder);
@@ -289,6 +291,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_siftback, sifting_state_t *, s_state)
 
 VOID_TASK_IMPL_1(sylvan_pre_reorder, reordering_type_t, type)
 {
+    reorder_db->is_reordering = true;
     reorder_db->config.t_start_sifting = wctime();
     reorder_db->config.total_num_var = 0;
 
@@ -339,6 +342,8 @@ VOID_TASK_IMPL_0(sylvan_post_reorder)
     }
 
     sylvan_timer_stop(SYLVAN_RE);
+
+    reorder_db->is_reordering = false;
 }
 
 void sylvan_reorder_resdescription(reorder_result_t result, char *buf, size_t buf_len)

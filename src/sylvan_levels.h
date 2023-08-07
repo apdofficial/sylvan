@@ -41,7 +41,7 @@ int levels_new_many(size_t amount);
 /**
  * @brief Insert a node at given level with given low and high nodes
  */
-int levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high);
+uint64_t levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high);
 
 /**
  * \brief  Reset all levels.

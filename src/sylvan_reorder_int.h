@@ -50,6 +50,7 @@ typedef struct reorder_db_s
     reorder_config_t        config;               // configuration for the sifting
     size_t                  call_count;           // number of reordering calls
     bool                    is_initialised;       // is dynamic reordering initialised
+    bool                    is_reordering;        // is dynamic reordering in progress
 } *reorder_db_t;
 
 reorder_db_t reorder_db_init();

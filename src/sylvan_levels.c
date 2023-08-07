@@ -44,7 +44,7 @@ int levels_new_many(size_t amount)
     return 1;
 }
 
-int levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high)
+uint64_t levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high)
 {
     if (level >= self->count) {
         fprintf(stderr, "mtbdd_levels_makenode failed. Out of level bounds.");
@@ -54,7 +54,7 @@ int levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high)
     BDDVAR order = self->level_to_order[level];
     self->table[order] = mtbdd_makenode(order, low, high);
 
-    return 1;
+    return self->table[order];
 }
 
 void levels_reset(levels_t* self)
