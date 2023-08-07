@@ -376,6 +376,50 @@ TASK_IMPL_2(MTBDD, gmp_op_max, MTBDD*, pa, MTBDD*, pb)
 /**
  * Operation "neg" for one mpq MTBDD
  */
+TASK_IMPL_2(MTBDD, gmp_op_convertToGMP, MTBDD, dd, size_t, p)
+{
+    /* Handle partial functions */
+    if (dd == mtbdd_false) {
+        mpq_t mres;
+        mpq_init(mres);
+        mpq_set_d(mres,0);
+        MTBDD res = mtbdd_gmp(mres);
+        mpq_clear(mres);
+        return res;
+    }
+    mtbddnode_t na = MTBDD_GETNODE(dd);
+    /* Compute result for leaf */
+    if (mtbdd_isleaf(dd)) {
+        // assert(mtbdd_gettype(dd) == gmp_type);
+        mpq_t mres;
+        mpq_init(mres);
+        if (mtbddnode_gettype(na) == 0) {
+            int64_t v = mtbdd_getint64(dd);
+            mpq_set_si(mres,v,1); // no need to canonicalize
+        } else if (mtbddnode_gettype(na) == 1) {
+            double d = mtbdd_getdouble(dd);
+            mpq_set_d(mres,d);
+        } else if (mtbddnode_gettype(na) == 2) {
+            uint64_t v = mtbddnode_getvalue(na);
+            int64_t nom_a = (int32_t)(v>>32);
+            uint64_t denom_a = v&0xffffffff;
+            mpq_set_d(mres,(nom_a+0.0)/denom_a);
+        } else {
+            // mqq_clear(mres);
+            assert(0); // failure
+        }
+        MTBDD res = mtbdd_gmp(mres);
+        mpq_clear(mres);
+        return res;
+    }
+
+    return mtbdd_invalid;
+    (void)p;
+}
+
+/**
+ * Operation "neg" for one mpq MTBDD
+ */
 TASK_IMPL_2(MTBDD, gmp_op_neg, MTBDD, dd, size_t, p)
 {
     /* Handle partial functions */

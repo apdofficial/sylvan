@@ -5,37 +5,42 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define COUNTER_T_MAX UINT64_MAX
+#define COUNTER16_T_MAX UINT16_MAX
+#define COUNTER32_T_MAX UINT32_MAX
 
-// use 16-bit counter (used by MRC)
-// max value is 65535, thus if node is referenced more than 65535 (keep it at 65535), it is unlikely it will be ever deleted
-typedef size_t counter_t;
-typedef _Atomic(counter_t) atomic_counter_t;
+typedef uint16_t counter16_t;
+typedef _Atomic(counter16_t) atomic_counter16_t;
 
-/**
- * Atomic array containing counts.
- * Used for tracking the number of references to the unique table nodes.
- * Incrementing has UINT8_MAX as ceiling. Decrementing has 0 as floor.
- * The reason is to use  as little as possible emmoru. It is unlikely a node referenced
- * UINT8_MAX times would be ever removed from the unique table. If you encounter this,
- * change uint16_t to a bigger type.
- */
-typedef struct atomic_counters_s
+typedef struct atomic_counters16_s
 {
-    atomic_counter_t *container;
+    atomic_counter16_t *container;
     size_t size;
-} atomic_counters_t;
+} atomic_counters16_t;
 
-void atomic_counters_init(atomic_counters_t* self, size_t new_size);
+void atomic_counters16_init(atomic_counters16_t* self, size_t new_size);
 
-void atomic_counters_deinit(atomic_counters_t *self);
+void atomic_counters16_deinit(atomic_counters16_t *self);
 
-void atomic_counters_add(atomic_counters_t* self, size_t idx, int val);
+void atomic_counters16_add(atomic_counters16_t* self, size_t idx, int val);
 
-void atomic_counters_set(atomic_counters_t* self, size_t idx, counter_t val);
+counter16_t atomic_counters16_get(const atomic_counters16_t* self, size_t idx);
 
-counter_t atomic_counters_get(const atomic_counters_t* self, size_t idx);
+typedef uint32_t counter32_t;
+typedef _Atomic(counter32_t) atomic_counter32_t;
 
+typedef struct atomic_counters32_s
+{
+    atomic_counter32_t *container;
+    size_t size;
+} atomic_counters32_t;
+
+void atomic_counters32_init(atomic_counters32_t* self, size_t new_size);
+
+void atomic_counters32_deinit(atomic_counters32_t *self);
+
+void atomic_counters32_add(atomic_counters32_t* self, size_t idx, int val);
+
+counter32_t atomic_counters32_get(const atomic_counters32_t* self, size_t idx);
 
 /**
  * Manual Reference Counter (MRC) for the unique table nodes.
@@ -44,13 +49,11 @@ counter_t atomic_counters_get(const atomic_counters_t* self, size_t idx);
  */
 typedef struct mrc_s
 {
-    roaring_bitmap_t*       node_ids;               // compressed roaring bitmap holding node indices of the nodes unique table
-    int                     isolated_count;         // number of isolated projection functions
-    _Atomic(size_t)         nnodes;                 // number of nodes all nodes in DD
-    atomic_counters_t       ref_nodes;              // number of internal references per node (use node unique table index)
-    atomic_counters_t       ref_vars;               // number of internal references per variable (use variable order)
-    atomic_counters_t       var_nnodes;             // number of nodes per variable (use variable order)
-    atomic_bitmap_t         ext_ref_nodes;          // bitmap of nodes with external references (1 -> has some, 0 -> has none)
+    roaring_bitmap_t*       node_ids;       // indices of the nodes unique table
+    _Atomic(size_t)         nnodes;         // number of all nodes in DD
+    atomic_counters32_t     ref_nodes;      // number of internal references per node
+    atomic_counters32_t     var_nnodes;     // number of nodes per variable
+    atomic_bitmap_t         ext_ref_nodes;  // nodes with external references
 } mrc_t;
 
 /**
@@ -70,8 +73,6 @@ void mrc_nnodes_set(mrc_t* self, int val);
  */
 void mrc_ref_nodes_add(mrc_t* self, size_t idx, int val);
 
-void mrc_ref_vars_add(mrc_t* self, size_t idx, int val);
-
 void mrc_var_nnodes_add(mrc_t* self, size_t idx, int val);
 
 void mrc_nnodes_add(mrc_t* self, int val);
@@ -79,15 +80,11 @@ void mrc_nnodes_add(mrc_t* self, int val);
 /**
  * getters
  */
-counter_t mrc_isolated_count_get(const mrc_t* self);
+counter16_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx);
 
-counter_t mrc_ext_ref_nodes_get(const mrc_t* self, size_t idx);
+counter32_t mrc_ref_nodes_get(const mrc_t* self, size_t idx);
 
-counter_t mrc_ref_nodes_get(const mrc_t* self, size_t idx);
-
-counter_t mrc_ref_vars_get(const mrc_t* self, size_t idx);
-
-counter_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
+counter32_t mrc_var_nnodes_get(const mrc_t* self, size_t idx);
 
 size_t mrc_nnodes_get(const mrc_t* self);
 
@@ -100,11 +97,6 @@ size_t mrc_nnodes_get(const mrc_t* self);
  */
 #define mrc_gc(...) RUN(mrc_gc, __VA_ARGS__)
 VOID_TASK_DECL_2(mrc_gc, mrc_t*, roaring_bitmap_t*)
-
-/**
- * utility functions
- */
-int mrc_is_var_isolated(const mrc_t* self, size_t idx);
 
 int mrc_is_node_dead(const mrc_t* self, size_t idx);
 

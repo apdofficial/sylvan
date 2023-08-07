@@ -213,7 +213,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_sift, uint32_t, low, uint32_t, high)
     }
     // mark and sort variable levels based on the threshold
     int ordered_levels[reorder_db->levels.count];
-    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
+    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, reorder_db->config.threshold);
     levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
     reorder_result_t res = SYLVAN_REORDER_SUCCESS;
@@ -348,7 +348,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
     }
     // mark and sort variable levels based on the threshold
     int ordered_levels[reorder_db->levels.count];
-    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, 0);
+    levels_mark_threshold(&reorder_db->levels, ordered_levels, level_counts, reorder_db->config.threshold);
     levels_gnome_sort(&reorder_db->levels, ordered_levels, level_counts);
 
     // remember the order of the levels, since it will change during the sifting
@@ -380,6 +380,7 @@ TASK_IMPL_2(reorder_result_t, sylvan_bounded_sift, uint32_t, low, uint32_t, high
 
     for (int i = 0; i < (int) reorder_db->levels.count; i++) {
         int lvl = ordered_levels[i];
+        if (lvl == -1) break;
         s_state.pos = reorder_db->levels.order_to_level[level_to_order[lvl]];
         if (s_state.pos < s_state.low || s_state.pos > s_state.high) continue;
 

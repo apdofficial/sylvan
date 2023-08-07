@@ -1,6 +1,7 @@
 #include <sylvan_int.h>
 #include <sylvan_align.h>
 
+#define TASK_SIZE 2048
 /**
  * @brief Check if a node is dependent on node with label <var> or <var>+1
  */
@@ -53,9 +54,9 @@ VOID_TASK_DECL_5(sylvan_varswap_p2, size_t, size_t, _Atomic (reorder_result_t) *
    @brief Adjacent variable swap phase 3
    @details Recovery phase, restore the nodes that were marked in phase 1.
 */
-VOID_TASK_DECL_3(sylvan_varswap_p3, uint32_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
+VOID_TASK_DECL_3(sylvan_varswap_recovery, uint32_t, _Atomic (reorder_result_t) *, roaring_bitmap_t*)
 
-#define sylvan_varswap_p3(pos, result, node_ids) CALL(sylvan_varswap_p3, pos, result, node_ids)
+#define sylvan_varswap_recovery(pos, result, node_ids) CALL(sylvan_varswap_recovery, pos, result, node_ids)
 
 
 TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
@@ -68,18 +69,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
 
     _Atomic (reorder_result_t) result = SYLVAN_REORDER_SUCCESS;
     sylvan_stats_count(SYLVAN_RE_SWAP_COUNT);
-
-    // Check whether the two projection functions involved in this
-    // swap are isolated. At the end, we'll be able to tell how many
-    // isolated projection functions are there by checking only these
-    // two functions again. This is done to eliminate the isolated
-    // projection functions from the node count.
-    BDDVAR xIndex = reorder_db->levels.level_to_order[pos];
-    BDDVAR yIndex = reorder_db->levels.level_to_order[pos + 1];
-    int isolated = -(mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex));
-
-    //TODO: investigate the implications of swapping only the mappings (eg., sylvan operations referring to variables)
-//    if (interact_test(&reorder_db->matrix, xIndex, yIndex) == 0) { }
 
     roaring_bitmap_t p2_ids;
     roaring_bitmap_init_cleared(&p2_ids);
@@ -105,7 +94,7 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
         sylvan_varswap_p2(&result, &p2_ids, reorder_db->mrc.node_ids);
         if (sylvan_reorder_issuccess(result) == 0) {
             /// Phase 3: recovery
-            sylvan_varswap_p3(pos, &result, reorder_db->mrc.node_ids);
+            sylvan_varswap_recovery(pos, &result, reorder_db->mrc.node_ids);
         }
     }
 
@@ -116,9 +105,6 @@ TASK_IMPL_1(reorder_result_t, sylvan_varswap, uint32_t, pos)
     // collect garbage (dead nodes)
     mrc_gc(&reorder_db->mrc, &p1_ids);
 #endif
-
-    isolated += mrc_is_var_isolated(&reorder_db->mrc, xIndex) + mrc_is_var_isolated(&reorder_db->mrc, yIndex);
-    reorder_db->mrc.isolated_count += isolated;
 
     levels_swap(&reorder_db->levels, pos, pos + 1);
 
@@ -141,7 +127,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
                  roaring_bitmap_t*, p1_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 16)) {
+    if (count > TASK_SIZE) {
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         size_t split = count / 2;
         roaring_bitmap_t a;
@@ -151,8 +137,10 @@ VOID_TASK_IMPL_6(sylvan_varswap_p0,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p0, var, first + split, count - split, result, node_ids, &b);
         roaring_bitmap_or_inplace(p1_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p0);
         roaring_bitmap_or_inplace(p1_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif
@@ -201,7 +189,7 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
                  roaring_bitmap_t*, p2_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 32)) {
+    if (count > TASK_SIZE) {
         size_t split = count / 2;
         roaring_bitmap_t a;
         roaring_bitmap_init_cleared(&a);
@@ -210,8 +198,10 @@ VOID_TASK_IMPL_6(sylvan_varswap_p1,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p1, var, first + split, count - split, result, p1_ids, &b);
         roaring_bitmap_or_inplace(p2_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p1);
         roaring_bitmap_or_inplace(p2_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif
@@ -318,7 +308,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
                  roaring_bitmap_t*, node_ids)
 {
 #if PARALLEL
-    if (count > (NBITS_PER_BUCKET * 32)) {
+    if (count > TASK_SIZE) {
         size_t split = count / 2;
         // standard reduction pattern with local roaring bitmaps collecting new node indices
         roaring_bitmap_t a;
@@ -328,8 +318,10 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
         roaring_bitmap_init_cleared(&b);
         CALL(sylvan_varswap_p2, first + split, count - split, result, p2_ids, &b);
         roaring_bitmap_or_inplace(node_ids, &b);
+        roaring_bitmap_clear(&b);
         SYNC(sylvan_varswap_p2);
         roaring_bitmap_or_inplace(node_ids, &a);
+        roaring_bitmap_clear(&a);
         return;
     }
 #endif
@@ -451,7 +443,7 @@ VOID_TASK_IMPL_5(sylvan_varswap_p2,
     }
 }
 
-VOID_TASK_IMPL_3(sylvan_varswap_p3, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
+VOID_TASK_IMPL_3(sylvan_varswap_recovery, uint32_t, pos, _Atomic (reorder_result_t)*, result, roaring_bitmap_t*, node_ids)
 {
     printf("\nReordering: Running recovery after running out of memory...\n");
 

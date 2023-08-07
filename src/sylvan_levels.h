@@ -36,12 +36,12 @@ uint64_t levels_new_one(levels_t* self);
  * @brief Create the next <amount> levels
  * @details The BDDs representing managed levels are always kept during garbage collection. Not currently thread-safe.
  */
-int levels_new_many(levels_t* self, size_t amount);
+int levels_new_many(size_t amount);
 
 /**
  * @brief Insert a node at given level with given low and high nodes
  */
-int levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high);
+uint64_t levels_new_node(levels_t* self, uint32_t level, uint64_t low, uint64_t high);
 
 /**
  * \brief  Reset all levels.
