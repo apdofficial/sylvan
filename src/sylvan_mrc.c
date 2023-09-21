@@ -224,6 +224,7 @@ VOID_TASK_IMPL_2(mrc_gc, mrc_t*, self, roaring_bitmap_t*, ids)
 #if SYLVAN_USE_LINEAR_PROBING
     sylvan_clear_and_mark();
     sylvan_rehash_all();
+    mrc_nnodes_set(self, llmsset_count_marked(nodes) + 2);
 #else
     CALL(llmsset_reset_all_regions);
 #endif

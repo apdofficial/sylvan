@@ -163,19 +163,12 @@ VOID_TASK_0(gc_end)
     INFO("GC: end: %zu/%zu size\n\n", used, total);
 }
 
-VOID_TASK_0(reordering_start)
-{
-    sylvan_gc();
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("RE: str: %zu size\n", total);
+VOID_TASK_0(reordering_start) {
+    printf("\r[% 8.2f] RE: from %zu to ... ", wctime()-t_start, llmsset_count_marked(nodes));
 }
 
-VOID_TASK_0(reordering_end)
-{
-    size_t used, total;
-    sylvan_table_usage(&used, &total);
-    INFO("RE: end: %zu size\n", total);
+VOID_TASK_0(reordering_end) {
+    printf("%zu nodes in %f\n", llmsset_count_marked(nodes), wctime() - reorder_db->config.t_start_sifting);
 }
 
 void order_statically()
@@ -361,9 +354,6 @@ TASK_0(int, solve_game)
     }
     if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
 
-    sylvan_reduce_heap(SYLVAN_REORDER_BOUNDED_SIFT);
-    if (verbose) INFO("Gates have size %zu\n", mtbdd_nodecount_more(game.gates, aag.header.a));
-
     game.c_inputs = sylvan_set_empty();
     game.u_inputs = sylvan_set_empty();
     mtbdd_protect(&game.c_inputs);
@@ -388,54 +378,6 @@ TASK_0(int, solve_game)
         }
     }
     INFO("There are %zu controllable and %zu uncontrollable inputs.\n", sylvan_set_count(game.c_inputs), sylvan_set_count(game.u_inputs));
-
-#if 0
-    sylvan_print(Xc);
-    printf("\n");
-    sylvan_print(Xu);
-    printf("\n");
-#endif
-
-
-#if 0
-    for (uint64_t g=0; g<A; g++) {
-        INFO("gate %d has size %zu\n", (int)g, sylvan_nodecount(gates[g]));
-    }
-
-    for (uint64_t g=0; g<A; g++) {
-        MTBDD supp = sylvan_support(gates[g]);
-        while (supp != sylvan_set_empty()) {
-            printf("%d ", sylvan_set_first(supp));
-            supp = sylvan_set_next(supp);
-        }
-        printf("\n");
-    }
-
-    MTBDD lnext[L];
-    for (uint64_t l=0; l<L; l++) {
-        MTBDD nxt;
-        if (lookup[l_next[l]/2] == -1) {
-            nxt = sylvan_ithvar(l_next[l]&1);
-        } else {
-            nxt = gates[lookup[l_next[l]]];
-        }
-        if (l_next[l]&1) nxt = sylvan_not(nxt);
-        lnext[l] = sylvan_equiv(sylvan_ithvar(latches[l]+1), nxt);
-    }
-    INFO("done making latches\n");
-
-    MTBDD Lvars = sylvan_set_empty();
-    mtbdd_protect(&Lvars);
-
-    for (uint64_t l = 0; l < aag.header.l; l++) {
-        Lvars = sylvan_set_add(Lvars, game.level_to_order[aag.latches[l] / 2]);
-    }
-
-    MTBDD LtoPrime = sylvan_map_empty();
-    for (uint64_t l=0; l<L; l++) {
-        LtoPrime = sylvan_map_add(LtoPrime, latches[l], latches[l]+1);
-    }
-#endif
 
     // Actually just make the compose vector
     MTBDD CV = sylvan_map_empty();
@@ -464,17 +406,6 @@ TASK_0(int, solve_game)
     if (aag.outputs[0] & 1) Unsafe = sylvan_not(Unsafe);
     Unsafe = sylvan_forall(Unsafe, game.c_inputs);
     Unsafe = sylvan_exists(Unsafe, game.u_inputs);
-
-
-#if 0
-    MTBDD supp = sylvan_support(Unsafe);
-    while (supp != sylvan_set_empty()) {
-        printf("%d ", sylvan_set_first(supp));
-        supp = sylvan_set_next(supp);
-    }
-    printf("\n");
-    INFO("exactly %.0f states are bad\n", sylvan_satcount(Unsafe, Lvars));
-#endif
 
     MTBDD OldUnsafe = sylvan_false; // empty set
     MTBDD Step = sylvan_false;
@@ -516,7 +447,7 @@ int main(int argc, char **argv)
     aag_buffer_open(&aag_buffer, filename, O_RDONLY);
     aag_file_read(&aag, &aag_buffer);
 
-    if (0) {
+    if (verbose) {
         INFO("----------header----------\n");
         INFO("# of variables            \t %lu\n", aag.header.m);
         INFO("# of inputs               \t %lu\n", aag.header.i);
@@ -549,8 +480,8 @@ int main(int argc, char **argv)
 
     // Set hooks for logging garbage collection & dynamic variable reordering
     if (verbose) {
-//        sylvan_re_hook_prere(TASK(reordering_start));
-//        sylvan_re_hook_postre(TASK(reordering_end));
+        sylvan_re_hook_prere(TASK(reordering_start));
+        sylvan_re_hook_postre(TASK(reordering_end));
         sylvan_gc_hook_pregc(TASK(gc_start));
         sylvan_gc_hook_postgc(TASK(gc_end));
     }

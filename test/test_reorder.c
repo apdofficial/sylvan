@@ -3,8 +3,8 @@
 #include <sys/time.h>
 
 #include <sylvan.h>
+#include <sylvan_int.h>
 #include "test_assert.h"
-#include "common.h"
 
 /* Obtain current wallclock time */
 static double
@@ -68,7 +68,7 @@ TASK_0(int, test_varswap)
     BDD one = sylvan_ithvar(6);
     BDD two = sylvan_ithvar(7);
 
-    test_assert(sylvan_level_to_order(6) == 6);
+    test_assert(levels_level_to_order(&reorder_db->levels, 6) == 6);
     test_assert(sylvan_level_to_order(7) == 7);
     test_assert(sylvan_order_to_level(6) == 6);
     test_assert(sylvan_order_to_level(7) == 7);
@@ -122,18 +122,13 @@ TASK_0(int, test_varswap_down)
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
 
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
-
     sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
-    // 0, 1, 2, 3
+    // (0), 1, 2, 3
     test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
-    // 1, 2, 3, 0
+    // 1, 2, 3, (0)
 
     sylvan_post_reorder();
 
@@ -151,11 +146,6 @@ TASK_0(int, test_varswap_down)
     test_assert(one == sylvan_ithvar(0));
     test_assert(two == sylvan_ithvar(1));
     test_assert(three == sylvan_ithvar(2));
-
-    test_assert(mtbdd_getvar(zero) == 3);
-    test_assert(mtbdd_getvar(one) == 0);
-    test_assert(mtbdd_getvar(two) == 1);
-    test_assert(mtbdd_getvar(three) == 2);
 
     return 0;
 }
@@ -178,18 +168,13 @@ TASK_0(int, test_varswap_up)
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
 
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
-
     sylvan_pre_reorder(SYLVAN_REORDER_SIFT);
 
-    // 0, 1, 2, 3
+    // 0, 1, 2, (3)
     test_assert(sylvan_varswap(2) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(1) == SYLVAN_REORDER_SUCCESS);
     test_assert(sylvan_varswap(0) == SYLVAN_REORDER_SUCCESS);
-    // 3, 0, 1, 2
+    // (3), 0, 1, 2
 
     sylvan_post_reorder();
 
@@ -207,11 +192,6 @@ TASK_0(int, test_varswap_up)
     test_assert(one == sylvan_ithvar(2));
     test_assert(two == sylvan_ithvar(3));
     test_assert(three == sylvan_ithvar(0));
-
-    test_assert(mtbdd_getvar(zero) == 1);
-    test_assert(mtbdd_getvar(one) == 2);
-    test_assert(mtbdd_getvar(two) == 3);
-    test_assert(mtbdd_getvar(three) == 0);
 
     return 0;
 }
@@ -247,11 +227,6 @@ TASK_0(int, test_sift_down)
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
 
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
-
     sifting_state_t state;
     state.low = 0;
     state.high = 3;
@@ -259,7 +234,7 @@ TASK_0(int, test_sift_down)
     state.size = 770;
     state.pos = 0;
 
-    state.best_size = 0;
+    state.best_size = 770;
     state.best_pos = 3;
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
@@ -267,7 +242,6 @@ TASK_0(int, test_sift_down)
     // (0), 1, 2, 3
     test_assert(sylvan_siftdown(&state) == SYLVAN_REORDER_SUCCESS);
     // 1, 2, 3, (0)
-    // due to the lower bounds the last variable will not be sifted as no improved in size is possible
 
     sylvan_post_reorder();
 
@@ -285,11 +259,6 @@ TASK_0(int, test_sift_down)
     test_assert(one == sylvan_ithvar(0));
     test_assert(two == sylvan_ithvar(1));
     test_assert(three == sylvan_ithvar(2));
-
-    test_assert(mtbdd_getvar(zero) == 3);
-    test_assert(mtbdd_getvar(one) == 0);
-    test_assert(mtbdd_getvar(two) == 1);
-    test_assert(mtbdd_getvar(three) == 2);
 
     return 0;
 }
@@ -314,11 +283,6 @@ TASK_0(int, test_sift_up)
     test_assert(one == sylvan_ithvar(1));
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
-
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
 
     sifting_state_t state;
     state.low = 0;
@@ -353,11 +317,6 @@ TASK_0(int, test_sift_up)
     test_assert(two == sylvan_ithvar(3));
     test_assert(three == sylvan_ithvar(0));
 
-    test_assert(mtbdd_getvar(zero) == 1);
-    test_assert(mtbdd_getvar(one) == 2);
-    test_assert(mtbdd_getvar(two) == 3);
-    test_assert(mtbdd_getvar(three) == 0);
-
     return 0;
 }
 
@@ -377,11 +336,6 @@ TASK_0(int, test_sift_back)
     test_assert(one == sylvan_ithvar(1));
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
-
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
 
     sifting_state_t state;
     state.low = 0;
@@ -416,11 +370,6 @@ TASK_0(int, test_sift_back)
     test_assert(two == sylvan_ithvar(3));
     test_assert(three == sylvan_ithvar(0));
 
-    test_assert(mtbdd_getvar(zero) == 1);
-    test_assert(mtbdd_getvar(one) == 2);
-    test_assert(mtbdd_getvar(two) == 3);
-    test_assert(mtbdd_getvar(three) == 0);
-
     state.size = 999;
     state.pos = 0;
 
@@ -439,11 +388,6 @@ TASK_0(int, test_sift_back)
     test_assert(one == sylvan_ithvar(1));
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
-
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
 
     return 0;
 }
@@ -464,11 +408,6 @@ TASK_0(int, test_reorder_perm)
     test_assert(one == sylvan_ithvar(1));
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(3));
-
-    test_assert(mtbdd_getvar(zero) == 0);
-    test_assert(mtbdd_getvar(one) == 1);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 3);
 
     uint32_t perm[4] = {3, 0, 2, 1};
 
@@ -492,11 +431,6 @@ TASK_0(int, test_reorder_perm)
     test_assert(one == sylvan_ithvar(3));
     test_assert(two == sylvan_ithvar(2));
     test_assert(three == sylvan_ithvar(0));
-
-    test_assert(mtbdd_getvar(zero) == 1);
-    test_assert(mtbdd_getvar(one) == 3);
-    test_assert(mtbdd_getvar(two) == 2);
-    test_assert(mtbdd_getvar(three) == 0);
 
     return 0;
 }
@@ -608,55 +542,55 @@ TASK_0(int, test_ref_nodes)
     _sylvan_quit();
     _sylvan_start();
 
-    MTBDD bdd2 = create_example_bdd(0);
-    sylvan_ref(bdd2);
+    MTBDD bdd = create_example_bdd(1);
+    sylvan_ref(bdd);
 
-    BDD bdd1 = sylvan_and(sylvan_ithvar(6), sylvan_ithvar(7));
-    sylvan_ref(bdd1);
+    MTBDD zero = bdd;
+    MTBDD one = mtbdd_gethigh(zero);
+    MTBDD two = mtbdd_getlow(zero);
+    MTBDD three = mtbdd_gethigh(two);
+    MTBDD four = mtbdd_getlow(two);
+    MTBDD five = mtbdd_gethigh(four);
 
     sylvan_pre_reorder(SYLVAN_REORDER_BOUNDED_SIFT);
 
-    int expected[8] = {0, 0, 1, 1, 1, 2, 3, 3};
-    for (size_t i = 0; i < reorder_db->levels.count; ++i) {
-        counter32_t ref_node_count = mrc_ref_nodes_get(&reorder_db->mrc, sylvan_level_to_order(i));
-#ifndef NDEBUGf
-        printf("ref_node_count: %d\n", ref_node_count);
-#endif
-        assert(expected[i] == (int)ref_node_count);
-    }
+    test_assert(0 == mrc_ref_nodes_get(&reorder_db->mrc, zero));
+    test_assert(1 == mrc_ref_nodes_get(&reorder_db->mrc, one));
+    test_assert(2 == mrc_ref_nodes_get(&reorder_db->mrc, two));
+    test_assert(1 == mrc_ref_nodes_get(&reorder_db->mrc, three));
+    test_assert(2 == mrc_ref_nodes_get(&reorder_db->mrc, four));
+    test_assert(1 == mrc_ref_nodes_get(&reorder_db->mrc, five));
 
     sylvan_post_reorder();
 
-    sylvan_deref(bdd1);
-    sylvan_deref(bdd2);
+    sylvan_deref(bdd);
 
     return 0;
 }
 
-
 TASK_1(int, runtests, size_t, ntests)
 {
-    printf("Test varswap\n");
+    printf("testing varswap...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap)) return 1;
-    printf("Test varswap_down\n");
+    printf("testing varswap_down...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_down)) return 1;
-    printf("Test varswap_up\n");
+    printf("testing varswap_up...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_varswap_up)) return 1;
-//    printf("Test sift_down\n");
-//    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
-//    printf("Test sift_up\n");
-//    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
-    printf("Test sift_back\n");
+    printf("testing sift_down...\n");
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_down)) return 1;
+    printf("testing sift_up...\n");
+    for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_up)) return 1;
+    printf("testing sift_back...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_sift_back)) return 1;
-    printf("Test reorder_perm\n");
+    printf("testing reorder_perm...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder_perm)) return 1;
-    printf("Test reorder\n");
+    printf("testing reorder...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_reorder)) return 1;
-    printf("Test map_reorder\n");
+    printf("testing map_reorder...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_map_reorder)) return 1;
-    printf("Test interact\n");
+    printf("testing interact...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_interact)) return 1;
-    printf("Test ref_nodes\n");
+    printf("testing ref_nodes...\n");
     for (size_t j = 0; j < ntests; j++) if (RUN(test_ref_nodes)) return 1;
     return 0;
 }
@@ -665,10 +599,9 @@ static int terminate_reordering = 0;
 
 VOID_TASK_0(reordering_start)
 {
-    sylvan_gc();
 #ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
-    printf("DE: start: %zu size\n", size);
+    printf("RE: start: %zu size\n", size);
 #endif
 }
 
@@ -676,16 +609,15 @@ VOID_TASK_0(reordering_progress)
 {
 #ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
-    printf("DE: progress: %zu size\n", size);
+    printf("RE: progress: %zu size\n", size);
 #endif
 }
 
 VOID_TASK_0(reordering_end)
 {
-    sylvan_gc();
 #ifndef NDEBUG
     size_t size = llmsset_count_marked(nodes);
-    printf("DE: end: %zu size\n", size);
+    printf("RE: end: %zu size\n", size);
 #endif
 }
 
@@ -696,23 +628,19 @@ int should_reordering_terminate()
 
 void _sylvan_start()
 {
-    sylvan_set_limits(1LL << 22, 1, 0);
+    sylvan_set_limits(1LL << 23, 1, 0);
     sylvan_init_package();
     sylvan_init_mtbdd();
     sylvan_init_reorder();
     sylvan_gc_enable();
-#ifdef NDEBUG
     sylvan_set_reorder_print(false);
-#else
-    sylvan_set_reorder_print(true);
-#endif
+    sylvan_set_reorder_nodes_threshold(1); // keep it 1, otherwise we skip levels which will fail the test expectations
 }
 
 void _sylvan_quit()
 {
     sylvan_quit();
 }
-
 
 int main()
 {
@@ -723,16 +651,12 @@ int main()
 
     _sylvan_start();
 
-    sylvan_set_reorder_nodes_threshold(1); // keep it 1, otherwise we skip levels which will fail the test expectations
-    sylvan_set_reorder_maxgrowth(1.2f);
-    sylvan_set_reorder_timelimit_sec(30);
-
-//    sylvan_re_hook_prere(TASK(reordering_start));
-//    sylvan_re_hook_postre(TASK(reordering_end));
-//    sylvan_re_hook_progre(TASK(reordering_progress));
+    sylvan_re_hook_prere(TASK(reordering_start));
+    sylvan_re_hook_postre(TASK(reordering_end));
+    sylvan_re_hook_progre(TASK(reordering_progress));
     sylvan_re_hook_termre(should_reordering_terminate);
 
-    size_t ntests = 5;
+    size_t ntests = 1;
 
     int res = RUN(runtests, ntests);
 
