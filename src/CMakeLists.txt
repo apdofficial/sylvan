@@ -16,6 +16,8 @@ target_sources(sylvan
     sylvan_sl.c
     sylvan_stats.c
     sylvan_zdd.c
+    libpopcnt.h
+    sylvan_bitmap.c
   PUBLIC
     sylvan.h
     sylvan_bdd.h
@@ -35,6 +37,7 @@ target_sources(sylvan
     sylvan_tls.h
     sylvan_zdd.h
     sylvan_zdd_int.h
+    sylvan_bitmap.h
 )
 
 set_target_properties(sylvan PROPERTIES VERSION ${sylvan_VERSION} SOVERSION ${sylvan_VERSION_MAJOR})
