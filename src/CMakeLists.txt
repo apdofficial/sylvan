@@ -18,6 +18,8 @@ target_sources(sylvan
     sylvan_zdd.c
     libpopcnt.h
     sylvan_bitmap.c
+    roaring.c
+    roaring.h
   PUBLIC
     sylvan.h
     sylvan_bdd.h
