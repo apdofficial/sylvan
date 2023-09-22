@@ -14,12 +14,16 @@
  * limitations under the License.
  */
 
+
 #include <sylvan_config.h>
 #include <stdlib.h>
 #include <string.h>
 
 #if SYLVAN_USE_MMAP
 #include <sys/mman.h> // for mmap
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS 0x1000  /* allocated from memory, swap space */
+#endif
 #endif
 
 #ifndef SYLVAN_ALIGN_H
@@ -40,7 +44,7 @@ alloc_aligned(size_t size)
     size = (size + LINE_SIZE - 1) & (~(LINE_SIZE - 1));
     void* res;
 #if SYLVAN_USE_MMAP
-    res = mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    res = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (res == MAP_FAILED) return 0;
 #else
 #if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)

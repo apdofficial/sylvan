@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+
 #include <sylvan_int.h>
 
 #include <inttypes.h>
@@ -108,6 +109,32 @@ VOID_TASK_IMPL_1(mtbdd_gc_mark_rec, MDD, mtbdd)
 refs_table_t mtbdd_refs;
 refs_table_t mtbdd_protected;
 static int mtbdd_protected_created = 0;
+
+/* Called during dynamic variable reordering */
+VOID_TASK_IMPL_1(mtbdd_re_mark_external_refs, _Atomic(uint64_t)*, bitmap)
+{
+    uint64_t *it = refs_iter(&mtbdd_refs, 0, mtbdd_refs.refs_size);
+    while (it != NULL) {
+        MTBDD dd = refs_next(&mtbdd_refs, &it, mtbdd_refs.refs_size);
+        size_t index = (dd & SYLVAN_TABLE_MASK_INDEX);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
+        uint64_t mask = BIT_MASK(index);
+        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    }
+}
+
+/* Called during dynamic variable reordering */
+VOID_TASK_IMPL_1(mtbdd_re_mark_protected, _Atomic(uint64_t)*, bitmap)
+{
+    uint64_t *it = protect_iter(&mtbdd_protected, 0, mtbdd_protected.refs_size);
+    while (it != NULL) {
+        BDD *dd = (BDD*)protect_next(&mtbdd_protected, &it, mtbdd_protected.refs_size);
+        size_t index = (*dd & SYLVAN_TABLE_MASK_INDEX);
+        _Atomic(uint64_t) *ptr = bitmap + BUCKET_OFFSET(index);
+        uint64_t mask = BIT_MASK(index);
+        atomic_fetch_or_explicit(ptr, mask, memory_order_relaxed);
+    }
+}
 
 MDD
 mtbdd_ref(MDD a)
@@ -463,6 +490,31 @@ _mtbdd_makenode_exit(void)
 }
 
 MTBDD
+_mtbdd_varswap_makenode(BDDVAR var, MTBDD low, MTBDD high, int* created)
+{
+    // Normalization to keep canonicity
+    // low will have no mark
+    MTBDD result = low & mtbdd_complement;
+    low ^= result;
+    high ^= result;
+
+    struct mtbddnode n;
+    mtbddnode_makenode(&n, var, low, high);
+
+    uint64_t index = llmsset_lookup(nodes, n.a, n.b, created);
+    if (index == 0) {
+        return mtbdd_invalid;
+    }
+
+
+    if (created) sylvan_stats_count(BDD_NODES_CREATED);
+    else sylvan_stats_count(BDD_NODES_REUSED);
+
+    result |= index;
+    return result;
+}
+
+MTBDD
 _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
 {
     // Normalization to keep canonicity
@@ -488,6 +540,31 @@ _mtbdd_makenode(uint32_t var, MTBDD low, MTBDD high)
 
     result |= index;
     return result;
+}
+
+/**
+ * Custom makemapnode that doesn't trigger garbage collection.
+ * Instead, returns mtbdd_invalid if we can't create the node.
+ */
+MTBDD
+mtbdd_varswap_makemapnode(BDDVAR var, MTBDD low, MTBDD high, int* created)
+{
+    struct mtbddnode n;
+    uint64_t index;
+    created = 0;
+
+    // in an MTBDDMAP, the low edges eventually lead to 0 and cannot have a low mark
+    assert(!MTBDD_HASMARK(low));
+
+    mtbddnode_makemapnode(&n, var, low, high);
+
+    index = llmsset_lookup(nodes, n.a, n.b, created);
+    if (index == 0) return mtbdd_invalid;
+
+    if (created) sylvan_stats_count(BDD_NODES_CREATED);
+    else sylvan_stats_count(BDD_NODES_REUSED);
+
+    return index;
 }
 
 MTBDD
@@ -524,7 +601,11 @@ mtbdd_makemapnode(uint32_t var, MTBDD low, MTBDD high)
 MTBDD
 mtbdd_ithvar(uint32_t var)
 {
-    return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    if (reorder_db != NULL && reorder_db->is_initialised){
+        return levels_ithlevel(&reorder_db->levels, var);
+    } else {
+        return mtbdd_makenode(var, mtbdd_false, mtbdd_true);
+    }
 }
 
 /* Operations */
